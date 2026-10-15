@@ -1,4 +1,4 @@
-"""Carga datos de EJEMPLO: 10 cuadrillas x 2, ~150 órdenes en un mes. Uso: python3 seed.py  (borra y recrea ops.db)"""
+"""Carga datos de EJEMPLO: 10 cuadrillas x 2, ~150 órdenes en un mes, inventario (89 materiales, 20 almacenes). Uso: python3 seed.py  (borra y recrea ops.db)"""
 import os, sys, random, sqlite3, datetime as dt, json
 random.seed(7)
 B = os.path.dirname(os.path.abspath(__file__)); DB = os.environ.get('DB_PATH') or os.path.join(B, 'ops.db')
@@ -18,6 +18,46 @@ for i,(n,e,z) in enumerate(CU):
         k = i*2+j
         c.execute('INSERT INTO tecnicos(cuadrilla_id,rol,nombre,telefono,especialidad,puesto,ejemplo) VALUES(?,?,?,?,?,?,1)',
           (cid, rol, f'{NOM[k]} {AP[k]} (ejemplo)', f'55-0000-{k:04d}', e, 'Supervisor' if rol=='líder' else 'Técnico Instalador'))
+today = dt.date.today()
+# ---- Inventario: catálogo desde plantillas.json + 20 almacenes (Torrelit, Autosound, Vehículo 01..18) ----
+A.asegurar_vehiculos(c)
+# Asignación de ejemplo: Vehículo NN → Cuadrilla NN (01-10); 11-18 → cuadrillas 01-08 (segundo vehículo)
+for i in range(1, 19):
+    c.execute('UPDATE almacenes SET cuadrilla_id=? WHERE nombre=?', ((i - 1) % 10 + 1, f'Vehículo {i:02d}'))
+ALM = {n: i for i, n in c.execute('SELECT id, nombre FROM almacenes')}
+VEH = {cid: i for i, cid in c.execute("SELECT MIN(id), cuadrilla_id FROM almacenes WHERE tipo='vehiculo' AND cuadrilla_id IS NOT NULL GROUP BY cuadrilla_id")}
+PREF = {'FIBRA PLANTA EXTERNA':'FPE','FIBRA PLANTA INTERNA':'FPI','PLANTA EXTERNA':'PE','PLANTA INTERNA':'PI','EQUIPOS':'EQ','EQUIPOS DE RED':'RED',
+        'GABINETES, RACKS, ACCESORIOS':'RCK','EQUIPO ELÉCTRICO':'ELE','MATERIALES CONSUMIBLES':'CON'}
+vistos, nsku = {}, {}
+for pl in A.PLANT.values():
+    for m in pl['materiales']:
+        k = (m['seccion'], m['concepto'])
+        if k in vistos: continue
+        pr = PREF.get(m['seccion'], 'OTR'); nsku[pr] = nsku.get(pr, 0) + 1
+        u = A.norm_unidad(m['unidad'])
+        vistos[k] = c.execute('INSERT INTO materiales(sku,nombre,categoria,variantes,unidad,stock_minimo,ubicacion,notas,ejemplo) VALUES(?,?,?,?,?,?,?,?,1)',
+            (f'{pr}-{nsku[pr]:03d}', m['concepto'], m['seccion'], m['tipos'] if m['tipos'] and m['tipos'] != '(Tipos)' else None, u,
+             random.choice([500,1000,2000]) if u == 'm' else random.choice([5,10,20]), f'Anaquel {random.choice("ABCDE")}{random.randint(1,9)}',
+             'Cantidades de EJEMPLO')).lastrowid
+inicio = f'{today - dt.timedelta(days=25)}T08:00'
+for mid in vistos.values():
+    mn = c.execute('SELECT stock_minimo FROM materiales WHERE id=?', (mid,)).fetchone()[0]
+    f = random.choice([1.5, 3, 4, 5, 6, 8])  # algunos quedarán bajo mínimo
+    for alm, part in (('Torrelit', .65), ('Autosound', .35)):
+        A.mover(c, mid, ALM[alm], 'entrada', round(mn * f * part * random.uniform(.8, 1.2)) or 1, 'Inventario inicial (EJEMPLO)', 'EJEMPLO', fecha=inicio)
+# Carga de ejemplo a 6 vehículos (transferencias desde Torrelit/Autosound)
+for vn in ('Vehículo 01', 'Vehículo 02', 'Vehículo 04', 'Vehículo 06', 'Vehículo 12', 'Vehículo 15'):
+    for mid in random.sample(list(vistos.values()), 12):
+        un = c.execute('SELECT unidad FROM materiales WHERE id=?', (mid,)).fetchone()[0]
+        qn = random.choice([100, 200]) if un == 'm' else random.choice([2, 3])
+        org = random.choice(['Torrelit', 'Autosound']); fch = f'{today - dt.timedelta(days=22)}T09:00'
+        A.mover(c, mid, ALM[org], 'transferencia', -qn, f'Transferencia a {vn} (EJEMPLO)', f'{org} → {vn}', permitir_negativo=True, fecha=fch)
+        A.mover(c, mid, ALM[vn], 'transferencia', qn, f'Transferencia desde {org} (EJEMPLO)', f'{org} → {vn}', fecha=fch)
+# Mínimos de EJEMPLO por almacén: bodegas reparten el mínimo global (60/40); vehículos cargados, mínimo pequeño
+for mid, mn, un in c.execute('SELECT id, stock_minimo, unidad FROM materiales').fetchall():
+    c.execute('UPDATE existencias SET minimo=? WHERE material_id=? AND almacen_id=?', (round(mn*.6), mid, ALM['Torrelit']))
+    c.execute('UPDATE existencias SET minimo=? WHERE material_id=? AND almacen_id=?', (round(mn*.4), mid, ALM['Autosound']))
+c.execute("UPDATE existencias SET minimo=CASE WHEN (SELECT unidad FROM materiales WHERE id=material_id)='m' THEN 50 ELSE 1 END WHERE almacen_id IN (SELECT id FROM almacenes WHERE tipo='vehiculo')")
 CLI = [('Ejemplo Hotel Plaza','Empresa'),('Ejemplo Municipio San Pedro','Gobierno'),('Ejemplo Farmacias del Valle','PYME'),('Ejemplo Escuela Técnica 12','Gobierno'),
        ('Ejemplo Residencial Los Pinos','Residencial'),('Ejemplo Logística Nova','Empresa'),('Ejemplo Clínica Santa Fe','PYME'),('Ejemplo Agroindustrias Delta','Empresa'),
        ('Red propia (backbone)','Empresa'),('Ejemplo Gasolinera Ruta 45','PYME')]
@@ -66,5 +106,13 @@ for n in range(150):
         for m in random.sample(A.PLANT[p]['materiales'], 5):
             tipos = [x.strip() for x in m['tipos'].split(',')] if m['tipos'] and m['tipos'] != '(Tipos)' else ['']
             q = random.choice([1,2,4]) if m['unidad'] != 'metros' else random.choice([15,30,50,120])
-            c.execute('INSERT INTO orden_materiales(orden_id,seccion,concepto,tipo,cantidad,unidad) VALUES(?,?,?,?,?,?)', (oid, m['seccion'], m['concepto'], random.choice(tipos), q, m['unidad']))
-c.commit(); print('órdenes', c.execute('SELECT estado,COUNT(*) FROM ordenes GROUP BY estado').fetchall())
+            mid = vistos[(m['seccion'], m['concepto'])]; un = A.norm_unidad(m['unidad'])
+            # Sale del vehículo ligado a la cuadrilla si alcanza; si no, de Torrelit o Autosound
+            alm = VEH.get(cid_); r = c.execute('SELECT stock FROM existencias WHERE material_id=? AND almacen_id=?', (mid, alm)).fetchone() if alm else None
+            if not r or r[0] < q: alm = max([ALM['Torrelit'], ALM['Autosound']], key=lambda a: (c.execute('SELECT stock FROM existencias WHERE material_id=? AND almacen_id=?', (mid, a)).fetchone() or [0])[0])
+            c.execute('INSERT INTO orden_materiales(orden_id,material_id,almacen_id,seccion,concepto,tipo,cantidad,unidad) VALUES(?,?,?,?,?,?,?,?)', (oid, mid, alm, m['seccion'], m['concepto'], random.choice(tipos), q, un))
+            A.mover(c, mid, alm, 'salida', q, 'Consumo en orden', f'{pref}{cnt[pref]:04d}', oid, permitir_negativo=True, fecha=fin)
+c.commit(); print('materiales', c.execute('SELECT COUNT(*) FROM materiales').fetchone()[0], '· almacenes', c.execute('SELECT COUNT(*) FROM almacenes').fetchone()[0],
+  '· movimientos', c.execute('SELECT tipo,COUNT(*) FROM movimientos GROUP BY tipo').fetchall(), '· bajo mínimo (global)', c.execute('SELECT COUNT(*) FROM materiales WHERE stock_actual<=stock_minimo').fetchone()[0], '· alertas por almacén', c.execute('SELECT COUNT(*) FROM existencias WHERE minimo>0 AND stock<=minimo').fetchone()[0],
+  '· existencias negativas', c.execute('SELECT COUNT(*) FROM existencias WHERE stock<0').fetchone()[0])
+print('órdenes', c.execute('SELECT estado,COUNT(*) FROM ordenes GROUP BY estado').fetchall())

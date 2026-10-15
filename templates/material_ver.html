@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block body %}
+<h1>{{m.nombre}} <span class="muted">{{m.sku}}</span></h1>
+<div class="grid g5">{% for a in alms if a.tipo=='bodega' or ex.get((m.id,a.id),0) or mins.get((m.id,a.id)) %}{% set v=ex.get((m.id,a.id),0) %}{% set mn=mins.get((m.id,a.id),0) %}<div class="kpi" style="{{'background:#ffd9a8' if mn and v<=mn}}"><div class="n {{'venc' if v<0}}">{{'%g'|format(v)}}</div><div class="l">{{a.nombre}} ({{m.unidad}}){% if mn %} · mín {{'%g'|format(mn)}}{% endif %}</div></div>{% endfor %}
+<div class="kpi"><div class="n {{'venc' if m.stock_actual<m.stock_minimo}}">{{'%g'|format(m.stock_actual)}}</div><div class="l">Total · mínimo {{'%g'|format(m.stock_minimo)}}</div></div></div>
+<p class="muted">{{m.categoria}}{% if m.variantes %} · Variantes: {{m.variantes}}{% endif %}{% if m.ubicacion %} · Ubicación: {{m.ubicacion}}{% endif %}{% if not m.activo %} · <b>INACTIVO</b>{% endif %}{% if m.notas %}<br>{{m.notas}}{% endif %}</p>
+<p style="display:flex;flex-wrap:wrap;gap:6px">{% for t in ['entrada','salida','ajuste','transferencia'] %}<a class="btn sec" href="/inventario/movimiento?tipo={{t}}&material_id={{m.id}}">{{TIPOS_MOV[t]}}</a>{% endfor %}<a class="btn sec" href="/inventario/{{m.id}}/editar">Editar</a></p>
+<details class="card"><summary><b>Mínimos por almacén</b> <span class="muted">(alerta cuando la existencia queda en o por debajo)</span></summary>
+<form method="post" action="/inventario/{{m.id}}/minimos" class="f"><div class="grid g5">{% for a in alms %}{% set v=ex.get((m.id,a.id),0) %}{% set mn=mins.get((m.id,a.id),0) %}<label style="{{'background:#ffd9a8;padding:4px;border-radius:6px' if mn and v<=mn}}">{{a.nombre}} <span class="muted">(hay {{'%g'|format(v)}})</span><input type="number" step="any" min="0" name="min{{a.id}}" value="{{'%g'|format(mn)}}"></label>{% endfor %}</div>
+<button class="btn">Guardar mínimos</button></form></details>
+<h2>Últimos movimientos</h2>{% include 'mov_tabla.html' with context %}{% endblock %}

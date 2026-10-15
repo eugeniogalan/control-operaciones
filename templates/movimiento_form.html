@@ -1,0 +1,22 @@
+{% extends 'base.html' %}{% block body %}<h1>Registrar {{TIPOS_MOV[tipo]|lower}}</h1>
+<p style="display:flex;flex-wrap:wrap;gap:6px">{% for t in ['entrada','salida','ajuste','transferencia'] %}<a class="btn {{'' if t==tipo else 'sec'}}" href="?tipo={{t}}{{'&material_id='~sel if sel}}">{{TIPOS_MOV[t]}}</a>{% endfor %}</p>
+{% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">{{err}}</div>{% endif %}
+{% if warn %}<div class="ej">⚠ {{warn}}</div>{% endif %}
+<form method="post" class="f card" style="max-width:640px"><input type="hidden" name="tipo" value="{{tipo}}">
+<label>Material<input list="mlist" id="mbus" placeholder="Escribe para buscar…" oninput="selm(this.value)" autocomplete="off">
+<select name="material_id" id="msel" required><option value="">— elige —</option>{% for x in mats %}<option value="{{x.id}}" data-t="{{x.sku}} · {{x.nombre}}" {{'selected' if (fv.material_id or sel)==x.id|string}}>{{x.sku}} · {{x.nombre}} ({{x.unidad}}) — total {{'%g'|format(x.stock_actual)}}</option>{% endfor %}</select></label>
+<datalist id="mlist">{% for x in mats %}<option value="{{x.sku}} · {{x.nombre}}">{% endfor %}</datalist>
+{% macro almsel(name, selv) %}<select name="{{name}}"><optgroup label="Almacenes">{% for a in alms if a.tipo=='bodega' %}<option value="{{a.id}}" {{'selected' if selv==a.id|string}}>{{a.nombre}}</option>{% endfor %}</optgroup><optgroup label="Vehículos de cuadrilla">{% for a in alms if a.tipo=='vehiculo' %}<option value="{{a.id}}" {{'selected' if selv==a.id|string}}>{{a.nombre}}{{' — '~a.cuad if a.cuad}}</option>{% endfor %}</optgroup></select>{% endmacro %}
+<div id="exist" class="muted"></div>
+<div class="grid g2"><label>{{'Almacén origen' if tipo=='transferencia' else 'Almacén'}}{{almsel('almacen_id', fv.almacen_id)}}</label>
+{% if tipo=='transferencia' %}<label>Almacén destino{{almsel('destino_id', fv.destino_id or request.args.get('destino_id') or alms[2].id|string)}}</label>{% endif %}
+<label>{{'Conteo físico (nuevo stock en el almacén)' if tipo=='ajuste' else 'Cantidad'}}<input type="number" step="any" {{'min=0' if tipo!='ajuste'}} inputmode="decimal" name="cantidad" required value="{{fv.cantidad or ''}}"></label>
+<label>Fecha<input disabled value="ahora"></label></div>
+<label>Motivo<input name="motivo" value="{{fv.motivo or ''}}" placeholder="{{ {'entrada':'Compra a proveedor','salida':'Consumo / merma','ajuste':'Conteo físico','transferencia':'Reabasto'}[tipo] }}"></label>
+<label>Referencia (factura, vale, etc.)<input name="referencia" value="{{fv.referencia or ''}}"></label>
+<label>Folio de orden (opcional)<input name="folio" value="{{fv.folio or ''}}"></label>
+{% if tipo in ('salida','transferencia') %}<label><input type="checkbox" name="permitir_negativo" value="1" style="width:auto"> Permitir stock negativo</label>{% endif %}
+<button class="btn">Registrar</button> <a class="btn sec" href="/inventario">Cancelar</a></form>
+<script>const EX={ {% for (mi,ai),v in ex.items() %}"{{mi}}-{{ai}}":{{v}},{% endfor %} },AL={ {% for a in alms %}{{a.id}}:"{{a.nombre}}",{% endfor %} };
+function show(){const m=document.getElementById('msel').value;if(!m){exist.textContent='';return}exist.textContent='Existencias: '+Object.entries(AL).map(([i,n])=>[n,EX[m+'-'+i]||0]).filter(x=>x[1]||!n.startsWith('Vehículo')).map(x=>x[0]+': '+x[1]).join(' · ')}
+function selm(v){for(const o of msel.options){if(o.dataset.t===v){o.selected=true;show()}}}msel.onchange=show;show()</script>{% endblock %}

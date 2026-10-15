@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block body %}<h1>Historial de movimientos</h1>
+<form class="filt card" method="get">
+<label>Material<select name="material"><option value="">Todos</option>{% for x in mats %}<option value="{{x.id}}" {{'selected' if f.material==x.id|string}}>{{x.nombre}} ({{x.sku}})</option>{% endfor %}</select></label>
+<label>Almacén<select name="almacen"><option value="">Todos</option>{% for a in alms %}<option value="{{a.id}}" {{'selected' if f.almacen==a.id|string}}>{{a.nombre}}</option>{% endfor %}</select></label>
+<label>Tipo<select name="tipo"><option value="">Todos</option>{% for k,v in TIPOS_MOV.items() %}<option value="{{k}}" {{'selected' if f.tipo==k}}>{{v}}</option>{% endfor %}</select></label>
+<label>Desde<input type="date" name="desde" value="{{f.desde}}"></label><label>Hasta<input type="date" name="hasta" value="{{f.hasta}}"></label>
+<label>Folio orden<input name="folio" value="{{f.folio}}"></label><label>Buscar<input name="buscar" value="{{f.buscar}}"></label><button class="btn">Filtrar</button></form>
+<p class="muted">{{total}} movimientos</p>{% set m=None %}{% include 'mov_tabla.html' with context %}
+<p class="pag">{% for i in range(1,pages+1) %}{% if i==page %}<span>{{i}}</span>{% elif i<4 or i>pages-3 or (i-page)|abs<3 %}<a href="?{{qs|urlencode}}&page={{i}}">{{i}}</a>{% endif %}{% endfor %}</p>{% endblock %}

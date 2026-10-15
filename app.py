@@ -89,6 +89,14 @@ CREATE TABLE IF NOT EXISTS ordenes(id INTEGER PRIMARY KEY, folio TEXT UNIQUE, ca
  folio_evidencias TEXT, audito_nombre TEXT, audito_puesto TEXT, fecha_auditoria TEXT, aprobacion TEXT, obs_auditoria TEXT, ejemplo INTEGER DEFAULT 0, creado TEXT DEFAULT CURRENT_TIMESTAMP);
 CREATE TABLE IF NOT EXISTS orden_materiales(id INTEGER PRIMARY KEY, orden_id INTEGER REFERENCES ordenes(id) ON DELETE CASCADE, seccion TEXT, concepto TEXT, tipo TEXT, cantidad REAL, unidad TEXT);
 CREATE TABLE IF NOT EXISTS orden_fotos(id INTEGER PRIMARY KEY, orden_id INTEGER REFERENCES ordenes(id) ON DELETE CASCADE, item TEXT, archivo TEXT, subido TEXT);
+CREATE TABLE IF NOT EXISTS materiales(id INTEGER PRIMARY KEY, sku TEXT UNIQUE NOT NULL, nombre TEXT NOT NULL, categoria TEXT, variantes TEXT, unidad TEXT DEFAULT 'pza',
+ stock_actual REAL NOT NULL DEFAULT 0, stock_minimo REAL NOT NULL DEFAULT 0, ubicacion TEXT, activo INTEGER DEFAULT 1, notas TEXT, ejemplo INTEGER DEFAULT 0, creado TEXT DEFAULT CURRENT_TIMESTAMP);
+CREATE TABLE IF NOT EXISTS movimientos(id INTEGER PRIMARY KEY, material_id INTEGER NOT NULL REFERENCES materiales(id), tipo TEXT NOT NULL CHECK(tipo IN ('entrada','salida','ajuste','devolucion','transferencia')),
+ almacen_id INTEGER REFERENCES almacenes(id), fecha TEXT NOT NULL, cantidad REAL NOT NULL, stock_resultante REAL, motivo TEXT, referencia TEXT, orden_id INTEGER REFERENCES ordenes(id) ON DELETE SET NULL, usuario TEXT);
+CREATE TABLE IF NOT EXISTS almacenes(id INTEGER PRIMARY KEY, nombre TEXT UNIQUE NOT NULL, tipo TEXT DEFAULT 'bodega' CHECK(tipo IN ('bodega','vehiculo')), cuadrilla_id INTEGER REFERENCES cuadrillas(id) ON DELETE SET NULL, activo INTEGER DEFAULT 1);
+CREATE TABLE IF NOT EXISTS existencias(material_id INTEGER NOT NULL REFERENCES materiales(id) ON DELETE CASCADE, almacen_id INTEGER NOT NULL REFERENCES almacenes(id), stock REAL NOT NULL DEFAULT 0, minimo REAL NOT NULL DEFAULT 0, PRIMARY KEY(material_id, almacen_id));
+CREATE INDEX IF NOT EXISTS ix_mov_mat ON movimientos(material_id, fecha);
+CREATE INDEX IF NOT EXISTS ix_mov_orden ON movimientos(orden_id);
 CREATE TABLE IF NOT EXISTS bitacora(id INTEGER PRIMARY KEY, orden_id INTEGER, fecha TEXT, texto TEXT);
 '''
 def db():
@@ -121,8 +129,12 @@ def dashboard():
     por_cat = q('SELECT categoria, COUNT(*) n FROM ordenes GROUP BY categoria')
     hoy_n = q("SELECT COUNT(*) n FROM ordenes WHERE fecha_programada=date('now','localtime')", one=True)['n']
     pend_aud = q("SELECT COUNT(*) n FROM ordenes WHERE estado='completada' AND (aprobacion IS NULL OR aprobacion='')", one=True)['n']
+    stock_alm = q(f"SELECT a.id, a.nombre, a.tipo, c.nombre cuad, COUNT(CASE WHEN e.stock>0 THEN 1 END) n, SUM(CASE WHEN e.stock<0 THEN 1 ELSE 0 END) neg, SUM(CASE WHEN m.activo=1 AND {BAJO_ALM} THEN 1 ELSE 0 END) bajo FROM almacenes a LEFT JOIN existencias e ON e.almacen_id=a.id LEFT JOIN materiales m ON m.id=e.material_id LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id GROUP BY a.id ORDER BY a.tipo='vehiculo', CASE WHEN a.tipo='bodega' THEN a.id END, a.nombre")
+    bajo_min = q(f'''SELECT m.id, m.sku, m.nombre, m.unidad, a.nombre alm, e.stock, e.minimo FROM existencias e JOIN materiales m ON m.id=e.material_id JOIN almacenes a ON a.id=e.almacen_id
+        WHERE m.activo=1 AND {BAJO_ALM} ORDER BY (e.stock - e.minimo) / e.minimo LIMIT 10''')
+    nbajo = q(f'SELECT COUNT(*) n FROM materiales m WHERE {BAJO_ALGUNO}', one=True)['n']
     total = sum(por_estado.values()); maxc = max([r['total'] for r in por_cuad] + [1])
-    return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud)
+    return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm)
 
 # ---------- Órdenes ----------
 @app.route('/ordenes')
@@ -180,7 +192,7 @@ def orden_ver(oid):
     p = plantilla_de(o); pl = PLANT.get(p) if p else None
     fotos = {r['item']: r for r in q('SELECT * FROM orden_fotos WHERE orden_id=?', (oid,))}
     return render_template('orden_ver.html', o=o, plantilla=p, pl=pl, fotos=fotos,
-        mats=q('SELECT * FROM orden_materiales WHERE orden_id=? ORDER BY id', (oid,)), bit=q('SELECT * FROM bitacora WHERE orden_id=? ORDER BY id DESC', (oid,)),
+        mats=q('SELECT m.*, a.nombre alm FROM orden_materiales m LEFT JOIN almacenes a ON a.id=m.almacen_id WHERE m.orden_id=? ORDER BY m.id', (oid,)), bit=q('SELECT * FROM bitacora WHERE orden_id=? ORDER BY id DESC', (oid,)),
         equipo=q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (o['cuadrilla_id'],)))
 
 @app.route('/ordenes/<int:oid>/eliminar', methods=['POST'])
@@ -216,20 +228,55 @@ def orden_materiales(oid):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) or abort(404)
     p = plantilla_de(o) or request.args.get('plantilla') or 'FO'
     cat = PLANT[p]['materiales']
+    porclave = {(r['categoria'], r['nombre']): r for r in q('SELECT * FROM materiales')}
+    matid = {r['id']: r for r in porclave.values()}
+    warn = None
     if request.method == 'POST':
-        db().execute('DELETE FROM orden_materiales WHERE orden_id=?', (oid,))
+        lineas = []  # (material_id, seccion, concepto, tipo, cantidad, unidad)
         for i, m in enumerate(cat):
             c = request.form.get(f'q{i}')
             if c and float(c) > 0:
-                db().execute('INSERT INTO orden_materiales(orden_id,seccion,concepto,tipo,cantidad,unidad) VALUES(?,?,?,?,?,?)', (oid, m['seccion'], m['concepto'], request.form.get(f't{i}'), float(c), m['unidad']))
-        for j in range(3):
-            c = request.form.get(f'oq{j}'); n = request.form.get(f'on{j}')
-            if n and c: db().execute('INSERT INTO orden_materiales(orden_id,seccion,concepto,tipo,cantidad,unidad) VALUES(?,?,?,?,?,?)', (oid,'OTROS MATERIALES',n,'',float(c),request.form.get(f'ou{j}') or ''))
-        log(oid, 'Materiales actualizados'); db().commit()
+                r = porclave.get((m['seccion'], m['concepto']))
+                lineas.append((r['id'] if r else None, m['seccion'], m['concepto'], request.form.get(f't{i}'), float(c), r['unidad'] if r else norm_unidad(m['unidad'])))
+        for j in range(int(request.form.get('nextra') or 0)):
+            mid_, c = request.form.get(f'em{j}'), request.form.get(f'eq{j}')
+            if mid_ and c and float(c) > 0 and int(mid_) in matid:
+                r = matid[int(mid_)]; lineas.append((r['id'], 'OTROS MATERIALES', r['nombre'], request.form.get(f'et{j}') or '', float(c), r['unidad']))
+        alm = int(request.form.get('almacen_id') or 1); nalm = {r['id']: r['nombre'] for r in almacenes()}
+        lineas = [l + (alm if l[0] else None,) for l in lineas]
+        con = db(); con.execute('BEGIN IMMEDIATE')
+        antes, despues = {}, {}  # clave (material_id, almacen_id)
+        for r in con.execute('SELECT material_id, COALESCE(almacen_id,1), SUM(cantidad) s FROM orden_materiales WHERE orden_id=? AND material_id IS NOT NULL GROUP BY 1,2', (oid,)):
+            antes[(r[0], r[1])] = r[2]
+        for l in lineas:
+            if l[0]: despues[(l[0], alm)] = despues.get((l[0], alm), 0) + l[4]
+        deltas = {k: despues.get(k, 0) - antes.get(k, 0) for k in set(antes) | set(despues)}
+        negs = []
+        for k, d in deltas.items():
+            st = stock_en(*k)
+            if d > 0 and st - d < 0: negs.append(f"{matid[k[0]]['nombre']} en {nalm.get(k[1])} (quedaría en {st-d:g} {matid[k[0]]['unidad']})")
+        if negs and not request.form.get('permitir_negativo'):
+            con.rollback()
+            warn = 'Stock insuficiente: ' + '; '.join(negs) + '. Marca «Permitir stock negativo» para guardar de todos modos, o registra antes una entrada.'
+            actual = {l[2]+'|'+l[1]: {'tipo': l[3], 'cantidad': l[4], 'material_id': l[0]} for l in lineas}
+            extras = [{'material_id': l[0], 'tipo': l[3], 'cantidad': l[4]} for l in lineas if l[1] == 'OTROS MATERIALES']
+            return render_template('materiales.html', o=o, cat=cat, plantilla=p, actual=actual, extras=extras, origen=request.form.get('origen',''), warn=warn, porclave=porclave, mats=mat_opciones(), alms=almacenes(), alm=alm, ex=existencias_map())
+        con.execute('DELETE FROM orden_materiales WHERE orden_id=?', (oid,))
+        for l in lineas:
+            con.execute('INSERT INTO orden_materiales(orden_id,material_id,seccion,concepto,tipo,cantidad,unidad,almacen_id) VALUES(?,?,?,?,?,?,?,?)', (oid,)+l)
+        for k, d in sorted(deltas.items(), key=lambda x: x[1]):  # primero devoluciones
+            if d > 0: mover(con, k[0], k[1], 'salida', d, 'Consumo en orden', o['folio'], oid, permitir_negativo=True)
+            elif d < 0: mover(con, k[0], k[1], 'devolucion', -d, 'Devolución / corrección de orden', o['folio'], oid)
+        log(oid, 'Materiales actualizados' + (f' · {sum(1 for d in deltas.values() if d)} movimientos de inventario' if any(deltas.values()) else '') + (' · con stock negativo' if negs else ''))
+        con.commit()
         if request.form.get('origen') == 'campo': return redirect(url_for('tecnico', cuadrilla=o['cuadrilla_id']))
         return redirect(url_for('orden_ver', oid=oid))
-    actual = {r['concepto']+'|'+r['seccion']: r for r in q('SELECT * FROM orden_materiales WHERE orden_id=?', (oid,))}
-    return render_template('materiales.html', o=o, cat=cat, plantilla=p, actual=actual, origen=request.args.get('origen',''))
+    filas = q('SELECT * FROM orden_materiales WHERE orden_id=?', (oid,))
+    actual = {r['concepto']+'|'+r['seccion']: r for r in filas}
+    extras = [r for r in filas if r['seccion'] == 'OTROS MATERIALES']
+    veh = q("SELECT id FROM almacenes WHERE tipo='vehiculo' AND cuadrilla_id=? ORDER BY nombre", (o['cuadrilla_id'],), one=True) if o['cuadrilla_id'] else None
+    alm = next((r['almacen_id'] for r in filas if r['almacen_id']), None) or int(request.args.get('almacen') or (veh['id'] if veh else 1))
+    return render_template('materiales.html', o=o, cat=cat, plantilla=p, actual=actual, extras=extras, origen=request.args.get('origen',''), warn=None, porclave=porclave, mats=mat_opciones(), alms=almacenes(), alm=alm, ex=existencias_map())
 
 @app.route('/ordenes/<int:oid>/foto', methods=['POST'])
 def orden_foto(oid):
@@ -316,6 +363,187 @@ def reporte_materiales():
        WHERE substr(COALESCE(o.fecha_cierre,o.fecha_programada),1,10) BETWEEN ? AND ? GROUP BY m.seccion,m.concepto,m.tipo,m.unidad ORDER BY m.seccion,m.concepto''', (desde, hasta))
     return render_template('reporte_materiales.html', rows=rows, desde=desde, hasta=hasta)
 
+
+# ---------- Inventario de materiales ----------
+CATS_MAT = ['FIBRA PLANTA EXTERNA','FIBRA PLANTA INTERNA','PLANTA EXTERNA','PLANTA INTERNA','EQUIPOS','EQUIPOS DE RED','GABINETES, RACKS, ACCESORIOS','EQUIPO ELÉCTRICO','MATERIALES CONSUMIBLES','OTROS']
+UNIDADES = ['m','pza','rollo','caja','kit','cm','lt','juego']
+TIPOS_MOV = {'entrada': 'Entrada', 'salida': 'Salida', 'ajuste': 'Ajuste', 'devolucion': 'Devolución', 'transferencia': 'Transferencia'}
+ALMACENES = ['Torrelit', 'Autosound']
+def norm_unidad(u):
+    return {'metros':'m','pzas.':'pza','pza.':'pza','cms.':'cm','kit':'kit'}.get((u or '').strip(), 'pza')
+BAJO = 'm.activo=1 AND m.stock_minimo>0 AND m.stock_actual <= m.stock_minimo'   # total bajo el mínimo global
+BAJO_ALM = 'e.minimo>0 AND e.stock <= e.minimo'                                 # por almacén (en tabla existencias e)
+BAJO_ALGUNO = f'({BAJO} OR EXISTS(SELECT 1 FROM existencias e WHERE e.material_id=m.id AND {BAJO_ALM}))'
+def usuario(): return CFG['APP_USER']
+
+def mover(con, mid, alm, tipo, cantidad, motivo='', referencia='', orden_id=None, permitir_negativo=False, fecha=None):
+    """Registra un movimiento en un almacén y actualiza existencias + stock_actual (total) en la misma transacción.
+    cantidad: positiva para entrada/salida/devolución; con signo para ajuste/transferencia."""
+    delta = {'entrada': 1, 'devolucion': 1, 'salida': -1, 'ajuste': 1, 'transferencia': 1}[tipo] * float(cantidad)
+    if con.execute('SELECT 1 FROM materiales WHERE id=?', (mid,)).fetchone() is None: raise ValueError('Material no existe')
+    con.execute('INSERT OR IGNORE INTO existencias(material_id,almacen_id,stock) VALUES(?,?,0)', (mid, alm))
+    nuevo = con.execute('SELECT stock FROM existencias WHERE material_id=? AND almacen_id=?', (mid, alm)).fetchone()[0] + delta
+    if nuevo < 0 and delta < 0 and not permitir_negativo: raise ValueError('stock negativo')
+    con.execute('UPDATE existencias SET stock=stock+? WHERE material_id=? AND almacen_id=?', (delta, mid, alm))
+    con.execute('UPDATE materiales SET stock_actual=stock_actual+? WHERE id=?', (delta, mid))
+    con.execute('INSERT INTO movimientos(material_id,almacen_id,tipo,fecha,cantidad,stock_resultante,motivo,referencia,orden_id,usuario) VALUES(?,?,?,?,?,?,?,?,?,?)',
+                (mid, alm, tipo, fecha or ahora(), delta, nuevo, motivo, referencia, orden_id, usuario() if has_request_context() else 'admin'))
+    return nuevo
+def stock_en(mid, alm):
+    r = db().execute('SELECT stock FROM existencias WHERE material_id=? AND almacen_id=?', (mid, alm)).fetchone(); return r[0] if r else 0
+N_VEHICULOS = 18
+def asegurar_vehiculos(con):
+    # 18 almacenes móviles "Vehículo 01".."Vehículo 18". Cada uno se asigna (reasignable) a una cuadrilla en /vehiculos.
+    for i in range(1, N_VEHICULOS + 1):
+        con.execute("INSERT OR IGNORE INTO almacenes(nombre,tipo) VALUES(?,'vehiculo')", (f'Vehículo {i:02d}',))
+def almacenes():
+    return q("SELECT a.*, c.nombre cuad FROM almacenes a LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id WHERE a.activo=1 ORDER BY a.tipo='vehiculo', CASE WHEN a.tipo='bodega' THEN a.id END, a.nombre")
+def minimos_map(): return {(r['material_id'], r['almacen_id']): r['minimo'] for r in q('SELECT material_id, almacen_id, minimo FROM existencias WHERE minimo>0')}
+def existencias_map():
+    d = {}
+    for r in q('SELECT * FROM existencias'): d[(r['material_id'], r['almacen_id'])] = r['stock']
+    return d
+from flask import has_request_context
+
+def mat_opciones(): return q('SELECT * FROM materiales WHERE activo=1 ORDER BY categoria, nombre')
+
+@app.route('/inventario')
+def inventario():
+    f = {k: request.args.get(k, '') for k in ('buscar','categoria','bajo','inactivos','almacen')}
+    w, a = ['1=1'], []
+    if not f['inactivos']: w.append('m.activo=1')
+    if f['buscar']: w.append('(m.sku LIKE ? OR m.nombre LIKE ? OR m.variantes LIKE ? OR m.ubicacion LIKE ?)'); a += ['%'+f['buscar']+'%']*4
+    if f['categoria']: w.append('m.categoria=?'); a.append(f['categoria'])
+    if f['bajo'] and f['almacen']: w.append(f'EXISTS(SELECT 1 FROM existencias e WHERE e.material_id=m.id AND e.almacen_id=? AND {BAJO_ALM})'); a.append(f['almacen'])
+    elif f['bajo']: w.append(BAJO_ALGUNO)
+    if f['almacen'] and not f['bajo']: w.append('EXISTS(SELECT 1 FROM existencias e WHERE e.material_id=m.id AND e.almacen_id=? AND e.stock<>0)'); a.append(f['almacen'])
+    rows = q(f'SELECT m.*, ({BAJO}) bajo, ({BAJO_ALGUNO}) bajo_alg FROM materiales m WHERE {" AND ".join(w)} ORDER BY m.categoria, m.nombre', a)
+    nbajo = q(f'SELECT COUNT(*) n FROM materiales m WHERE {BAJO_ALGUNO}', one=True)['n']
+    bajo_por_alm = {r['almacen_id']: r['n'] for r in q(f'SELECT e.almacen_id, COUNT(*) n FROM existencias e JOIN materiales m ON m.id=e.material_id WHERE m.activo=1 AND {BAJO_ALM} GROUP BY 1')}
+    if f['almacen']: nbajo = bajo_por_alm.get(int(f['almacen']), 0)
+    return render_template('inventario.html', bajo_por_alm=bajo_por_alm, mins=minimos_map(), rows=rows, f=f, CATS_MAT=CATS_MAT, nbajo=nbajo, alms=almacenes(), ex=existencias_map())
+
+@app.route('/inventario/nuevo', methods=['GET','POST'])
+@app.route('/inventario/<int:mid>/editar', methods=['GET','POST'])
+def material_form(mid=None):
+    m = q('SELECT * FROM materiales WHERE id=?', (mid,), one=True) if mid else None
+    if mid and not m: abort(404)
+    err = None
+    if request.method == 'POST':
+        d = {k: (request.form.get(k) or '').strip() for k in ('sku','nombre','categoria','variantes','unidad','ubicacion','notas')}
+        d['stock_minimo'] = float(request.form.get('stock_minimo') or 0); d['activo'] = 1 if request.form.get('activo') else 0
+        if not d['sku'] or not d['nombre']: err = 'SKU y nombre son obligatorios'
+        elif q('SELECT 1 FROM materiales WHERE sku=? AND id IS NOT ?', (d['sku'], mid), one=True): err = 'Ese SKU ya existe'
+        if not err:
+            ks = list(d)
+            if m: db().execute(f"UPDATE materiales SET {', '.join(k+'=?' for k in ks)} WHERE id=?", [d[k] for k in ks]+[mid])
+            else:
+                mid = db().execute(f"INSERT INTO materiales({','.join(ks)}) VALUES({','.join('?'*len(ks))})", [d[k] for k in ks]).lastrowid
+                ini = float(request.form.get('stock_inicial') or 0)
+                if ini: mover(db(), mid, int(request.form.get('almacen_id') or 1), 'entrada', ini, 'Inventario inicial')
+            db().commit(); return redirect(url_for('material_ver', mid=mid))
+        m = d
+    return render_template('material_form.html', m=m, mid=mid, err=err, CATS_MAT=CATS_MAT, UNIDADES=UNIDADES, alms=almacenes())
+
+@app.route('/inventario/<int:mid>')
+def material_ver(mid):
+    m = q('SELECT * FROM materiales WHERE id=?', (mid,), one=True) or abort(404)
+    movs = q('SELECT v.*, o.folio, a.nombre alm FROM movimientos v LEFT JOIN ordenes o ON o.id=v.orden_id LEFT JOIN almacenes a ON a.id=v.almacen_id WHERE v.material_id=? ORDER BY v.id DESC LIMIT 100', (mid,))
+    return render_template('material_ver.html', m=m, movs=movs, TIPOS_MOV=TIPOS_MOV, alms=almacenes(), ex=existencias_map(), mins=minimos_map())
+
+@app.route('/inventario/<int:mid>/minimos', methods=['POST'])
+def material_minimos(mid):
+    for a in almacenes():
+        v = request.form.get(f'min{a["id"]}')
+        if v is not None:
+            db().execute('INSERT OR IGNORE INTO existencias(material_id,almacen_id,stock) VALUES(?,?,0)', (mid, a['id']))
+            db().execute('UPDATE existencias SET minimo=? WHERE material_id=? AND almacen_id=?', (float(v or 0), mid, a['id']))
+    db().commit(); return redirect(url_for('material_ver', mid=mid))
+
+@app.route('/inventario/<int:mid>/eliminar', methods=['POST'])
+def material_eliminar(mid):
+    # Si tiene movimientos se desactiva (para conservar el historial); si no, se borra.
+    if q('SELECT 1 FROM movimientos WHERE material_id=? LIMIT 1', (mid,), one=True) or q('SELECT 1 FROM orden_materiales WHERE material_id=? LIMIT 1', (mid,), one=True):
+        db().execute('UPDATE materiales SET activo=0 WHERE id=?', (mid,))
+    else: db().execute('DELETE FROM materiales WHERE id=?', (mid,))
+    db().commit(); return redirect(url_for('inventario'))
+
+@app.route('/inventario/movimiento', methods=['GET','POST'])
+def movimiento_form():
+    tipo = request.values.get('tipo', 'entrada')
+    if tipo not in ('entrada','salida','ajuste','transferencia'): tipo = 'entrada'
+    err = warn = None; fv = request.form
+    if request.method == 'POST':
+        con = db()
+        try:
+            mid = int(fv['material_id']); m = q('SELECT * FROM materiales WHERE id=?', (mid,), one=True) or abort(400)
+            alm = int(fv['almacen_id']); cant = float(fv.get('cantidad') or 0)
+            if tipo != 'ajuste' and cant <= 0: raise ValueError('La cantidad debe ser mayor a 0')
+            oid = None
+            if fv.get('folio'):
+                o = q('SELECT id FROM ordenes WHERE folio=?', (fv['folio'].strip(),), one=True)
+                if not o: raise ValueError('No existe la orden '+fv['folio'])
+                oid = o['id']
+            permitir = bool(fv.get('permitir_negativo'))
+            nalm = {r['id']: r['nombre'] for r in almacenes()}
+            con.execute('BEGIN IMMEDIATE')
+            try:
+                if tipo == 'ajuste':  # se captura el conteo físico del almacén
+                    mover(con, mid, alm, 'ajuste', cant - stock_en(mid, alm), fv.get('motivo') or 'Conteo físico', fv.get('referencia',''), oid)
+                elif tipo == 'transferencia':
+                    dest = int(fv['destino_id'])
+                    if dest == alm: raise ValueError('Origen y destino deben ser distintos')
+                    ref = fv.get('referencia') or f'{nalm[alm]} → {nalm[dest]}'
+                    mover(con, mid, alm, 'transferencia', -cant, fv.get('motivo') or f'Transferencia a {nalm[dest]}', ref, oid, permitir)
+                    mover(con, mid, dest, 'transferencia', cant, fv.get('motivo') or f'Transferencia desde {nalm[alm]}', ref, oid)
+                else:
+                    mover(con, mid, alm, tipo, cant, fv.get('motivo',''), fv.get('referencia',''), oid, permitir)
+            except ValueError as e:
+                con.rollback()
+                if str(e) == 'stock negativo':
+                    warn = f"La operación deja «{m['nombre']}» en {stock_en(mid, alm)-cant:g} {m['unidad']} en {nalm[alm]} (negativo). Marca «Permitir stock negativo» para registrarla de todos modos."
+                raise
+            con.commit(); return redirect(url_for('movimientos', material=mid))
+        except ValueError as e:
+            if not warn: err = str(e)
+    return render_template('movimiento_form.html', tipo=tipo, mats=mat_opciones(), err=err, warn=warn, fv=fv, sel=request.values.get('material_id',''),
+        TIPOS_MOV=TIPOS_MOV, alms=almacenes(), ex=existencias_map())
+
+@app.route('/inventario/movimientos')
+def movimientos():
+    f = {k: request.args.get(k, '') for k in ('material','tipo','desde','hasta','folio','buscar','almacen')}
+    w, a = ['1=1'], []
+    if f['material']: w.append('v.material_id=?'); a.append(f['material'])
+    if f['tipo']: w.append('v.tipo=?'); a.append(f['tipo'])
+    if f['almacen']: w.append('v.almacen_id=?'); a.append(f['almacen'])
+    if f['desde']: w.append('substr(v.fecha,1,10)>=?'); a.append(f['desde'])
+    if f['hasta']: w.append('substr(v.fecha,1,10)<=?'); a.append(f['hasta'])
+    if f['folio']: w.append('o.folio LIKE ?'); a.append('%'+f['folio']+'%')
+    if f['buscar']: w.append('(m.nombre LIKE ? OR m.sku LIKE ? OR v.motivo LIKE ? OR v.referencia LIKE ?)'); a += ['%'+f['buscar']+'%']*4
+    where = ' AND '.join(w)
+    total = q(f'SELECT COUNT(*) n FROM movimientos v JOIN materiales m ON m.id=v.material_id LEFT JOIN ordenes o ON o.id=v.orden_id WHERE {where}', a, one=True)['n']
+    per = 50; pages = max(1, math.ceil(total/per)); page = min(max(1, int(request.args.get('page', 1) or 1)), pages)
+    rows = q(f'''SELECT v.*, m.sku, m.nombre, m.unidad, o.folio, al.nombre alm FROM movimientos v JOIN materiales m ON m.id=v.material_id LEFT JOIN ordenes o ON o.id=v.orden_id LEFT JOIN almacenes al ON al.id=v.almacen_id
+        WHERE {where} ORDER BY v.fecha DESC, v.id DESC LIMIT ? OFFSET ?''', a+[per, (page-1)*per])
+    return render_template('movimientos.html', rows=rows, f=f, total=total, page=page, pages=pages, mats=q('SELECT id,sku,nombre FROM materiales ORDER BY nombre'),
+        TIPOS_MOV=TIPOS_MOV, alms=almacenes(), qs={k: v for k, v in f.items() if v})
+
+@app.route('/api/materiales')
+def api_materiales():
+    ex = existencias_map(); al = almacenes()
+    return jsonify([dict(r, existencias={a['nombre']: ex.get((r['id'], a['id']), 0) for a in al}) for r in q('SELECT * FROM materiales ORDER BY categoria, nombre')])
+
+@app.route('/vehiculos', methods=['GET','POST'])
+def vehiculos():
+    if request.method == 'POST':
+        for v in q("SELECT id FROM almacenes WHERE tipo='vehiculo'"):
+            cid = request.form.get(f'v{v["id"]}')
+            if cid is not None: db().execute('UPDATE almacenes SET cuadrilla_id=? WHERE id=?', (int(cid) if cid else None, v['id']))
+        db().commit(); return redirect(url_for('vehiculos', ok=1))
+    vs = q('''SELECT a.*, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat FROM almacenes a WHERE a.tipo='vehiculo' ORDER BY a.nombre''')
+    cu = q('SELECT * FROM cuadrillas ORDER BY id')
+    return render_template('vehiculos.html', vs=vs, cu=cu, ok=request.args.get('ok'))
+
 # ---------- API JSON ----------
 @app.route('/api/resumen')
 def api_resumen():
@@ -327,7 +555,16 @@ def api_ordenes():
     return jsonify([dict(r) for r in q('SELECT * FROM ordenes ORDER BY fecha_programada DESC LIMIT 500')])
 
 def init_db():
-    c = sqlite3.connect(DB); c.executescript(SCHEMA); c.commit(); c.close()
+    c = sqlite3.connect(DB); c.executescript(SCHEMA)
+    if 'material_id' not in [r[1] for r in c.execute('PRAGMA table_info(orden_materiales)')]:
+        c.execute('ALTER TABLE orden_materiales ADD COLUMN material_id INTEGER REFERENCES materiales(id)')
+    if 'minimo' not in [r[1] for r in c.execute('PRAGMA table_info(existencias)')]:
+        c.execute('ALTER TABLE existencias ADD COLUMN minimo REAL NOT NULL DEFAULT 0')
+    if 'almacen_id' not in [r[1] for r in c.execute('PRAGMA table_info(orden_materiales)')]:
+        c.execute('ALTER TABLE orden_materiales ADD COLUMN almacen_id INTEGER REFERENCES almacenes(id)')
+    for n in ALMACENES: c.execute("INSERT OR IGNORE INTO almacenes(nombre,tipo) VALUES(?,'bodega')", (n,))
+    asegurar_vehiculos(c)
+    c.commit(); c.close()
 init_db()
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=False)

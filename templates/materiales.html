@@ -1,10 +1,24 @@
 {% extends 'base.html' %}{% block body %}
 <h1>Materiales · {{o.folio}} <span class="muted">plantilla {{plantilla}}</span></h1>
+{% if warn %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{warn}}</div>{% endif %}
 <form method="post" class="f"><input type="hidden" name="origen" value="{{origen}}">
-<div class="tw"><table><tr><th>Concepto</th><th>Tipo</th><th style="width:110px">Cantidad</th><th>Unidad</th></tr>
-{% set ns=namespace(s='') %}{% for m in cat %}{% if m.seccion!=ns.s %}{% set ns.s=m.seccion %}<tr><th colspan="4" style="background:#dfe7f1">{{m.seccion}}</th></tr>{% endif %}
-{% set a=actual.get(m.concepto+'|'+m.seccion) %}<tr><td>{{m.concepto}}</td><td>{% set ops=m.tipos.replace(' y ',', ').split(',') if m.tipos and m.tipos!='(Tipos)' else [] %}
+<div class="card"><label><b>Almacén del que salen los materiales</b>
+<select name="almacen_id" id="alm" onchange="stk()">{% set mios=alms|selectattr('tipo','equalto','vehiculo')|selectattr('cuadrilla_id','equalto',o.cuadrilla_id)|list if o.cuadrilla_id else [] %}
+{% if mios %}<optgroup label="★ Vehículos de la cuadrilla de esta orden">{% for a in mios %}<option value="{{a.id}}" {{'selected' if a.id==alm}}>{{a.nombre}} ({{a.cuad}})</option>{% endfor %}</optgroup>{% endif %}
+<optgroup label="Almacenes">{% for a in alms if a.tipo=='bodega' %}<option value="{{a.id}}" {{'selected' if a.id==alm}}>{{a.nombre}}</option>{% endfor %}</optgroup>
+<optgroup label="Otros vehículos">{% for a in alms if a.tipo=='vehiculo' and a not in mios %}<option value="{{a.id}}" {{'selected' if a.id==alm}}>{{a.nombre}}{{' — '~a.cuad if a.cuad}}</option>{% endfor %}</optgroup></select></label>
+<div class="muted">Al guardar se descuenta del almacén elegido (salida ligada a la orden). Si corriges cantidades o cambias de almacén, la diferencia se devuelve automáticamente.</div></div>
+<div class="tw"><table><tr><th>Concepto</th><th>Tipo</th><th style="width:110px">Cantidad</th><th>Unidad</th><th style="text-align:right">Disp.</th></tr>
+{% set ns=namespace(s='') %}{% for m in cat %}{% if m.seccion!=ns.s %}{% set ns.s=m.seccion %}<tr><th colspan="5" style="background:#dfe7f1">{{m.seccion}}</th></tr>{% endif %}
+{% set a=actual.get(m.concepto+'|'+m.seccion) %}{% set r=porclave.get((m.seccion,m.concepto)) %}<tr><td>{{m.concepto}}{% if r %} <span class="muted">{{r.sku}}</span>{% endif %}</td><td>{% set ops=m.tipos.replace(' y ',', ').split(',') if m.tipos and m.tipos!='(Tipos)' else [] %}
 {% if ops|length>1 %}<select name="t{{loop.index0}}"><option></option>{% for x in ops %}<option {{'selected' if a and a.tipo==x.strip()}}>{{x.strip()}}</option>{% endfor %}</select>{% else %}<input name="t{{loop.index0}}" value="{{a.tipo if a else (m.tipos if m.tipos!='(Tipos)' else '')}}">{% endif %}</td>
-<td><input type="number" step="any" min="0" inputmode="decimal" name="q{{loop.index0}}" value="{{a.cantidad if a else ''}}"></td><td>{{m.unidad}}</td></tr>{% endfor %}
-<tr><th colspan="4" style="background:#dfe7f1">OTROS MATERIALES</th></tr>{% for j in range(3) %}<tr><td><input name="on{{j}}" placeholder="Concepto"></td><td></td><td><input type="number" step="any" name="oq{{j}}"></td><td><input name="ou{{j}}" placeholder="unidad"></td></tr>{% endfor %}
-</table></div><p><button class="btn">Guardar materiales</button></p></form>{% endblock %}
+<td><input type="number" step="any" min="0" inputmode="decimal" name="q{{loop.index0}}" value="{{a.cantidad if a else ''}}"></td><td>{{r.unidad if r else m.unidad}}</td><td class="disp" data-m="{{r.id if r}}" style="text-align:right"></td></tr>{% endfor %}
+<tr><th colspan="5" style="background:#dfe7f1">OTROS MATERIALES (del catálogo de inventario)</th></tr>
+{% set nx=extras|length+3 %}{% for j in range(nx) %}{% set e=extras[j] if j<extras|length else None %}<tr><td colspan="2"><select name="em{{j}}" onchange="stk()"><option value="">— elegir del catálogo —</option>{% for x in mats %}<option value="{{x.id}}" {{'selected' if e and e.material_id==x.id}}>{{x.sku}} · {{x.nombre}} ({{x.unidad}})</option>{% endfor %}</select>
+<input name="et{{j}}" placeholder="variante / tipo" value="{{e.tipo if e else ''}}" style="margin-top:4px"></td><td><input type="number" step="any" min="0" inputmode="decimal" name="eq{{j}}" value="{{e.cantidad if e else ''}}"></td><td></td><td class="disp" data-sel="em{{j}}" style="text-align:right"></td></tr>{% endfor %}
+</table></div><input type="hidden" name="nextra" value="{{nx}}">
+<p><label><input type="checkbox" name="permitir_negativo" value="1" style="width:auto"> Permitir stock negativo (registrar aunque no alcance la existencia)</label></p>
+<p><button class="btn">Guardar materiales</button></p></form>
+<script>const EX={ {% for (mi,ai),v in ex.items() %}"{{mi}}-{{ai}}":{{v}},{% endfor %} };
+function stk(){const a=document.getElementById('alm').value;document.querySelectorAll('.disp').forEach(td=>{const m=td.dataset.sel?document.querySelector('[name='+td.dataset.sel+']').value:td.dataset.m;if(!m){td.textContent='';return}const v=EX[m+'-'+a]||0;td.textContent=v;td.style.color=v<=0?'#b42318':''})}stk()</script>
+{% endblock %}

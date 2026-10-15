@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block body %}<h1>Vehículos (almacenes móviles)</h1>
+{% if ok %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34">Asignaciones guardadas.</div>{% endif %}
+<p class="muted">Cada vehículo pertenece a una cuadrilla (se puede reasignar). Su inventario se mantiene aunque cambie de cuadrilla. Al capturar materiales de una orden se sugieren primero los vehículos de su cuadrilla.</p>
+<form method="post" class="f"><div class="tw"><table><tr><th>Vehículo</th><th>Cuadrilla asignada</th><th>Materiales con stock</th><th></th></tr>
+{% for v in vs %}<tr><td><b>{{v.nombre}}</b></td><td><select name="v{{v.id}}"><option value="">— sin asignar —</option>{% for c in cu %}<option value="{{c.id}}" {{'selected' if v.cuadrilla_id==c.id}}>{{c.nombre}}</option>{% endfor %}</select></td>
+<td>{{v.nmat}}</td><td style="white-space:nowrap"><a href="/inventario?almacen={{v.id}}">Inventario</a> · <a href="/inventario/movimiento?tipo=transferencia&destino_id={{v.id}}">Cargar</a></td></tr>{% endfor %}</table></div>
+<p><button class="btn">Guardar asignaciones</button></p></form>
+<h2>Por cuadrilla</h2><div class="grid g5">{% for c in cu %}<div class="kpi"><div class="l">{{c.nombre}}</div><b>{% for v in vs if v.cuadrilla_id==c.id %}{{v.nombre}}{{', ' if not loop.last}}{% else %}<span class="muted">sin vehículo</span>{% endfor %}</b></div>{% endfor %}</div>{% endblock %}
