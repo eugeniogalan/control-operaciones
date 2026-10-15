@@ -1,0 +1,4 @@
+{% extends 'base.html' %}{% block body %}<h1>Catálogo de equipo y materiales</h1><p class="muted">Tomado de las plantillas de instalación del Excel.</p>
+<p>{% for k in plant %}<a class="btn {{'' if k==p else 'sec'}}" href="?plantilla={{k}}" style="margin:2px">{{k}}</a>{% endfor %}</p>
+<div class="grid g2"><div class="tw"><table><tr><th>Sección</th><th>Concepto</th><th>Tipos</th><th>Unidad</th></tr>{% for m in plant[p].materiales %}<tr><td class="muted">{{m.seccion}}</td><td>{{m.concepto}}</td><td>{{m.tipos}}</td><td>{{m.unidad}}</td></tr>{% endfor %}</table></div>
+<div class="card"><b>Evidencias requeridas</b><ol>{% for f in plant[p].fotos %}<li>{{f}}</li>{% endfor %}</ol><b>Reportes</b><ul>{% for r in plant[p].reportes %}<li>{{r}}</li>{% endfor %}</ul></div></div>{% endblock %}

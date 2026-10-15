@@ -1,0 +1,6 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><title>{{o.folio}}</title><style>
+body{font-family:Arial,sans-serif;font-size:12px;color:#000;max-width:800px;margin:20px auto}h1{text-align:center;font-size:16px;border:2px solid #000;padding:6px;margin:0 0 8px}
+.s{background:#d9d9d9;font-weight:bold;padding:3px 6px;border:1px solid #000;margin-top:8px}table{width:100%;border-collapse:collapse}td,th{border:1px solid #000;padding:4px;vertical-align:top}
+.x{display:inline-block;width:11px;height:11px;border:1px solid #000;margin-right:4px;text-align:center;line-height:10px;font-size:10px}.firma{height:34px}
+@media print{.np{display:none}}</style></head><body><p class="np"><button onclick="print()">Imprimir / guardar PDF</button></p>
+{% macro ck(c) %}<span class="x">{{'X' if c}}</span>{% endmacro %}{% block c %}{% endblock %}</body></html>

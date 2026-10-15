@@ -1,0 +1,21 @@
+{% extends 'base.html' %}{% from 'macros.html' import est %}{% block body %}
+<h1>Panel de operaciones</h1>
+<div class="ej">Los datos actuales son <b>de ejemplo</b> (marcados "EJEMPLO"); sustitúyelos por los reales cuando quieras.</div>
+<div class="grid g5">
+<a class="kpi" href="/ordenes"><div class="n">{{total}}</div><div class="l">Órdenes totales</div></a>
+{% for e in ESTADOS %}<a class="kpi" href="/ordenes?estado={{e}}"><div class="n">{{por_estado[e]}}</div><div class="l">{{est(e)}}</div></a>{% endfor %}
+<a class="kpi" href="/ordenes?vencidas=1" style="border-color:#f3b4b4"><div class="n venc">{{vencidas|length}}</div><div class="l">Vencidas (abiertas y fuera de fecha)</div></a>
+<a class="kpi" href="/ordenes?desde={{hoy}}&hasta={{hoy}}"><div class="n">{{hoy_n}}</div><div class="l">Programadas hoy</div></a>
+<a class="kpi" href="/ordenes?estado=completada"><div class="n">{{pend_aud}}</div><div class="l">Completadas sin auditar</div></a>
+</div>
+<div class="grid g2" style="margin-top:14px">
+<div class="card"><h2 style="margin-top:0">Órdenes por cuadrilla</h2>
+<table><tr><th>Cuadrilla</th><th style="width:40%">Total</th><th>Abiertas</th><th>Compl.</th><th>Venc.</th></tr>
+{% for r in por_cuad %}<tr><td><a href="/ordenes?cuadrilla={{r.id}}">{{r.nombre}}</a></td><td><div style="display:flex;gap:6px;align-items:center"><div class="bar" style="width:{{(r.total/maxc*100)|int}}%"></div>{{r.total}}</div></td><td>{{r.abiertas or 0}}</td><td>{{r.comp or 0}}</td><td class="{{'venc' if r.venc}}">{{r.venc or 0}}</td></tr>{% endfor %}</table></div>
+<div class="card"><h2 style="margin-top:0">Órdenes vencidas</h2>
+{% if not vencidas %}<p class="muted">Sin órdenes vencidas 🎉</p>{% endif %}
+<div class="tw" style="max-height:420px;overflow:auto"><table><tr><th>Folio</th><th>Programada</th><th>Cliente / sitio</th><th>Cuadrilla</th><th>Estado</th></tr>
+{% for o in vencidas %}<tr><td><a href="/ordenes/{{o.id}}">{{o.folio}}</a></td><td class="venc">{{o.fecha_programada}}</td><td>{{o.cliente}}<div class="muted">{{o.sitio}}</div></td><td>{{o.cuad or '—'}}</td><td>{{est(o.estado)}}</td></tr>{% endfor %}</table></div></div>
+</div>
+<div class="card"><h2 style="margin-top:0">Por tipo de formato</h2>{% for r in por_cat %}<div>{{CATEGORIAS.get(r.categoria, r.categoria)}}: <b>{{r.n}}</b></div>{% endfor %}</div>
+{% endblock %}

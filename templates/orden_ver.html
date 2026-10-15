@@ -1,0 +1,25 @@
+{% extends 'base.html' %}{% from 'macros.html' import est, pri, fh %}{% block body %}
+<div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center">
+<h1>Orden {{o.folio}} {{est(o.estado)}} {{pri(o.prioridad)}}</h1>
+<div class="noprint"><a class="btn" href="/ordenes/{{o.id}}/editar">Editar</a> <a class="btn sec" href="/ordenes/{{o.id}}/imprimir/orden" target="_blank">🖨 Formato de orden</a>
+{% if pl %}<a class="btn sec" href="/ordenes/{{o.id}}/imprimir/evidencias" target="_blank">🖨 Reporte de evidencias</a>{% endif %}</div></div>
+{% if o.ejemplo %}<div class="ej">Orden de EJEMPLO</div>{% endif %}
+<div class="grid g2">
+<div class="card"><b>{{CATEGORIAS[o.categoria]}}</b><br>{{o.tipo_grupo}} → <b>{{o.tipo_orden}}</b>
+<p>Ordena: {{o.ordena_nombre or '—'}} ({{o.ordena_puesto or '—'}}) · Fecha orden: {{o.fecha_emision}}<br>Programada: <b>{{o.fecha_programada}}</b></p>
+<p><b>{{o.cliente}}</b> {% if o.tipo_cliente %}({{o.tipo_cliente}}){% endif %}<br>{{o.sitio}}<br>{{o.calle}} {{o.ciudad}} {{o.estado_geo}}<br>
+Contacto: {{o.contacto or '—'}} {{o.telefono or ''}}<br>GPS: {{o.coordenadas or '—'}} {% if o.coordenadas_b %}· Punto B: {{o.coordenadas_b}}{% endif %}</p>
+<p>{{o.descripcion or ''}}</p></div>
+<div class="card"><b>Ejecución</b><p>Cuadrilla: <b>{{o.cuad or 'sin asignar'}}</b>{% for t in equipo %}<br>· {{t.nombre}} ({{t.rol}}) {{t.telefono}}{% endfor %}</p>
+<p>Inicio: {{fh(o.fecha_inicio) or '—'}} · Cierre: {{fh(o.fecha_cierre) or '—'}}<br>Personas adicionales: {{o.personas_adicionales or '—'}}<br>Folio evidencias: {{o.folio_evidencias or '—'}}</p>
+<p>Observaciones: {{o.observaciones or '—'}}</p><p style="white-space:pre-line">Notas: {{o.notas or '—'}}</p>
+<p><b>Auditoría:</b> {{o.aprobacion or 'pendiente'}} {% if o.audito_nombre %}— {{o.audito_nombre}} ({{o.audito_puesto}}) {{o.fecha_auditoria}}{% endif %}<br>{{o.obs_auditoria or ''}}</p>
+<form method="post" action="/ordenes/{{o.id}}/estado" class="noprint" style="display:flex;gap:6px;flex-wrap:wrap">
+{% for e in ESTADOS if e!=o.estado %}<button class="btn sec" name="estado" value="{{e}}">→ {{e}}</button>{% endfor %}</form></div></div>
+<div class="card"><div style="display:flex;justify-content:space-between"><h2 style="margin:0">Equipo y materiales utilizados {% if plantilla %}<span class="muted">(plantilla {{plantilla}})</span>{% endif %}</h2><a class="btn sec" href="/ordenes/{{o.id}}/materiales">Capturar materiales</a></div>
+{% if mats %}<table><tr><th>Sección</th><th>Concepto</th><th>Tipo</th><th>Cantidad</th><th>Unidad</th></tr>{% for m in mats %}<tr><td class="muted">{{m.seccion}}</td><td>{{m.concepto}}</td><td>{{m.tipo}}</td><td>{{m.cantidad|round(2)}}</td><td>{{m.unidad}}</td></tr>{% endfor %}</table>{% else %}<p class="muted">Sin materiales registrados.</p>{% endif %}</div>
+<div class="card" id="evidencias"><div style="display:flex;justify-content:space-between"><h2 style="margin:0">Evidencias fotográficas</h2><a class="btn sec" href="/ordenes/{{o.id}}/evidencias">Subir evidencias</a></div>
+{% if pl %}<p>{{fotos|length}} de {{pl.fotos|length + pl.reportes|length}} evidencias cargadas.</p>{% else %}<p class="muted">Este tipo de instalación no tiene plantilla de evidencias en los formatos; se pueden subir fotos libres.</p>{% endif %}</div>
+<div class="card"><h2 style="margin-top:0">Bitácora</h2>{% for b in bit %}<div><span class="muted">{{fh(b.fecha)}}</span> {{b.texto}}</div>{% endfor %}</div>
+<form method="post" action="/ordenes/{{o.id}}/eliminar" onsubmit="return confirm('¿Eliminar orden?')" class="noprint"><button class="btn rojo">Eliminar orden</button></form>
+{% endblock %}

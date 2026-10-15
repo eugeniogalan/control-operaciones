@@ -1,0 +1,50 @@
+{% extends 'base.html' %}{% block body %}
+<h1>{{ 'Editar orden '+o.folio if o else 'Nueva orden de trabajo' }}</h1>
+{% set v = o or {} %}
+<form class="f" method="post">
+<fieldset><legend>Datos generales</legend><div class="grid g2">
+<label>Formato<select name="categoria" id="cat" required>{% for k,t in CATEGORIAS.items() %}<option value="{{k}}" {{'selected' if v.categoria==k}}>{{t}}</option>{% endfor %}</select></label>
+<label>Folio <span class="muted">(vacío = automático)</span><input name="folio" value="{{v.folio or ''}}"></label>
+<label>Tipo de orden (grupo)<select name="tipo_grupo" id="grp"></select></label>
+<label>Tipo de orden / instalación<select name="tipo_orden" id="tip"></select></label>
+<label>Prioridad<select name="prioridad">{% for p in PRIORIDADES %}<option {{'selected' if (v.prioridad or 'media')==p}}>{{p}}</option>{% endfor %}</select></label>
+<label>Estado<select name="estado">{% for e in ESTADOS %}<option {{'selected' if (v.estado or 'pendiente')==e}}>{{e}}</option>{% endfor %}</select></label>
+<label>Fecha de la orden<input type="date" name="fecha_emision" value="{{v.fecha_emision or hoy}}"></label>
+<label>Fecha en que se debe ejecutar / se promete la entrega<input type="date" name="fecha_programada" value="{{v.fecha_programada or ''}}" required></label>
+</div></fieldset>
+<fieldset><legend>Persona que ordena</legend><div class="grid g2">
+<label>Nombre<input name="ordena_nombre" value="{{v.ordena_nombre or ''}}"></label>
+<label>Puesto<select name="ordena_puesto"><option></option>{% for p in PUESTOS_ORDENA %}<option {{'selected' if v.ordena_puesto==p}}>{{p}}</option>{% endfor %}</select></label></div></fieldset>
+<fieldset><legend>Cliente y lugar</legend><div class="grid g2">
+<label>Cliente / nombre<input name="cliente" value="{{v.cliente or ''}}"></label>
+<label>Tipo de cliente<select name="tipo_cliente"><option></option>{% for p in TIPOS_CLIENTE %}<option {{'selected' if v.tipo_cliente==p}}>{{p}}</option>{% endfor %}</select></label>
+<label>Sitio / lugar de la orden<input name="sitio" value="{{v.sitio or ''}}"></label>
+<label>Calle y No.<input name="calle" value="{{v.calle or ''}}"></label>
+<label>Ciudad<input name="ciudad" value="{{v.ciudad or ''}}"></label><label>Estado (entidad)<input name="estado_geo" value="{{v.estado_geo or ''}}"></label>
+<label>Persona de contacto<input name="contacto" value="{{v.contacto or ''}}"></label><label>Teléfono<input name="telefono" value="{{v.telefono or ''}}"></label>
+<label>Coordenadas GPS (punto A)<input name="coordenadas" value="{{v.coordenadas or ''}}" placeholder="19.4326,-99.1332"></label>
+<label>Coordenadas GPS punto B (enlaces P-P)<input name="coordenadas_b" value="{{v.coordenadas_b or ''}}"></label></div>
+<label>Descripción y lugar de la orden<textarea name="descripcion" rows="3">{{v.descripcion or ''}}</textarea></label></fieldset>
+<fieldset><legend>Ejecución</legend><div class="grid g2">
+<label>Cuadrilla asignada<select name="cuadrilla_id"><option value="">— Sin asignar —</option>{% for c in cuadrillas %}<option value="{{c.id}}" {{'selected' if v.cuadrilla_id==c.id}}>{{c.nombre}} ({{c.especialidad}})</option>{% endfor %}</select></label>
+<label>Puesto de quien ejecutó<select name="ejecuto_puesto"><option></option>{% for p in PUESTOS_EJEC %}<option {{'selected' if v.ejecuto_puesto==p}}>{{p}}</option>{% endfor %}</select></label>
+<label>Personas adicionales involucradas<input name="personas_adicionales" value="{{v.personas_adicionales or ''}}"></label>
+<label>No. folio reporte de evidencias<input name="folio_evidencias" value="{{v.folio_evidencias or ''}}"></label>
+<label>Inicio de ejecución<input type="datetime-local" name="fecha_inicio" value="{{v.fecha_inicio or ''}}"></label>
+<label>Fin de ejecución (cierre)<input type="datetime-local" name="fecha_cierre" value="{{v.fecha_cierre or ''}}"></label></div>
+<label>Observaciones<textarea name="observaciones" rows="2">{{v.observaciones or ''}}</textarea></label>
+<label>Notas de campo<textarea name="notas" rows="3">{{v.notas or ''}}</textarea></label></fieldset>
+<fieldset><legend>Auditoría de la ejecución</legend><div class="grid g2">
+<label>Persona que auditó<input name="audito_nombre" value="{{v.audito_nombre or ''}}"></label>
+<label>Puesto<select name="audito_puesto"><option></option>{% for p in PUESTOS_AUD %}<option {{'selected' if v.audito_puesto==p}}>{{p}}</option>{% endfor %}</select></label>
+<label>Fecha de auditoría<input type="date" name="fecha_auditoria" value="{{v.fecha_auditoria or ''}}"></label>
+<label>Aprobación<select name="aprobacion"><option value="">— Pendiente —</option><option {{'selected' if v.aprobacion=='POSITIVA'}}>POSITIVA</option><option {{'selected' if v.aprobacion=='NEGATIVA'}}>NEGATIVA</option></select></label></div>
+<label>Observaciones de auditoría<textarea name="obs_auditoria" rows="2">{{v.obs_auditoria or ''}}</textarea></label></fieldset>
+<button class="btn">Guardar</button> <a class="btn sec" href="{{ '/ordenes/%d'%o.id if o else '/ordenes' }}">Cancelar</a></form>
+<script>
+const T={{tipos_json|safe}},cat=document.getElementById('cat'),grp=document.getElementById('grp'),tip=document.getElementById('tip');
+const ini={g:{{(v.tipo_grupo or '')|tojson}},t:{{(v.tipo_orden or '')|tojson}}};
+function fill(s,arr,sel){s.innerHTML=arr.map(x=>`<option ${x==sel?'selected':''}>${x}</option>`).join('')}
+function upG(){fill(grp,Object.keys(T[cat.value]),ini.g);upT()} function upT(){fill(tip,T[cat.value][grp.value]||[],ini.t)}
+cat.onchange=upG;grp.onchange=upT;upG();
+</script>{% endblock %}

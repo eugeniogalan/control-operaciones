@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block body %}<h1>{{ c.nombre if c else 'Nueva cuadrilla' }}</h1>
+<form class="f" method="post"><fieldset><legend>Cuadrilla</legend><div class="grid g2">
+<label>Nombre<input name="nombre" required value="{{c.nombre if c else ''}}"></label>
+<label>Especialidad<select name="especialidad">{% for e in ['Fibra Óptica','Microondas','Redes / Wi-Fi','Satelital','Instalaciones a cliente','Mixta'] %}<option {{'selected' if c and c.especialidad==e}}>{{e}}</option>{% endfor %}</select></label>
+<label>Zona<input name="zona" value="{{c.zona if c else ''}}"></label>{% if c %}<label><input type="checkbox" name="activa" style="width:auto" {{'checked' if c.activa}}> Activa</label>{% endif %}</div></fieldset>
+{% for rol,k in [('líder','l'),('técnico','t')] %}{% set t=m.get(rol) %}<fieldset><legend>{{ 'Líder de cuadrilla' if k=='l' else 'Técnico' }}</legend><div class="grid g2">
+<label>Nombre<input name="{{k}}_nombre" value="{{t.nombre if t else ''}}" required></label><label>Teléfono<input name="{{k}}_tel" type="tel" value="{{t.telefono if t else ''}}"></label>
+<label>Especialidad<input name="{{k}}_esp" value="{{t.especialidad if t else ''}}"></label>
+<label>Puesto<select name="{{k}}_puesto">{% for p in PUESTOS_EJEC %}<option {{'selected' if t and t.puesto==p}}>{{p}}</option>{% endfor %}</select></label></div></fieldset>{% endfor %}
+<button class="btn">Guardar</button> <a class="btn sec" href="/cuadrillas">Cancelar</a></form>{% endblock %}

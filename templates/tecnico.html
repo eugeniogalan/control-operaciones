@@ -1,0 +1,30 @@
+{% extends 'base.html' %}{% from 'macros.html' import est, pri, fh %}{% block head %}<style>
+.oc{background:#fff;border:1px solid var(--b);border-left:6px solid #9aa5b4;border-radius:12px;padding:14px;margin-bottom:14px}
+.oc.s-en{border-left-color:#d48a00}.oc.s-completada{border-left-color:#16803c;opacity:.8}.oc.s-asignada{border-left-color:#1d4fb8}
+.big{display:block;width:100%;padding:16px;font-size:18px;font-weight:700;border-radius:10px;margin-top:8px}
+.oc textarea,.oc input{width:100%;padding:10px;font-size:16px;border:1px solid #c5ccd6;border-radius:8px;margin-top:6px}
+.sel{width:100%;padding:12px;font-size:17px;border-radius:10px;border:1px solid #c5ccd6}
+</style>{% endblock %}{% block body %}
+<select class="sel" onchange="location='/tecnico?cuadrilla='+this.value">{% for x in cs %}<option value="{{x.id}}" {{'selected' if x.id==c.id}}>{{x.nombre}} · {{x.especialidad}}</option>{% endfor %}</select>
+<p class="muted">{% for t in equipo %}{{'👷' if t.rol=='líder' else '🔧'}} {{t.nombre}}{{' · ' if not loop.last}}{% endfor %}</p>
+{% macro tarjeta(o) %}<div class="oc s-{{o.estado.split()[0]}}" id="o{{o.id}}">
+<div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:17px">{{o.folio}}</b><span>{{pri(o.prioridad)}} {{est(o.estado)}}</span></div>
+<div style="font-size:16px;margin-top:4px"><b>{{o.tipo_orden}}</b></div><div>{{o.cliente}} — {{o.sitio}}</div>
+<div class="muted">{{o.calle or ''}} {{o.ciudad or ''}} · 📅 {{o.fecha_programada}} {% if o.vencida %}<span class="venc">VENCIDA</span>{% endif %}</div>
+{% if o.contacto %}<div>📞 {{o.contacto}} <a href="tel:{{o.telefono}}">{{o.telefono}}</a></div>{% endif %}
+{% if o.coordenadas %}<div><a href="https://maps.google.com/?q={{o.coordenadas}}" target="_blank">📍 Abrir en mapa</a></div>{% endif %}
+{% if o.descripcion %}<div style="margin-top:4px">{{o.descripcion}}</div>{% endif %}
+{% if o.notas %}<div class="muted" style="white-space:pre-line;margin-top:4px">{{o.notas}}</div>{% endif %}
+{% if o.estado in ('pendiente','asignada','en curso') %}
+<form method="post" action="/ordenes/{{o.id}}/estado"><input type="hidden" name="origen" value="campo">
+<textarea name="nota" rows="2" placeholder="Notas (opcional)"></textarea>
+{% if o.estado!='en curso' %}<button class="btn ama big" name="estado" value="en curso">▶ Iniciar (en curso)</button>
+{% else %}<label class="muted">Hora de cierre<input type="datetime-local" name="hora" value="{{ahora}}"></label><button class="btn verde big" name="estado" value="completada">✔ Completada</button>{% endif %}
+</form>
+<form method="post" action="/ordenes/{{o.id}}/nota"><input type="hidden" name="origen" value="campo"><input name="nota" placeholder="Agregar solo una nota…" required><button class="btn sec big">Guardar nota</button></form>
+{% else %}<div class="muted">Cerrada: {{fh(o.fecha_cierre)}}</div>{% endif %}
+<div style="display:flex;gap:8px"><a class="btn sec big" style="text-align:center" href="/ordenes/{{o.id}}/evidencias?origen=campo">📷 Evidencias</a><a class="btn sec big" style="text-align:center" href="/ordenes/{{o.id}}/materiales?origen=campo">📦 Materiales</a></div>
+</div>{% endmacro %}
+<h2>Hoy ({{de_hoy|length}})</h2>{% for o in de_hoy %}{{tarjeta(o)}}{% else %}<p class="muted">No hay órdenes programadas para hoy.</p>{% endfor %}
+<h2>Pendientes ({{pend|length}})</h2>{% for o in pend %}{{tarjeta(o)}}{% else %}<p class="muted">Sin pendientes.</p>{% endfor %}
+{% endblock %}

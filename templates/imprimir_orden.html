@@ -1,0 +1,21 @@
+{% extends 'print_base.html' %}{% block c %}{% macro ck(c) %}<span class="x">{{'X' if c}}</span>{% endmacro %}
+{% set lider = (equipo|selectattr('rol','equalto','líder')|list) %}{% set tec = (equipo|selectattr('rol','equalto','técnico')|list) %}
+<h1>{{ 'ORDEN DE INSTALACIÓN A CLIENTE' if o.categoria=='INST' else ('ORDEN DE EJECUCIÓN - RED DE FIBRA ÓPTICA' if o.categoria=='EJ-FO' else 'ORDEN DE EJECUCIÓN - RED DE MICROONDAS') }}</h1>
+<table><tr><td>FECHA: {{o.fecha_emision}}</td><td>FOLIO: <b>{{o.folio}}</b></td></tr></table>
+<div class="s">PERSONA QUE ORDENA:</div><table><tr><td>Nombre: {{o.ordena_nombre or ''}}</td><td>Puesto: {% for p in (['Director/Gerente','Vendedor','Supervisor'] if o.categoria=='INST' else ['Director','Gerente','Supervisor']) %}{{ck(o.ordena_puesto and o.ordena_puesto in p)}}{{p}} {% endfor %}</td></tr>
+<tr><td class="firma">Firma:</td><td>{{ 'Fecha en que se promete la entrega' if o.categoria=='INST' else 'Fecha en que se debe ejecutar' }}: <b>{{o.fecha_programada}}</b></td></tr></table>
+{% if o.categoria=='INST' %}
+<div class="s">DATOS DEL CLIENTE:</div><table><tr><td colspan="2">Nombre: {{o.cliente}}</td></tr><tr><td colspan="2">Calle y No.: {{o.calle or ''}}</td></tr><tr><td>Ciudad: {{o.ciudad or ''}}</td><td>Estado: {{o.estado_geo or ''}}</td></tr><tr><td>Persona de contacto: {{o.contacto or ''}}</td><td>Teléfono: {{o.telefono or ''}}</td></tr></table>
+<div class="s">TIPO DE CLIENTE:</div><table><tr>{% for t in TIPOS_CLIENTE %}<td>{{ck(o.tipo_cliente==t)}}{{t}}</td>{% endfor %}</tr></table>
+<div class="s">TIPO DE INSTALACIÓN:</div><table>{% for t in TIPOS['INST']['Tipo de instalación']|batch(2) %}<tr>{% for x in t %}<td>{{ck(o.tipo_orden==x)}}{{x}}</td>{% endfor %}</tr>{% endfor %}</table>
+<div class="s">DESCRIPCIÓN BREVE DE LA ORDEN:</div><table><tr><td style="height:50px">{{o.sitio or ''}} — {{o.descripcion or ''}}</td></tr></table>
+{% else %}<div class="s">TIPO DE ORDEN:</div><table>{% for g,ts in TIPOS[o.categoria].items() %}<tr><td style="width:30%"><b>{{g|upper}}</b></td><td>{% for x in ts %}<div>{{ck(o.tipo_orden==x)}}{{x}}</div>{% endfor %}</td></tr>{% endfor %}</table>
+<div class="s">DESCRIPCIÓN Y LUGAR DE LA ORDEN:</div><table><tr><td style="height:50px">{{o.cliente or ''}} · {{o.sitio or ''}} {{o.coordenadas or ''}}<br>{{o.descripcion or ''}}</td></tr></table>{% endif %}
+<div class="s">PERSONA QUE EJECUTÓ:</div><table><tr><td>Nombre: {{lider[0].nombre if lider else ''}} ({{o.cuad or ''}})</td><td>Puesto: {% for p in PUESTOS_EJEC %}{{ck(o.ejecuto_puesto==p)}}{{p}} {% endfor %}</td></tr>
+<tr><td class="firma">Firma:</td><td>Fecha en que se inició la ejecución: {{(o.fecha_inicio or '')|replace('T',' ')}}</td></tr>
+<tr><td>Personas adicionales involucradas: {{ tec[0].nombre if tec else '' }}{% if o.personas_adicionales %}, {{o.personas_adicionales}}{% endif %}</td><td>Fecha en que terminó la ejecución: {{(o.fecha_cierre or '')|replace('T',' ')}}</td></tr>
+{% if o.categoria=='INST' %}<tr><td colspan="2">No. Folio Reporte de Evidencias: {{o.folio_evidencias or ''}}</td></tr>{% endif %}
+<tr><td colspan="2" style="height:40px">Observaciones: {{o.observaciones or ''}} {{o.notas or ''}}</td></tr></table>
+<div class="s">PERSONA QUE AUDITÓ LA EJECUCIÓN:</div><table><tr><td>Nombre: {{o.audito_nombre or ''}}</td><td>Puesto: {% for p in PUESTOS_AUD %}{{ck(o.audito_puesto==p)}}{{p}} {% endfor %}</td></tr>
+<tr><td class="firma">Firma:</td><td>Fecha en que se auditó: {{o.fecha_auditoria or ''}}</td></tr><tr><td colspan="2">APROBACIÓN: {{ck(o.aprobacion=='POSITIVA')}}POSITIVA {{ck(o.aprobacion=='NEGATIVA')}}NEGATIVA</td></tr>
+<tr><td colspan="2" style="height:40px">Observaciones: {{o.obs_auditoria or ''}}</td></tr></table>{% endblock %}

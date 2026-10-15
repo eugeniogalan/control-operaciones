@@ -1,0 +1,10 @@
+{% extends 'base.html' %}{% block body %}
+<h1>Materiales · {{o.folio}} <span class="muted">plantilla {{plantilla}}</span></h1>
+<form method="post" class="f"><input type="hidden" name="origen" value="{{origen}}">
+<div class="tw"><table><tr><th>Concepto</th><th>Tipo</th><th style="width:110px">Cantidad</th><th>Unidad</th></tr>
+{% set ns=namespace(s='') %}{% for m in cat %}{% if m.seccion!=ns.s %}{% set ns.s=m.seccion %}<tr><th colspan="4" style="background:#dfe7f1">{{m.seccion}}</th></tr>{% endif %}
+{% set a=actual.get(m.concepto+'|'+m.seccion) %}<tr><td>{{m.concepto}}</td><td>{% set ops=m.tipos.replace(' y ',', ').split(',') if m.tipos and m.tipos!='(Tipos)' else [] %}
+{% if ops|length>1 %}<select name="t{{loop.index0}}"><option></option>{% for x in ops %}<option {{'selected' if a and a.tipo==x.strip()}}>{{x.strip()}}</option>{% endfor %}</select>{% else %}<input name="t{{loop.index0}}" value="{{a.tipo if a else (m.tipos if m.tipos!='(Tipos)' else '')}}">{% endif %}</td>
+<td><input type="number" step="any" min="0" inputmode="decimal" name="q{{loop.index0}}" value="{{a.cantidad if a else ''}}"></td><td>{{m.unidad}}</td></tr>{% endfor %}
+<tr><th colspan="4" style="background:#dfe7f1">OTROS MATERIALES</th></tr>{% for j in range(3) %}<tr><td><input name="on{{j}}" placeholder="Concepto"></td><td></td><td><input type="number" step="any" name="oq{{j}}"></td><td><input name="ou{{j}}" placeholder="unidad"></td></tr>{% endfor %}
+</table></div><p><button class="btn">Guardar materiales</button></p></form>{% endblock %}

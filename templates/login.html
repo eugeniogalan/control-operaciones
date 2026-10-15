@@ -1,0 +1,7 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Iniciar sesión</title>
+<style>body{margin:0;font-family:system-ui,sans-serif;background:#0b4f8a;display:flex;min-height:100vh;align-items:center;justify-content:center}
+form{background:#fff;border-radius:14px;padding:24px;width:92%;max-width:360px}h1{font-size:20px;margin:0 0 16px}label{display:block;font-size:14px;color:#4a5260;margin-bottom:12px}
+input{width:100%;box-sizing:border-box;padding:12px;font-size:17px;border:1px solid #c5ccd6;border-radius:8px;margin-top:4px}button{width:100%;padding:14px;font-size:17px;font-weight:700;background:#0b4f8a;color:#fff;border:0;border-radius:10px}.e{color:#b42318;margin-bottom:10px}</style></head>
+<body><form method="post"><h1>⚙ Control de Operaciones</h1>{% if err %}<div class="e">{{err}}</div>{% endif %}
+<label>Usuario<input name="usuario" autocomplete="username" autocapitalize="none" required></label>
+<label>Contraseña<input name="clave" type="password" autocomplete="current-password" required></label><button>Entrar</button></form></body></html>

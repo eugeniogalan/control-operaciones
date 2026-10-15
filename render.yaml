@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: ops-app
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    # El disco del plan gratuito es efímero: la base se recrea con datos de EJEMPLO en cada arranque/redeploy.
+    startCommand: python seed.py --if-missing && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60
+    healthCheckPath: /login
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ADMIN_USER
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DB_PATH
+        value: /tmp/ops-data/ops.db
+      - key: UPLOAD_DIR
+        value: /tmp/ops-data/uploads

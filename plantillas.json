@@ -1,0 +1,2048 @@
+{
+ "FO": {
+  "fotos": [
+   "Fachada principal del Edificio Donde se instaló.",
+   "Acometida por donde ingresa la Fibra al Edificio",
+   "Trayectoria de la Fibra",
+   "Ingreso de la Fibra a el Cuarto en donde se instalaron los aparatos de telecomunicaciones.",
+   "Vista general del SITE o del cuarto en donde se Ubicaron los equipos de telecomunicaciones.",
+   "Vista FRONTAL de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "Vista TRASERA de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "Vista frontal de ODF o Roseta",
+   "Vista Frontal del ROUTER o Demarcador del Servicio",
+   "Vista de Regulador de Voltaje",
+   "Vista de UPS (Respaldo de Energía)",
+   "Vista de Voltaje en Multimetro en el contacto en donde se conecta el regulador de voltaje"
+  ],
+  "materiales": [
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fibra Optica ADSS",
+    "tipos": "96, 72, 48, 24, 12 hilos",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fibra Optica MINI ADSS",
+    "tipos": "12, 8, 6 hilos",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fibra Optica DROP",
+    "tipos": "2, 1 hilos",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Jumper DROP",
+    "tipos": "50, 100, 150 metros",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Conector Mecánico para Drop",
+    "tipos": "SC, Otro",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Poste",
+    "tipos": "Madera, Concreto",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Mastil 3m. para acometida",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Gancho Tensor para cable drop",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Remate preformado",
+    "tipos": "ADSS, MINI ADSS",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Caja/Cierre de Empalme",
+    "tipos": "3M, Optronics",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Registro de Telecomunicaciones",
+    "tipos": "Concreto, Fibra de Vidrio, Plastico",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Ducto plástico subterráneo",
+    "tipos": "3/4, 1, 1 1/2, 2 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Conector para Ducto Subterráneo",
+    "tipos": "3/4, 1, 1 1/2, 2 pulg. Diam.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Herrajes tipo \"D\"",
+    "tipos": "ADSS, MINI ADSS",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Herrajes tipo \"J\"",
+    "tipos": "ADSS, MINI ADSS",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fleje",
+    "tipos": "5/8, 3/4 pulg.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Hebilla",
+    "tipos": "5/8, 3/4 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "ODF (Distribuidor de Fibra Optica)",
+    "tipos": "2, 4, 6, 8, 12, 24, 48, 72 hilos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Roseta",
+    "tipos": "1, 2 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Mangas para fusión",
+    "tipos": "40, 60 mm.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Jumpers de Fibra",
+    "tipos": "1, 2, 3, 6, 10 pies",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Escalerilla",
+    "tipos": "50, 100,150, 200, 300 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Router",
+    "tipos": "MTK (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "ONT",
+    "tipos": "Variantes",
+    "unidad": ""
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Demarcador",
+    "tipos": "RAISECOM (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch POE",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Monitor ambiental",
+    "tipos": "Tycon, Itwatchdogs, Otro",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Cable de Parcheo UTP (Cobre)",
+    "tipos": "1, 2, 3, 5, 10 ft.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de piso",
+    "tipos": "24, 45 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack/Gabinete de pared cerrado",
+    "tipos": "4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de pared abierto",
+    "tipos": "2, 4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Charola para rack",
+    "tipos": "1, 2, 3 UR.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Regulador de Voltaje",
+    "tipos": "1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "UPS (Respaldo de Energía)",
+    "tipos": "500, 600, 750, 1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Barra multicontacto",
+    "tipos": "6, 8, 10 contactos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Clavija tipo Industrial",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Contacto Doble c/Caja",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 3 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 2 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Sistema de Tierras",
+    "tipos": "",
+    "unidad": "kit"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete expansor acero",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete plastico",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Pijas",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinchos de plastico",
+    "tipos": "12 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Tensor",
+    "tipos": "3/16, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Grapa con Clavo para Concreto",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Alambre galvanizado",
+    "tipos": "",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Aislante",
+    "tipos": "",
+    "unidad": "cms."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Adhesiva \"Doble cara\"",
+    "tipos": "",
+    "unidad": "cms."
+   }
+  ],
+  "reportes": [
+   "Reporte generado (PDF)",
+   "Reporte de datos de entrega (PDF)"
+  ]
+ },
+ "MO": {
+  "fotos": [
+   "Fachada principal del Edificio Donde se instaló.",
+   "Azotea  (Vista General)",
+   "Torre, Mástil, Montaje tipo \"J\", Montaje \"Fleximount\", u otro tipo de soporte. (Que salga completo)",
+   "Vista FRONTAL  de Antena instalada",
+   "Vista TRASERA de Antena Instalada",
+   "Trayectoria y sujeción de cable UTP (Varias fotografías)",
+   "Ingreso de Cable UTP a cuarto en donde se instalaron los aparatos de telecomunicaciones.",
+   "Vista general del SITE o del cuarto en donde se Ubicaron los equipos de telecomunicaciones.",
+   "Vista FRONTAL de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "Vista TRASERA de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "Vista Frontal del ROUTER o Demarcador del Servicio",
+   "Vista de Regulador de Voltaje",
+   "Vista de UPS (Respaldo de Energía)",
+   "Vista de Voltaje en Multimetro en el contacto en donde se conecta el regulador de voltaje"
+  ],
+  "materiales": [
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Antena",
+    "tipos": "25, 30, 34 dbi.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Radio",
+    "tipos": "Mimosa C5C, Mimosa C5X, Mimosa C6X, Prism AC GEN2, AC Lite",
+    "unidad": ""
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Radio con antena Integrada",
+    "tipos": "Litebeam M5 23dbi, Litebeam AC GEN2 23dbi, PowerBeam M5 25dbi, Powerbeam AC GEN2 25dbi, Powerbeam AC GEN2 27dbi, Powerbeam AC GEN2 29dbi.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Cable UTP para Exteriores",
+    "tipos": "CAT5e, CAT6, CAT6A",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Mastil 3m. para antena",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Montaje tipo \"J\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Montaje tipo \"Fleximount\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Mástil Telescópico",
+    "tipos": "6, 9, 12, 15 metros",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Torre de Telecomunicaciones",
+    "tipos": "TZ30, TZ45",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA INTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA INTERNA",
+    "concepto": "Escalerilla",
+    "tipos": "50, 100,150, 200, 300 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Router",
+    "tipos": "MTK (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Demarcador",
+    "tipos": "RAISECOM (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch POE",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Monitor ambiental",
+    "tipos": "Tycon, Itwatchdogs, Otro",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Cable de Parcheo UTP (Cobre)",
+    "tipos": "1, 2, 3, 5, 10 ft.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de piso",
+    "tipos": "24, 45 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack/Gabinete de pared cerrado",
+    "tipos": "4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de pared abierto",
+    "tipos": "2, 4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Charola para rack",
+    "tipos": "1, 2, 3 UR.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Regulador de Voltaje",
+    "tipos": "1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "UPS (Respaldo de Energía)",
+    "tipos": "500, 600, 750, 1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Barra multicontacto",
+    "tipos": "6, 8, 10 contactos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Clavija tipo Industrial",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Contacto Doble c/Caja",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 3 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 2 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Sistema de Tierras",
+    "tipos": "",
+    "unidad": "kit"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete expansor acero",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete plastico",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Pijas",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinchos de plastico",
+    "tipos": "12 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Tensor",
+    "tipos": "3/16, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Grapa con Clavo para Concreto",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Alambre galvanizado",
+    "tipos": "",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Aislante",
+    "tipos": "",
+    "unidad": "cms."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Adhesiva \"Doble cara\"",
+    "tipos": "",
+    "unidad": "cms."
+   }
+  ],
+  "reportes": [
+   "Reporte generado (PDF)",
+   "Reporte de datos de entrega (PDF)"
+  ]
+ },
+ "SAT": {
+  "fotos": [
+   "Fachada principal del Edificio Donde se instaló.",
+   "Azotea  (Vista General)",
+   "Vista FRONTAL  de Antena instalada",
+   "Vista TRASERA de Antena Instalada",
+   "Trayectoria y sujeción de cable de alimentación (Varias fotografías)",
+   "Ingreso de Cable de Alimentación a cuarto en donde se instalaron los aparatos de telecomunicaciones.",
+   "Vista general del SITE o del cuarto en donde se Ubicaron los equipos de telecomunicaciones.",
+   "Vista FRONTAL de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "Vista TRASERA de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "Vista Frontal del ROUTER o Demarcador del Servicio",
+   "Vista de Regulador de Voltaje",
+   "Vista de UPS (Respaldo de Energía)",
+   "Vista de Voltaje en Multimetro en el contacto en donde se conecta el regulador de voltaje"
+  ],
+  "materiales": [
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Antena/Radio",
+    "tipos": "Starlink G1, G2, G3, Mini",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA INTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA INTERNA",
+    "concepto": "Escalerilla",
+    "tipos": "50, 100,150, 200, 300 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Router",
+    "tipos": "MTK (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch POE",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Monitor ambiental",
+    "tipos": "Tycon, Itwatchdogs, Otro",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Cable de Parcheo UTP (Cobre)",
+    "tipos": "1, 2, 3, 5, 10 ft.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de piso",
+    "tipos": "24, 45 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack/Gabinete de pared cerrado",
+    "tipos": "4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de pared abierto",
+    "tipos": "2, 4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Charola para rack",
+    "tipos": "1, 2, 3 UR.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Regulador de Voltaje",
+    "tipos": "1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "UPS (Respaldo de Energía)",
+    "tipos": "500, 600, 750, 1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Barra multicontacto",
+    "tipos": "6, 8, 10 contactos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Clavija tipo Industrial",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Contacto Doble c/Caja",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 3 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 2 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Sistema de Tierras",
+    "tipos": "",
+    "unidad": "kit"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete expansor acero",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete plastico",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Pijas",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinchos de plastico",
+    "tipos": "12 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Tensor",
+    "tipos": "3/16, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Grapa con Clavo para Concreto",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Alambre galvanizado",
+    "tipos": "",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Aislante",
+    "tipos": "",
+    "unidad": "cms."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Adhesiva \"Doble cara\"",
+    "tipos": "",
+    "unidad": "cms."
+   }
+  ],
+  "reportes": [
+   "Reporte de datos de entrega (PDF)"
+  ]
+ },
+ "FO P-P": {
+  "fotos": [
+   "PUNTO A: Fachada principal del Edificio Donde se instaló.",
+   "PUNTO A: Acometida por donde ingresa la Fibra al Edificio",
+   "PUNTO A: Trayectoria de la Fibra",
+   "PUNTO A: Ingreso de la Fibra a el Cuarto en donde se instalaron los aparatos de telecomunicaciones.",
+   "PUNTO A: Vista general del SITE o del cuarto en donde se Ubicaron los equipos de telecomunicaciones.",
+   "PUNTO A: Vista FRONTAL de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO A: Vista TRASERA de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO A: Vista frontal de ODF o Roseta",
+   "PUNTO A: Vista Frontal del ROUTER o Demarcador del Servicio",
+   "PUNTO A: Vista de Regulador de Voltaje",
+   "PUNTO A: Vista de UPS (Respaldo de Energía)",
+   "PUNTO A: Vista de Voltaje en Multimetro en el contacto en donde se conecta el regulador de voltaje",
+   "PUNTO B: Fachada principal del Edificio Donde se instaló.",
+   "PUNTO B: Acometida por donde ingresa la Fibra al Edificio",
+   "PUNTO B: Trayectoria de la Fibra",
+   "PUNTO B: Ingreso de la Fibra a el Cuarto en donde se instalaron los aparatos de telecomunicaciones.",
+   "PUNTO B: Vista general del SITE o del cuarto en donde se Ubicaron los equipos de telecomunicaciones.",
+   "PUNTO B: Vista FRONTAL de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO B: Vista TRASERA de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO B: Vista frontal de ODF o Roseta",
+   "PUNTO B: Vista Frontal del ROUTER o Demarcador del Servicio",
+   "PUNTO B: Vista de Regulador de Voltaje",
+   "PUNTO B: Vista de UPS (Respaldo de Energía)",
+   "PUNTO B: Vista de Voltaje en Multimetro en el contacto en donde se conecta el regulador de voltaje"
+  ],
+  "materiales": [
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fibra Optica ADSS",
+    "tipos": "96, 72, 48, 24, 12 hilos",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fibra Optica MINI ADSS",
+    "tipos": "12, 8, 6 hilos",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fibra Optica DROP",
+    "tipos": "2, 1 hilos",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Jumper DROP",
+    "tipos": "50, 100, 150 metros",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Conector Mecánico para Drop",
+    "tipos": "SC, Otro",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Poste",
+    "tipos": "Madera, Concreto",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Mastil 3m. para acometida",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Gancho Tensor para cable drop",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Remate preformado",
+    "tipos": "ADSS, MINI ADSS",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Caja/Cierre de Empalme",
+    "tipos": "3M, Optronics",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Registro de Telecomunicaciones",
+    "tipos": "Concreto, Fibra de Vidrio, Plastico",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Ducto plástico subterráneo",
+    "tipos": "3/4, 1, 1 1/2, 2 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Conector para Ducto Subterráneo",
+    "tipos": "3/4, 1, 1 1/2, 2 pulg. Diam.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Herrajes tipo \"D\"",
+    "tipos": "ADSS, MINI ADSS",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Herrajes tipo \"J\"",
+    "tipos": "ADSS, MINI ADSS",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Fleje",
+    "tipos": "5/8, 3/4 pulg.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Hebilla",
+    "tipos": "5/8, 3/4 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA EXTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "ODF (Distribuidor de Fibra Optica)",
+    "tipos": "2, 4, 6, 8, 12, 24, 48, 72 hilos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Roseta",
+    "tipos": "1, 2 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Mangas para fusión",
+    "tipos": "40, 60 mm.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Jumpers de Fibra",
+    "tipos": "1, 2, 3, 6, 10 pies",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "FIBRA PLANTA INTERNA",
+    "concepto": "Escalerilla",
+    "tipos": "50, 100,150, 200, 300 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Router",
+    "tipos": "MTK (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "ONT",
+    "tipos": "Variantes",
+    "unidad": ""
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Demarcador",
+    "tipos": "RAISECOM (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch POE",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Monitor ambiental",
+    "tipos": "Tycon, Itwatchdogs, Otro",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Cable de Parcheo UTP (Cobre)",
+    "tipos": "1, 2, 3, 5, 10 ft.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de piso",
+    "tipos": "24, 45 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack/Gabinete de pared cerrado",
+    "tipos": "4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de pared abierto",
+    "tipos": "2, 4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Charola para rack",
+    "tipos": "1, 2, 3 UR.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Regulador de Voltaje",
+    "tipos": "1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "UPS (Respaldo de Energía)",
+    "tipos": "500, 600, 750, 1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Barra multicontacto",
+    "tipos": "6, 8, 10 contactos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Clavija tipo Industrial",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Contacto Doble c/Caja",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 3 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 2 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Sistema de Tierras",
+    "tipos": "",
+    "unidad": "kit"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete expansor acero",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete plastico",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Pijas",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinchos de plastico",
+    "tipos": "12 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Tensor",
+    "tipos": "3/16, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Grapa con Clavo para Concreto",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Alambre galvanizado",
+    "tipos": "",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Aislante",
+    "tipos": "",
+    "unidad": "cms."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Adhesiva \"Doble cara\"",
+    "tipos": "",
+    "unidad": "cms."
+   }
+  ],
+  "reportes": [
+   "Reporte generado (PDF)",
+   "Reporte de datos de entrega (PDF)"
+  ]
+ },
+ "MO P-P": {
+  "fotos": [
+   "PUNTO A: Fachada principal del Edificio Donde se instaló.",
+   "PUNTO A: Azotea  (Vista General)",
+   "PUNTO A: Torre, Mástil, Montaje tipo \"J\", Montaje \"Fleximount\", u otro tipo de soporte. (Que salga completo)",
+   "PUNTO A: Vista FRONTAL  de Antena instalada",
+   "PUNTO A: Vista TRASERA de Antena Instalada",
+   "PUNTO A: Trayectoria y sujeción de cable UTP (Varias fotografías)",
+   "PUNTO A: Ingreso de Cable UTP a cuarto en donde se instalaron los aparatos de telecomunicaciones.",
+   "PUNTO A: Vista general del SITE o del cuarto en donde se Ubicaron los equipos de telecomunicaciones.",
+   "PUNTO A: Vista FRONTAL de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO A: Vista TRASERA de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO A: Vista Frontal del ROUTER o Demarcador del Servicio",
+   "PUNTO A: Vista de Regulador de Voltaje",
+   "PUNTO A: Vista de UPS (Respaldo de Energía)",
+   "PUNTO A: Vista de Voltaje en Multimetro en el contacto en donde se conecta el regulador de voltaje",
+   "PUNTO B: Fachada principal del Edificio Donde se instaló.",
+   "PUNTO B: Azotea  (Vista General)",
+   "PUNTO B: Torre, Mástil, Montaje tipo \"J\", Montaje \"Fleximount\", u otro tipo de soporte. (Que salga completo)",
+   "PUNTO B: Vista FRONTAL  de Antena instalada",
+   "PUNTO B: Vista TRASERA de Antena Instalada",
+   "PUNTO B: Trayectoria y sujeción de cable UTP (Varias fotografías)",
+   "PUNTO B: Ingreso de Cable UTP a cuarto en donde se instalaron los aparatos de telecomunicaciones.",
+   "PUNTO B: Vista general del SITE o del cuarto en donde se Ubicaron los equipos de telecomunicaciones.",
+   "PUNTO B: Vista FRONTAL de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO B: Vista TRASERA de RACK o Mueble en donde se colocaron los equipos de telecomunicaciones",
+   "PUNTO B: Vista Frontal del ROUTER o Demarcador del Servicio",
+   "PUNTO B: Vista de Regulador de Voltaje",
+   "PUNTO B: Vista de UPS (Respaldo de Energía)",
+   "PUNTO B: Vista de Voltaje en Multimetro en el contacto en donde se conecta el regulador de voltaje"
+  ],
+  "materiales": [
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Antena",
+    "tipos": "25, 30, 34 dbi.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Radio",
+    "tipos": "Mimosa C5C, Mimosa C5X, Mimosa C6X, Prism AC GEN2, AC Lite",
+    "unidad": ""
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Radio con antena Integrada",
+    "tipos": "Litebeam M5 23dbi, Litebeam AC GEN2 23dbi, PowerBeam M5 25dbi, Powerbeam AC GEN2 25dbi, Powerbeam AC GEN2 27dbi, Powerbeam AC GEN2 29dbi.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Cable UTP para Exteriores",
+    "tipos": "CAT5e, CAT6, CAT6A",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Mastil 3m. para antena",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Montaje tipo \"J\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Montaje tipo \"Fleximount\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Mástil Telescópico",
+    "tipos": "6, 9, 12, 15 metros",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Torre de Telecomunicaciones",
+    "tipos": "TZ30, TZ45",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA EXTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA INTERNA",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "PLANTA INTERNA",
+    "concepto": "Escalerilla",
+    "tipos": "50, 100,150, 200, 300 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Router",
+    "tipos": "MTK (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Demarcador",
+    "tipos": "RAISECOM (Variantes)",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Switch POE",
+    "tipos": "4, 8, 16, 24, 48 puertos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Monitor ambiental",
+    "tipos": "Tycon, Itwatchdogs, Otro",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS DE RED",
+    "concepto": "Cable de Parcheo UTP (Cobre)",
+    "tipos": "1, 2, 3, 5, 10 ft.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de piso",
+    "tipos": "24, 45 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack/Gabinete de pared cerrado",
+    "tipos": "4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de pared abierto",
+    "tipos": "2, 4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Charola para rack",
+    "tipos": "1, 2, 3 UR.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Regulador de Voltaje",
+    "tipos": "1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "UPS (Respaldo de Energía)",
+    "tipos": "500, 600, 750, 1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Barra multicontacto",
+    "tipos": "6, 8, 10 contactos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Clavija tipo Industrial",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Contacto Doble c/Caja",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 3 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 2 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Sistema de Tierras",
+    "tipos": "",
+    "unidad": "kit"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete expansor acero",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete plastico",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Pijas",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinchos de plastico",
+    "tipos": "12 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Tensor",
+    "tipos": "3/16, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Grapa con Clavo para Concreto",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Alambre galvanizado",
+    "tipos": "",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Aislante",
+    "tipos": "",
+    "unidad": "cms."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Adhesiva \"Doble cara\"",
+    "tipos": "",
+    "unidad": "cms."
+   }
+  ],
+  "reportes": [
+   "Reporte generado (PDF)",
+   "Reporte de datos de entrega (PDF)"
+  ]
+ },
+ "Red WIFI": {
+  "fotos": [
+   "Switch No.1: imagen cercana",
+   "Switch No.1: imagen lejana",
+   "Switch No.2: imagen cercana",
+   "Switch No.2: imagen lejana",
+   "Switch No.3: imagen cercana",
+   "Switch No.3: imagen lejana",
+   "Switch POE No.1: imagen cercana",
+   "Switch POE No.1: imagen lejana",
+   "Switch POE No.2: imagen cercana",
+   "Switch POE No.2: imagen lejana",
+   "Switch POE No.3: imagen cercana",
+   "Switch POE No.3: imagen lejana",
+   "Access Point No.1: imagen cercana",
+   "Access Point No.1: imagen lejana",
+   "Nodo de Red AP No.1: cableado",
+   "Access Point No.2: imagen cercana",
+   "Access Point No.2: imagen lejana",
+   "Nodo de Red AP No.2: cableado",
+   "Access Point No.3: imagen cercana",
+   "Access Point No.3: imagen lejana",
+   "Nodo de Red AP No.3: cableado"
+  ],
+  "materiales": [
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.1",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.2",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.3",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.N…",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.1",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.2",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.3",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.N…",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.1",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.1",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.2",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.2",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.3",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.3",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.N…",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.N…",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "CANALIZACIÓN y ACCESORIOS DE MONTAJE",
+    "tipos": "",
+    "unidad": ""
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Canaleta de PVC",
+    "tipos": "12X8, 20X10, 20X17, 35X17 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Escalerilla",
+    "tipos": "50, 100,150, 200, 300 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Mastil 3m. para antena",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Montaje tipo \"J\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Montaje tipo \"Fleximount\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de piso",
+    "tipos": "24, 45 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack/Gabinete de pared cerrado",
+    "tipos": "4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de pared abierto",
+    "tipos": "2, 4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Charola para rack",
+    "tipos": "1, 2, 3 UR.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Regulador de Voltaje",
+    "tipos": "1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "UPS (Respaldo de Energía)",
+    "tipos": "500, 600, 750, 1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Barra multicontacto",
+    "tipos": "6, 8, 10 contactos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Clavija tipo Industrial",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Contacto Doble c/Caja",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 3 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 2 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Sistema de Tierras",
+    "tipos": "",
+    "unidad": "kit"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete expansor acero",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete plastico",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Pijas",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinchos de plastico",
+    "tipos": "12 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Tensor",
+    "tipos": "3/16, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Grapa con Clavo para Concreto",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Alambre galvanizado",
+    "tipos": "",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Aislante",
+    "tipos": "",
+    "unidad": "cms."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Adhesiva \"Doble cara\"",
+    "tipos": "",
+    "unidad": "cms."
+   }
+  ],
+  "reportes": [
+   "Layout de instalación (PDF)",
+   "Captura de pantalla del controlador (PDF)",
+   "Captura de pantalla de la configuración (PDF)"
+  ]
+ },
+ "ROUTER-FW": {
+  "fotos": [
+   "Switch No.1: imagen cercana",
+   "Switch No.1: imagen lejana",
+   "Switch No.2: imagen cercana",
+   "Switch No.2: imagen lejana",
+   "Switch No.3: imagen cercana",
+   "Switch No.3: imagen lejana",
+   "Switch POE No.1: imagen cercana",
+   "Switch POE No.1: imagen lejana",
+   "Switch POE No.2: imagen cercana",
+   "Switch POE No.2: imagen lejana",
+   "Switch POE No.3: imagen cercana",
+   "Switch POE No.3: imagen lejana",
+   "Access Point No.1: imagen cercana",
+   "Access Point No.1: imagen lejana",
+   "Nodo de Red AP No.1: cableado",
+   "Access Point No.2: imagen cercana",
+   "Access Point No.2: imagen lejana",
+   "Nodo de Red AP No.2: cableado",
+   "Access Point No.3: imagen cercana",
+   "Access Point No.3: imagen lejana",
+   "Nodo de Red AP No.3: cableado"
+  ],
+  "materiales": [
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.1",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.2",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.3",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch No.N…",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.1",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.2",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.3",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Switch POE No.N…",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.1",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.1",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.2",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.2",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.3",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.3",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Access Point No.N…",
+    "tipos": "(Tipos)",
+    "unidad": "pza."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Nodo de Red AP No.N…",
+    "tipos": "Interior/Exterior/Industrial/Fibra Óptica",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "CANALIZACIÓN y ACCESORIOS DE MONTAJE",
+    "tipos": "",
+    "unidad": ""
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Canaleta de PVC",
+    "tipos": "12X8, 20X10, 20X17, 35X17 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Escalerilla",
+    "tipos": "50, 100,150, 200, 300 mm.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Mastil 3m. para antena",
+    "tipos": "2 pulg. Diam",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Montaje tipo \"J\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPOS",
+    "concepto": "Montaje tipo \"Fleximount\"",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de piso",
+    "tipos": "24, 45 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack/Gabinete de pared cerrado",
+    "tipos": "4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Rack de pared abierto",
+    "tipos": "2, 4, 6, 12, 24 UR",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "GABINETES, RACKS, ACCESORIOS",
+    "concepto": "Charola para rack",
+    "tipos": "1, 2, 3 UR.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Regulador de Voltaje",
+    "tipos": "1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "UPS (Respaldo de Energía)",
+    "tipos": "500, 600, 750, 1000, 2000, 3000 VA",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Barra multicontacto",
+    "tipos": "6, 8, 10 contactos",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Clavija tipo Industrial",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Contacto Doble c/Caja",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 3 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Cable uso rudo 2 hilos",
+    "tipos": "12, 14, 16, 18 Calibre AWG",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Sistema de Tierras",
+    "tipos": "",
+    "unidad": "kit"
+   },
+   {
+    "seccion": "EQUIPO ELÉCTRICO",
+    "concepto": "Tubería conduit",
+    "tipos": "3/4, 1, 1 1/2, 2, 3 pulg. Diam.",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete expansor acero",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Taquete plastico",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Pijas",
+    "tipos": "1/4, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinchos de plastico",
+    "tipos": "12 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Tensor",
+    "tipos": "3/16, 3/8, 1/2 pulg.",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Grapa con Clavo para Concreto",
+    "tipos": "",
+    "unidad": "pzas."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Alambre galvanizado",
+    "tipos": "",
+    "unidad": "metros"
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Aislante",
+    "tipos": "",
+    "unidad": "cms."
+   },
+   {
+    "seccion": "MATERIALES CONSUMIBLES",
+    "concepto": "Cinta Adhesiva \"Doble cara\"",
+    "tipos": "",
+    "unidad": "cms."
+   }
+  ],
+  "reportes": [
+   "Layout de instalación (PDF)",
+   "Captura de pantalla del controlador (PDF)",
+   "Captura de pantalla de la configuración (PDF)"
+  ]
+ }
+}

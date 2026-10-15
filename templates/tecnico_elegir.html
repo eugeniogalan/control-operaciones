@@ -1,0 +1,2 @@
+{% extends 'base.html' %}{% block body %}<h1>¿Qué cuadrilla eres?</h1>
+<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">{% for c in cs %}<a class="btn" style="padding:22px;font-size:18px;text-align:center" href="/tecnico?cuadrilla={{c.id}}">{{c.nombre}}</a>{% endfor %}</div>{% endblock %}

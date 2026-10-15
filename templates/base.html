@@ -1,0 +1,34 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Control de Operaciones{% endblock %}</title>
+<style>
+:root{--az:#0b4f8a;--bg:#f3f5f8;--b:#dde2ea}
+*{box-sizing:border-box}body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:#1c2430;font-size:15px}
+header{background:var(--az);color:#fff;display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;padding:10px 16px;position:sticky;top:0;z-index:5}
+header b{font-size:17px;margin-right:10px}header a{color:#dbe9f7;text-decoration:none;padding:4px 2px}header a.on,header a:hover{color:#fff;border-bottom:2px solid #fff}
+main{max-width:1200px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 14px}h2{font-size:17px;margin:18px 0 8px}
+.card{background:#fff;border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:14px}
+.grid{display:grid;gap:12px}.g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}.g5{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.kpi{background:#fff;border:1px solid var(--b);border-radius:10px;padding:12px;text-decoration:none;color:inherit}.kpi .n{font-size:30px;font-weight:700}.kpi .l{color:#5b6573;font-size:13px}
+table{width:100%;border-collapse:collapse;background:#fff}th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--b);vertical-align:top}th{background:#eef2f7;font-size:13px}
+.tw{overflow-x:auto;border:1px solid var(--b);border-radius:10px}
+.b{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600;white-space:nowrap}
+.e-pendiente{background:#eceff3;color:#4a5260}.e-asignada{background:#dfeafe;color:#1d4fb8}.e-en.curso,.e-en{background:#fff1cc;color:#8a5a00}.e-completada{background:#d8f5e1;color:#146c34}.e-cancelada{background:#fde0e0;color:#a32020}
+.p-urgente{background:#a32020;color:#fff}.p-alta{background:#fde0e0;color:#a32020}.p-media{background:#eceff3}.p-baja{background:#f5f7fa;color:#777}
+.venc{color:#b42318;font-weight:700}
+.btn{display:inline-block;background:var(--az);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:14px;text-decoration:none;cursor:pointer}
+.btn.sec{background:#e6ebf2;color:#1c2430}.btn.rojo{background:#b42318}.btn.verde{background:#16803c}.btn.ama{background:#d48a00}
+form.f label{display:block;font-size:13px;color:#4a5260;margin-bottom:8px}form.f input,form.f select,form.f textarea,.filt input,.filt select{width:100%;padding:8px;border:1px solid #c5ccd6;border-radius:7px;font:inherit;background:#fff}
+fieldset{border:1px solid var(--b);border-radius:10px;margin:0 0 14px;padding:10px 14px;background:#fff}legend{font-weight:700;color:var(--az);padding:0 6px}
+.filt{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+.bar{height:14px;background:var(--az);border-radius:4px}.muted{color:#6b7480;font-size:13px}
+.pag a,.pag span{padding:5px 10px;border:1px solid var(--b);border-radius:6px;margin-right:4px;text-decoration:none;background:#fff}
+.ej{background:#fff7d6;border:1px solid #f0d77a;color:#6b5400;padding:6px 10px;border-radius:8px;font-size:13px;margin-bottom:12px}
+@media print{header,.noprint{display:none!important}body{background:#fff}main{padding:0}}
+</style>{% block head %}{% endblock %}</head><body>
+<header class="noprint"><b>⚙ Control de Operaciones</b>
+{% set rp=request.path %}
+<a href="/" class="{{'on' if rp=='/'}}">Panel</a><a href="/ordenes" class="{{'on' if rp.startswith('/ordenes')}}">Órdenes</a>
+<a href="/cuadrillas" class="{{'on' if rp.startswith('/cuadrillas')}}">Cuadrillas</a><a href="/tecnico" class="{{'on' if rp.startswith('/tecnico')}}">Vista técnico</a>
+<a href="/catalogo" class="{{'on' if rp.startswith('/catalogo')}}">Catálogo materiales</a><a href="/reportes/materiales" class="{{'on' if rp.startswith('/reportes')}}">Reporte materiales</a><a href="/logout">Salir</a></header>
+<main>{% block body %}{% endblock %}</main></body></html>

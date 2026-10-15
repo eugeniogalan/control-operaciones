@@ -1,0 +1,10 @@
+.env
+*.db
+uploads/
+screenshot-*.png
+bin/
+__pycache__/
+*.log
+tunnel.log
+shots.py
+formatos.xlsx

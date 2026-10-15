@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block body %}
+<h1>Evidencias · {{o.folio}}</h1><p class="muted">{{o.tipo_orden}} {% if plantilla %}· plantilla {{plantilla}}{% endif %}</p>
+{% set items = (pl.fotos + pl.reportes) if pl else ['Foto libre 1','Foto libre 2','Foto libre 3','Foto libre 4'] %}
+{% if request.args.origen=='campo' %}<p><a class="btn sec" href="/tecnico?cuadrilla={{o.cuadrilla_id}}">← Volver a mis órdenes</a></p>{% endif %}
+<div class="grid g2">{% for it in items %}{% set f=fotos.get(it) %}
+<form class="card" method="post" action="/ordenes/{{o.id}}/foto" enctype="multipart/form-data"><input type="hidden" name="item" value="{{it}}"><input type="hidden" name="origen" value="{{request.args.origen}}">
+<b>{{ '✅' if f else '⬜' }} {{loop.index}}. {{it}}</b>
+{% if f %}{% if f.archivo.lower().endswith(('.jpg','.jpeg','.png','.webp')) %}<div><img src="/uploads/{{f.archivo}}" style="max-width:100%;max-height:160px;margin-top:6px"></div>{% else %}<div><a href="/uploads/{{f.archivo}}">{{f.archivo}}</a></div>{% endif %}{% endif %}
+<div style="display:flex;gap:6px;margin-top:8px"><input type="file" name="archivo" accept="{{ '.pdf,image/*' if 'PDF' in it else 'image/*' }}" capture="environment" required><button class="btn">Subir</button></div></form>{% endfor %}</div>{% endblock %}

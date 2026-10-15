@@ -1,0 +1,3 @@
+{% macro est(e) %}<span class="b e-{{e.split()[0]}}">{{e}}</span>{% endmacro %}
+{% macro pri(p) %}<span class="b p-{{p}}">{{p}}</span>{% endmacro %}
+{% macro fh(v) %}{{ (v or '')|replace('T',' ') }}{% endmacro %}

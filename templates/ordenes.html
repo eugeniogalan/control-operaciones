@@ -1,0 +1,18 @@
+{% extends 'base.html' %}{% from 'macros.html' import est, pri %}{% block body %}
+<div style="display:flex;justify-content:space-between;align-items:center"><h1>Órdenes de trabajo <span class="muted">({{total}})</span></h1><a class="btn" href="/ordenes/nueva">+ Nueva orden</a></div>
+<form class="card filt" method="get">
+<label>Estado<select name="estado"><option value="">Todos</option>{% for e in ESTADOS %}<option {{'selected' if f.estado==e}}>{{e}}</option>{% endfor %}</select></label>
+<label>Cuadrilla<select name="cuadrilla"><option value="">Todas</option>{% for c in cuadrillas %}<option value="{{c.id}}" {{'selected' if f.cuadrilla==c.id|string}}>{{c.nombre}}</option>{% endfor %}</select></label>
+<label>Formato<select name="categoria"><option value="">Todos</option>{% for k,v in CATEGORIAS.items() %}<option value="{{k}}" {{'selected' if f.categoria==k}}>{{v}}</option>{% endfor %}</select></label>
+<label>Cliente<input name="cliente" list="cl" value="{{f.cliente}}"><datalist id="cl">{% for c in clientes %}<option>{{c}}</option>{% endfor %}</datalist></label>
+<label>Desde<input type="date" name="desde" value="{{f.desde}}"></label><label>Hasta<input type="date" name="hasta" value="{{f.hasta}}"></label>
+<label>Buscar (folio, sitio, tipo)<input name="buscar" value="{{f.buscar}}"></label>
+<label><input type="checkbox" name="vencidas" value="1" style="width:auto" {{'checked' if f.vencidas}}> Solo vencidas</label>
+<div><button class="btn">Filtrar</button> <a class="btn sec" href="/ordenes">Limpiar</a></div></form>
+<div class="tw"><table><tr><th>Folio</th><th>Programada</th><th>Tipo</th><th>Cliente / sitio</th><th>Cuadrilla</th><th>Prioridad</th><th>Estado</th><th>Cierre</th></tr>
+{% for o in rows %}<tr><td><a href="/ordenes/{{o.id}}"><b>{{o.folio}}</b></a>{% if o.ejemplo %}<div class="muted">EJEMPLO</div>{% endif %}</td>
+<td class="{{'venc' if o.vencida}}">{{o.fecha_programada}}{% if o.vencida %}<div>vencida</div>{% endif %}</td><td>{{o.tipo_orden}}<div class="muted">{{o.tipo_grupo}}</div></td>
+<td>{{o.cliente}}<div class="muted">{{o.sitio}}</div></td><td>{{o.cuad or '—'}}</td><td>{{pri(o.prioridad)}}</td><td>{{est(o.estado)}}</td><td>{{(o.fecha_cierre or '')|replace('T',' ')}}</td></tr>
+{% else %}<tr><td colspan="8" class="muted">Sin resultados</td></tr>{% endfor %}</table></div>
+<p class="pag">{% for p in range(1,pages+1) %}{% if p==page %}<span><b>{{p}}</b></span>{% elif p<=2 or p>pages-2 or (p-page)|abs<=2 %}<a href="?{{ qs|urlencode }}&page={{p}}">{{p}}</a>{% elif (p-page)|abs==3 %}…{% endif %}{% endfor %}</p>
+{% endblock %}
