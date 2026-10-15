@@ -433,6 +433,8 @@ def material_form(mid=None):
         d = {k: (request.form.get(k) or '').strip() for k in ('sku','nombre','categoria','variantes','unidad','ubicacion','notas')}
         d['stock_minimo'] = float(request.form.get('stock_minimo') or 0); d['activo'] = 1 if request.form.get('activo') else 0
         d['codigo_barras'] = (request.form.get('codigo_barras') or '').strip() or None
+        for k in ('numero_parte','syscom_id','marca','imagen_url'): d[k] = (request.form.get(k) or '').strip() or None
+        if d['imagen_url'] and not (d['imagen_url'].startswith(('https://','http://','/static/','/uploads/'))): d['imagen_url'] = None
         if not d['sku'] or not d['nombre']: err = 'SKU y nombre son obligatorios'
         elif d['codigo_barras'] and q('SELECT 1 FROM materiales WHERE codigo_barras=? AND id IS NOT ?', (d['codigo_barras'], mid), one=True): err = 'Ese código de barras ya está asignado a otro material'
         elif q('SELECT 1 FROM materiales WHERE sku=? AND id IS NOT ?', (d['sku'], mid), one=True): err = 'Ese SKU ya existe'
@@ -605,6 +607,20 @@ def sembrar_codigos(c, n=30):
     for mid, in c.execute('SELECT id FROM materiales WHERE ejemplo=1 ORDER BY id LIMIT ?', (n,)).fetchall():
         c.execute('UPDATE materiales SET codigo_barras=? WHERE id=?', (ean13(f'7501{(mid*7919)%100000000:08d}'), mid))
 
+SYSCOM_COLS = [('numero_parte','TEXT'),('syscom_id','TEXT'),('marca','TEXT'),('imagen_url','TEXT'),('imagen_local','TEXT'),
+    ('precio_syscom','REAL'),('syscom_link','TEXT'),('syscom_sync','TEXT'),('imagen_ejemplo','INTEGER DEFAULT 0')]
+def sembrar_imagenes_ejemplo(c, n=6):
+    """Pone miniaturas de EJEMPLO (static/productos/ejemplo-N.svg) a unos materiales para que la UI muestre fotos antes de la sync real."""
+    if c.execute('SELECT 1 FROM materiales WHERE imagen_url IS NOT NULL OR imagen_local IS NOT NULL LIMIT 1').fetchone(): return
+    for i, (mid,) in enumerate(c.execute('SELECT id FROM materiales WHERE activo=1 ORDER BY categoria, nombre LIMIT ?', (n,)).fetchall(), 1):
+        c.execute("UPDATE materiales SET imagen_url=?, imagen_ejemplo=1, marca=COALESCE(marca,'EJEMPLO') WHERE id=?", (f'/static/productos/ejemplo-{i}.svg', mid))
+def miniatura(m):
+    try:
+        if m['imagen_local']: return '/uploads/' + m['imagen_local']
+        return m['imagen_url'] or None
+    except (KeyError, IndexError, TypeError): return None
+app.jinja_env.globals['miniatura'] = miniatura
+
 def init_db():
     c = sqlite3.connect(DB); c.executescript(SCHEMA)
     if 'material_id' not in [r[1] for r in c.execute('PRAGMA table_info(orden_materiales)')]:
@@ -619,7 +635,50 @@ def init_db():
         c.execute('ALTER TABLE materiales ADD COLUMN codigo_barras TEXT')
     c.execute('CREATE UNIQUE INDEX IF NOT EXISTS ux_mat_cb ON materiales(codigo_barras) WHERE codigo_barras IS NOT NULL')
     sembrar_codigos(c)
+    mc = [r[1] for r in c.execute('PRAGMA table_info(materiales)')]
+    for col, typ in SYSCOM_COLS:
+        if col not in mc: c.execute(f'ALTER TABLE materiales ADD COLUMN {col} {typ}')
+    c.execute('CREATE INDEX IF NOT EXISTS ix_mat_np ON materiales(numero_parte)')
+    sembrar_imagenes_ejemplo(c)
     c.commit(); c.close()
+import syscom_client as SC
+
+@app.route('/proveedores/syscom', methods=['GET','POST'])
+def syscom_config():
+    msg = err = None
+    if request.method == 'POST':
+        acc = request.form.get('accion')
+        if acc == 'guardar':
+            cid, sec = (request.form.get('client_id') or '').strip(), (request.form.get('client_secret') or '').strip()
+            if os.environ.get('SYSCOM_CLIENT_ID'): err = 'Las credenciales vienen de variables de entorno (Render); cámbialas ahí.'
+            elif not cid or not sec: err = 'Escribe client_id y client_secret'
+            else:
+                SC.guardar_credenciales(cid, sec); ok, m = SC.probar_conexion()
+                if ok: msg = 'Credenciales guardadas en .env. ' + m
+                else: err = 'Credenciales guardadas, pero la prueba falló: ' + m
+        elif acc == 'probar':
+            ok, m = SC.probar_conexion(); msg, err = (m, None) if ok else (None, m)
+        elif acc == 'sincronizar':
+            if not SC.estado().get('conexion_ok'): err = 'Primero prueba la conexión'
+            else:
+                try:
+                    modelos = [x.strip() for x in (request.form.get('modelos') or '').replace(',', '\n').splitlines() if x.strip()]
+                    c = sqlite3.connect(DB); r = SC.sincronizar(c, UP, crear_nuevos=bool(modelos), consultas=modelos); c.close()
+                    msg = f"Sincronización: {r['revisados']} revisados, {r['actualizados']} actualizados, {r['creados']} nuevos, {r['imagenes']} fotos, {r['sin_coincidencia']} sin coincidencia" + (f", {len(r['errores'])} errores" if r['errores'] else '')
+                except SC.SyscomError as e: err = str(e)
+    cid, sec = SC.credenciales(); est = SC.estado()
+    st = 'conectado' if (cid and sec and est.get('conexion_ok')) else ('credenciales sin probar' if cid and sec else 'sin credenciales')
+    stats = q("SELECT COUNT(*) n, SUM(syscom_id IS NOT NULL) con_sys, SUM(imagen_local IS NOT NULL OR imagen_url IS NOT NULL) con_img, SUM(imagen_ejemplo=1) ej FROM materiales WHERE activo=1", one=True)
+    return render_template('syscom.html', st=st, est=est, cid_mask=(cid[:4] + '…' + cid[-2:]) if cid and len(cid) > 8 else ('••••' if cid else ''),
+        origen=SC.origen_credenciales(), msg=msg, err=err, stats=stats, desde_env=bool(os.environ.get('SYSCOM_CLIENT_ID')))
+
+@app.route('/api/syscom/buscar')
+def syscom_buscar():
+    t = (request.args.get('q') or '').strip()
+    if len(t) < 2: return jsonify(error='consulta muy corta'), 400
+    try: return jsonify(SC.buscar_productos(t))
+    except SC.SyscomError as e: return jsonify(error=str(e)), 503
+
 init_db()
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=False)

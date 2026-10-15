@@ -8,3 +8,4 @@ __pycache__/
 tunnel.log
 shots.py
 formatos.xlsx
+syscom_estado.json

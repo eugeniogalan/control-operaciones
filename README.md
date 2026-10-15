@@ -18,3 +18,16 @@ El servicio se duerme tras ~15 min sin uso (primer acceso tarda ~1 min).
 - **Órdenes**: en "Capturar materiales" se elige el almacén de salida (se sugieren los vehículos de la cuadrilla). Al guardar se genera una salida ligada a la orden; si se corrige la cantidad o el almacén, la diferencia se devuelve. Sin existencia suficiente se pide confirmar "Permitir stock negativo".
 - **Mínimos**: `stock_minimo` global (suma) + `existencias.minimo` por almacén (se edita en la ficha del material). Alerta cuando la existencia queda en o por debajo; el panel muestra conteos por almacén y /inventario?almacen=ID&bajo=1 filtra.
 - `seed.py` crea 89 materiales (de plantillas.json) con existencias **de EJEMPLO**.
+
+## Proveedor SYSCOM (números de parte y fotos)
+
+Página: **/proveedores/syscom** (menú "Syscom"). Cliente: `syscom_client.py` (OAuth2 `client_credentials` contra `https://developers.syscom.mx/api/v1/oauth/token`).
+
+Credenciales (nunca en la base de datos ni en git):
+- **Render:** Environment → agregar `SYSCOM_CLIENT_ID` y `SYSCOM_CLIENT_SECRET` → redesplegar. (Tienen prioridad.)
+- **Local / servidor propio:** pegarlas en el formulario de /proveedores/syscom; se guardan en `.env` (gitignored, permisos 600).
+- Opcional: `SYSCOM_API_URL`, `SYSCOM_STATE_PATH` (token y última sync; por defecto `syscom_estado.json`, gitignored).
+
+Flujo: **Guardar y probar** → **Probar conexión** → **Sincronizar catálogo** (se habilita solo cuando la conexión funciona).
+La sync busca cada material por ID Syscom → número de parte/modelo → SKU; llena `numero_parte`, `syscom_id`, `marca`, `precio_syscom`, `imagen_url` y descarga la foto a `uploads/productos/`. No toca existencias. Puede dar de alta modelos nuevos (uno por línea).
+Búsqueda: `GET /api/syscom/buscar?q=texto`. Las miniaturas en `static/productos/ejemplo-*.svg` son **de ejemplo** (marcadas `imagen_ejemplo=1`).

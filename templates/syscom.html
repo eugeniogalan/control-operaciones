@@ -1,0 +1,28 @@
+{% extends 'base.html' %}{% block body %}<style>.btn[disabled]{opacity:.45;cursor:not-allowed}</style>
+<h1>Proveedor: SYSCOM <span class="muted">catálogo, números de parte y fotos</span></h1>
+{% if msg %}<div class="ej" style="background:#dcfce7;border-color:#86efac;color:#14532d">✔ {{msg}}</div>{% endif %}
+{% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{err}}</div>{% endif %}
+<div class="grid g5">
+<div class="kpi" style="background:{{'#dcfce7' if st=='conectado' else ('#fff3c4' if st!='sin credenciales' else '#eef2f7')}}"><div class="n" style="font-size:20px">{{ {'conectado':'🟢 Conectado','sin credenciales':'⚪ Sin credenciales'}.get(st, '🟡 Sin probar') }}</div><div class="l">Estado{% if origen %} · desde {{origen}}{% endif %}{% if cid_mask %} · client_id {{cid_mask}}{% endif %}</div></div>
+<div class="kpi"><div class="n" style="font-size:20px">{{est.ultima_sync or '—'}}</div><div class="l">Última sincronización</div></div>
+<div class="kpi"><div class="n">{{stats.con_sys or 0}}/{{stats.n}}</div><div class="l">Materiales ligados a Syscom</div></div>
+<div class="kpi"><div class="n">{{stats.con_img or 0}}</div><div class="l">Con foto ({{stats.ej or 0}} de ejemplo)</div></div></div>
+{% if est.ultimo_error and st!='conectado' %}<p class="muted">Último error: {{est.ultimo_error}}{% if est.ultima_prueba %} ({{est.ultima_prueba}}){% endif %}</p>{% endif %}
+
+<div class="card"><h2 style="margin-top:0">1. Credenciales de la API</h2>
+{% if desde_env %}<p>Las credenciales se leen de las <b>variables de entorno</b> del servidor (Render). Para cambiarlas edita <code>SYSCOM_CLIENT_ID</code> y <code>SYSCOM_CLIENT_SECRET</code> en Render → Environment.</p>
+{% else %}<form method="post" class="f" autocomplete="off"><input type="hidden" name="accion" value="guardar">
+<label>client_id<input name="client_id" placeholder="{{cid_mask or 'pega aquí tu client_id'}}" autocomplete="off"></label>
+<label>client_secret<input name="client_secret" type="password" placeholder="{{'•••••••• (guardado)' if cid_mask else 'pega aquí tu client_secret'}}" autocomplete="new-password"></label>
+<button class="btn">Guardar y probar</button></form>{% endif %}
+<p class="muted">Se obtienen en <a href="https://developers.syscom.mx/clients" target="_blank" rel="noopener">developers.syscom.mx → Mis credenciales</a>. No se guardan en la base de datos ni en GitHub: van al archivo <code>.env</code> del servidor (ignorado por git) o a variables de entorno.
+En Render el disco se reinicia al redesplegar, así que allí conviene ponerlas como variables <code>SYSCOM_CLIENT_ID</code> / <code>SYSCOM_CLIENT_SECRET</code>.</p></div>
+
+<div class="card"><h2 style="margin-top:0">2. Probar y sincronizar</h2>
+<form method="post" style="display:inline"><input type="hidden" name="accion" value="probar"><button class="btn sec" {{'disabled' if st=='sin credenciales'}}>Probar conexión</button></form>
+<form method="post" class="f" style="margin-top:10px"><input type="hidden" name="accion" value="sincronizar">
+<label>Dar de alta modelos nuevos (opcional, uno por línea)<textarea name="modelos" rows="3" placeholder="DS-2CD1023G0E-I&#10;LOCO5AC" {{'disabled' if st!='conectado'}}></textarea></label>
+<button class="btn" {{'disabled title="Primero conecta y prueba las credenciales"' if st!='conectado'}}>Sincronizar catálogo</button></form>
+<p class="muted">La sincronización busca cada material por ID Syscom, luego por número de parte/modelo y luego por SKU; actualiza modelo, marca, precio y descarga una foto pequeña a <code>uploads/productos/</code>. No modifica existencias.</p>
+{% if est.ultimo_resumen %}<p class="muted">Último resumen: {{est.ultimo_resumen.revisados}} revisados · {{est.ultimo_resumen.actualizados}} actualizados · {{est.ultimo_resumen.creados}} nuevos · {{est.ultimo_resumen.imagenes}} fotos · {{est.ultimo_resumen.sin_coincidencia}} sin coincidencia</p>{% endif %}</div>
+{% endblock %}

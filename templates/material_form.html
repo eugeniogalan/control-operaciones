@@ -3,6 +3,10 @@
 <form method="post" class="f card" style="max-width:640px"><input type="hidden" name="next" value="{{nxt}}"><div class="grid g2">
 <label>SKU / código *<input name="sku" required value="{{m.sku or '' if m else ''}}"></label>
 <label>Código de barras<input name="codigo_barras" autocomplete="off" value="{{m.codigo_barras or '' if m else ''}}" placeholder="EAN-13 / CODE128 (opcional)"></label>
+<label>No. de parte / modelo Syscom<input name="numero_parte" value="{{m.numero_parte or '' if m else ''}}" placeholder="p.ej. DS-2CD1023G0E-I"></label>
+<label>Marca<input name="marca" value="{{m.marca or '' if m else ''}}"></label>
+<label>ID Syscom<input name="syscom_id" value="{{m.syscom_id or '' if m else ''}}" placeholder="se llena al sincronizar"></label>
+<label>URL de imagen<input name="imagen_url" value="{{m.imagen_url or '' if m else ''}}" placeholder="https://… (se llena al sincronizar)"></label>
 <label>Nombre / concepto *<input name="nombre" required value="{{m.nombre or '' if m else ''}}"></label>
 <label>Tipo / categoría<select name="categoria">{% for c in CATS_MAT %}<option {{'selected' if m and m.categoria==c}}>{{c}}</option>{% endfor %}</select></label>
 <label>Unidad<input name="unidad" list="uds" value="{{m.unidad or 'pza' if m else 'pza'}}"><datalist id="uds">{% for u in UNIDADES %}<option>{{u}}</option>{% endfor %}</datalist></label>
