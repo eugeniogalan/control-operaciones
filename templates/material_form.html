@@ -1,12 +1,13 @@
 {% extends 'base.html' %}{% block body %}
 <h1>{{'Editar' if mid else 'Nuevo'}} material</h1>{% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">{{err}}</div>{% endif %}
-<form method="post" class="f card" style="max-width:640px"><div class="grid g2">
-<label>SKU / código *<input name="sku" required value="{{m.sku if m else ''}}"></label>
-<label>Nombre / concepto *<input name="nombre" required value="{{m.nombre if m else ''}}"></label>
+<form method="post" class="f card" style="max-width:640px"><input type="hidden" name="next" value="{{nxt}}"><div class="grid g2">
+<label>SKU / código *<input name="sku" required value="{{m.sku or '' if m else ''}}"></label>
+<label>Código de barras<input name="codigo_barras" autocomplete="off" value="{{m.codigo_barras or '' if m else ''}}" placeholder="EAN-13 / CODE128 (opcional)"></label>
+<label>Nombre / concepto *<input name="nombre" required value="{{m.nombre or '' if m else ''}}"></label>
 <label>Tipo / categoría<select name="categoria">{% for c in CATS_MAT %}<option {{'selected' if m and m.categoria==c}}>{{c}}</option>{% endfor %}</select></label>
-<label>Unidad<input name="unidad" list="uds" value="{{m.unidad if m else 'pza'}}"><datalist id="uds">{% for u in UNIDADES %}<option>{{u}}</option>{% endfor %}</datalist></label>
+<label>Unidad<input name="unidad" list="uds" value="{{m.unidad or 'pza' if m else 'pza'}}"><datalist id="uds">{% for u in UNIDADES %}<option>{{u}}</option>{% endfor %}</datalist></label>
 <label>Variantes / tipos<input name="variantes" value="{{m.variantes or '' if m else ''}}" placeholder="ej. 12, 24, 48 hilos"></label>
-<label>Stock mínimo global (suma de almacenes)<input type="number" step="any" min="0" name="stock_minimo" value="{{m.stock_minimo if m else 0}}"></label>
+<label>Stock mínimo global (suma de almacenes)<input type="number" step="any" min="0" name="stock_minimo" value="{{m.stock_minimo or 0 if m else 0}}"></label>
 <label>Ubicación (pasillo/anaquel)<input name="ubicacion" value="{{m.ubicacion or '' if m else ''}}"></label>
 <label><input type="checkbox" name="activo" value="1" style="width:auto" {{'checked' if not m or m.activo}}> Activo</label>
 {% if not mid %}<label>Stock inicial<input type="number" step="any" min="0" name="stock_inicial" value="0"></label>

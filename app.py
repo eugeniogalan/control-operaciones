@@ -412,7 +412,7 @@ def inventario():
     f = {k: request.args.get(k, '') for k in ('buscar','categoria','bajo','inactivos','almacen')}
     w, a = ['1=1'], []
     if not f['inactivos']: w.append('m.activo=1')
-    if f['buscar']: w.append('(m.sku LIKE ? OR m.nombre LIKE ? OR m.variantes LIKE ? OR m.ubicacion LIKE ?)'); a += ['%'+f['buscar']+'%']*4
+    if f['buscar']: w.append('(m.sku LIKE ? OR m.nombre LIKE ? OR m.variantes LIKE ? OR m.ubicacion LIKE ? OR m.codigo_barras LIKE ?)'); a += ['%'+f['buscar']+'%']*5
     if f['categoria']: w.append('m.categoria=?'); a.append(f['categoria'])
     if f['bajo'] and f['almacen']: w.append(f'EXISTS(SELECT 1 FROM existencias e WHERE e.material_id=m.id AND e.almacen_id=? AND {BAJO_ALM})'); a.append(f['almacen'])
     elif f['bajo']: w.append(BAJO_ALGUNO)
@@ -432,7 +432,9 @@ def material_form(mid=None):
     if request.method == 'POST':
         d = {k: (request.form.get(k) or '').strip() for k in ('sku','nombre','categoria','variantes','unidad','ubicacion','notas')}
         d['stock_minimo'] = float(request.form.get('stock_minimo') or 0); d['activo'] = 1 if request.form.get('activo') else 0
+        d['codigo_barras'] = (request.form.get('codigo_barras') or '').strip() or None
         if not d['sku'] or not d['nombre']: err = 'SKU y nombre son obligatorios'
+        elif d['codigo_barras'] and q('SELECT 1 FROM materiales WHERE codigo_barras=? AND id IS NOT ?', (d['codigo_barras'], mid), one=True): err = 'Ese código de barras ya está asignado a otro material'
         elif q('SELECT 1 FROM materiales WHERE sku=? AND id IS NOT ?', (d['sku'], mid), one=True): err = 'Ese SKU ya existe'
         if not err:
             ks = list(d)
@@ -441,9 +443,12 @@ def material_form(mid=None):
                 mid = db().execute(f"INSERT INTO materiales({','.join(ks)}) VALUES({','.join('?'*len(ks))})", [d[k] for k in ks]).lastrowid
                 ini = float(request.form.get('stock_inicial') or 0)
                 if ini: mover(db(), mid, int(request.form.get('almacen_id') or 1), 'entrada', ini, 'Inventario inicial')
-            db().commit(); return redirect(url_for('material_ver', mid=mid))
+            db().commit()
+            nxt = request.form.get('next') or ''
+            return redirect(nxt if nxt.startswith('/inventario/escanear') else url_for('material_ver', mid=mid))
         m = d
-    return render_template('material_form.html', m=m, mid=mid, err=err, CATS_MAT=CATS_MAT, UNIDADES=UNIDADES, alms=almacenes())
+    if not m and request.args.get('codigo'): m = {'codigo_barras': request.args['codigo'], 'activo': 1}
+    return render_template('material_form.html', m=m, mid=mid, err=err, nxt=request.values.get('next',''), CATS_MAT=CATS_MAT, UNIDADES=UNIDADES, alms=almacenes())
 
 @app.route('/inventario/<int:mid>')
 def material_ver(mid):
@@ -533,6 +538,44 @@ def api_materiales():
     ex = existencias_map(); al = almacenes()
     return jsonify([dict(r, existencias={a['nombre']: ex.get((r['id'], a['id']), 0) for a in al}) for r in q('SELECT * FROM materiales ORDER BY categoria, nombre')])
 
+# ---------- Escaneo por código de barras ----------
+@app.route('/inventario/escanear')
+def escanear():
+    return render_template('escanear.html', alms=almacenes())
+
+def _mat_por_codigo(cb):
+    return q('SELECT * FROM materiales WHERE codigo_barras=? OR (sku=? AND codigo_barras IS NULL) ORDER BY codigo_barras IS NULL LIMIT 1', (cb, cb), one=True)
+
+@app.route('/api/inventario/codigo/<path:cb>')
+def api_codigo(cb):
+    m = _mat_por_codigo(cb.strip())
+    if not m: return jsonify(ok=False, error='Código no registrado', codigo=cb), 404
+    alm = request.args.get('almacen_id', type=int)
+    return jsonify(ok=True, material=dict(id=m['id'], sku=m['sku'], nombre=m['nombre'], unidad=m['unidad'], activo=m['activo'], codigo_barras=m['codigo_barras'], stock_total=m['stock_actual']),
+                   stock=stock_en(m['id'], alm) if alm else None)
+
+@app.route('/api/inventario/escanear', methods=['POST'])
+def api_escanear():
+    d = request.get_json(silent=True) or request.form
+    cb = str(d.get('codigo_barras') or d.get('barcode') or '').strip(); tipo = d.get('tipo')
+    try: alm = int(d.get('almacen_id')); cant = float(d.get('cantidad') or 1)
+    except (TypeError, ValueError): return jsonify(ok=False, error='almacen_id/cantidad inválidos'), 400
+    if tipo not in ('entrada', 'salida'): return jsonify(ok=False, error='tipo debe ser entrada o salida'), 400
+    if cant <= 0: return jsonify(ok=False, error='La cantidad debe ser mayor a 0'), 400
+    a = q('SELECT * FROM almacenes WHERE id=? AND activo=1', (alm,), one=True)
+    if not a: return jsonify(ok=False, error='Almacén no existe'), 400
+    m = _mat_por_codigo(cb)
+    if not m: return jsonify(ok=False, error='Código no registrado', codigo=cb), 404
+    if not m['activo']: return jsonify(ok=False, error='Material inactivo'), 400
+    con = db()
+    try: nuevo = mover(con, m['id'], alm, tipo, cant, d.get('motivo') or f'Escaneo ({TIPOS_MOV[tipo].lower()})', referencia=f'CB {cb}')
+    except ValueError as e:
+        con.rollback()
+        if str(e) == 'stock negativo': return jsonify(ok=False, error=f"Stock insuficiente en {a['nombre']}: hay {stock_en(m['id'], alm):g} {m['unidad']}"), 409
+        return jsonify(ok=False, error=str(e)), 400
+    con.commit()
+    return jsonify(ok=True, material=dict(id=m['id'], sku=m['sku'], nombre=m['nombre'], unidad=m['unidad']), almacen=a['nombre'], tipo=tipo, cantidad=cant, stock=nuevo)
+
 @app.route('/vehiculos', methods=['GET','POST'])
 def vehiculos():
     if request.method == 'POST':
@@ -554,6 +597,14 @@ def api_resumen():
 def api_ordenes():
     return jsonify([dict(r) for r in q('SELECT * FROM ordenes ORDER BY fecha_programada DESC LIMIT 500')])
 
+def ean13(base12):
+    d = [int(x) for x in base12]; s = sum(d[0::2]) + 3*sum(d[1::2]); return base12 + str((10 - s % 10) % 10)
+def sembrar_codigos(c, n=30):
+    # EJEMPLO: EAN-13 ficticios con apariencia de proveedor (prefijo 750 = México). Reemplazar por los códigos reales de las etiquetas.
+    if c.execute('SELECT 1 FROM materiales WHERE codigo_barras IS NOT NULL LIMIT 1').fetchone(): return
+    for mid, in c.execute('SELECT id FROM materiales WHERE ejemplo=1 ORDER BY id LIMIT ?', (n,)).fetchall():
+        c.execute('UPDATE materiales SET codigo_barras=? WHERE id=?', (ean13(f'7501{(mid*7919)%100000000:08d}'), mid))
+
 def init_db():
     c = sqlite3.connect(DB); c.executescript(SCHEMA)
     if 'material_id' not in [r[1] for r in c.execute('PRAGMA table_info(orden_materiales)')]:
@@ -564,6 +615,10 @@ def init_db():
         c.execute('ALTER TABLE orden_materiales ADD COLUMN almacen_id INTEGER REFERENCES almacenes(id)')
     for n in ALMACENES: c.execute("INSERT OR IGNORE INTO almacenes(nombre,tipo) VALUES(?,'bodega')", (n,))
     asegurar_vehiculos(c)
+    if 'codigo_barras' not in [r[1] for r in c.execute('PRAGMA table_info(materiales)')]:
+        c.execute('ALTER TABLE materiales ADD COLUMN codigo_barras TEXT')
+    c.execute('CREATE UNIQUE INDEX IF NOT EXISTS ux_mat_cb ON materiales(codigo_barras) WHERE codigo_barras IS NOT NULL')
+    sembrar_codigos(c)
     c.commit(); c.close()
 init_db()
 if __name__ == '__main__':

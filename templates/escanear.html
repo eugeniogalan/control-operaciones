@@ -1,0 +1,65 @@
+{% extends 'base.html' %}{% block title %}Escanear · Inventario{% endblock %}
+{% block head %}<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+.sc{max-width:480px;margin:0 auto}.seg{display:flex;gap:6px;margin-bottom:10px}.seg button{flex:1;padding:14px;font-size:17px;font-weight:700;border:2px solid #c5ccd6;border-radius:10px;background:#fff;cursor:pointer}
+.seg button.on[data-t=entrada]{background:#1f8a4c;border-color:#1f8a4c;color:#fff}.seg button.on[data-t=salida]{background:#c0392b;border-color:#c0392b;color:#fff}
+.sc select,.sc input{width:100%;padding:12px;font-size:17px;border:1px solid #c5ccd6;border-radius:9px;box-sizing:border-box}
+#reader{width:100%;min-height:60px;border-radius:10px;overflow:hidden;background:#111;margin:10px 0}#reader video{border-radius:10px}
+.row{display:flex;gap:6px}.row .btn{padding:12px 14px;font-size:16px}.big{width:100%;padding:14px!important;font-size:18px!important;margin-top:8px}
+.res{padding:12px;border-radius:10px;margin-top:10px;border:1px solid #ddd;background:#fff}.ok{background:#e3f6ea;border-color:#9fd8b4}.err{background:#fde0e0;border-color:#f3b4b4}
+.qty{display:flex;align-items:center;gap:8px;margin:10px 0}.qty button{width:52px;height:52px;font-size:26px;border-radius:10px;border:1px solid #c5ccd6;background:#f4f6f9}.qty input{text-align:center;font-size:22px;font-weight:700}
+.hist{font-size:14px;margin-top:12px}.hist div{padding:6px 0;border-bottom:1px solid #eee}
+</style>{% endblock %}
+{% block body %}<div class="sc">
+<h1 style="margin:4px 0 10px">Escanear material</h1>
+<div class="seg" id="tipo"><button type="button" data-t="entrada" class="on">⬇ Entrada</button><button type="button" data-t="salida">⬆ Salida</button></div>
+<label class="muted">Almacén</label>
+<select id="alm">{% for a in alms %}<option value="{{a.id}}">{{a.nombre}}{% if a.cuad %} · {{a.cuad}}{% endif %}</option>{% endfor %}</select>
+<div id="reader"></div>
+<div class="row"><button class="btn" id="cam" type="button" style="flex:1">📷 Activar cámara</button></div>
+<form id="manual" class="row" style="margin-top:8px"><input id="cb" autocomplete="off" placeholder="Código de barras o SKU"><button class="btn sec">Buscar</button></form>
+<div id="panel"></div>
+<div class="hist" id="hist"></div>
+</div>
+<script>
+const $=s=>document.querySelector(s); let tipo=localStorage.esc_tipo||'entrada', scanner=null, busy=false, actual=null;
+if(localStorage.esc_alm) $('#alm').value=localStorage.esc_alm;
+function setTipo(t){tipo=t;localStorage.esc_tipo=t;document.querySelectorAll('#tipo button').forEach(b=>b.classList.toggle('on',b.dataset.t==t)); if(actual) mostrar(actual);}
+document.querySelectorAll('#tipo button').forEach(b=>b.onclick=()=>setTipo(b.dataset.t)); setTipo(tipo);
+$('#alm').onchange=()=>{localStorage.esc_alm=$('#alm').value; if(actual) buscar(actual.codigo);};
+let ac; function beep(ok){try{ac=ac||new (window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=ok?1200:220;o.type=ok?'sine':'square';g.gain.value=.15;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+(ok?.12:.4));}catch(e){} if(navigator.vibrate) navigator.vibrate(ok?80:[200,80,200]);}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function buscar(cb){cb=(cb||'').trim(); if(!cb||busy) return; busy=true;
+  try{const r=await fetch('/api/inventario/codigo/'+encodeURIComponent(cb)+'?almacen_id='+$('#alm').value); const j=await r.json();
+    if(r.status==401){location='/login?next=/inventario/escanear';return}
+    if(!j.ok){beep(false); actual=null; const alta='/inventario/nuevo?codigo='+encodeURIComponent(cb)+'&next=/inventario/escanear';
+      $('#panel').innerHTML=`<div class="res err"><b>Código no registrado:</b> ${esc(cb)}<br><a class="btn big" href="${alta}">➕ Crear material con este código</a><button class="btn sec big" onclick="limpiar()">Cancelar</button></div>`; return;}
+    beep(true); actual={codigo:cb,...j}; mostrar(actual); pausar();
+  }catch(e){beep(false);$('#panel').innerHTML=`<div class="res err">Error de red</div>`} finally{busy=false}}
+function mostrar(a){const m=a.material, alm=$('#alm').selectedOptions[0].text;
+  $('#panel').innerHTML=`<div class="res"><div style="font-size:18px;font-weight:700">${esc(m.nombre)}</div><div class="muted">${esc(m.sku)} · ${esc(a.codigo)}</div>
+  <div style="margin-top:6px">Stock en <b>${esc(alm)}</b>: <b>${a.stock} ${esc(m.unidad)}</b> <span class="muted">(total ${m.stock_total})</span></div>
+  ${m.activo?'':'<div class="res err">Material inactivo</div>'}
+  <div class="qty"><button type="button" onclick="dq(-1)">−</button><input id="qty" type="number" inputmode="decimal" min="0" step="any" value="1"><button type="button" onclick="dq(1)">+</button><span>${esc(m.unidad)}</span></div>
+  <button class="btn big" style="background:${tipo=='entrada'?'#1f8a4c':'#c0392b'}" onclick="confirmar()">Confirmar ${tipo=='entrada'?'ENTRADA':'SALIDA'}</button>
+  <button class="btn sec big" onclick="limpiar()">Cancelar</button></div>`;}
+function dq(d){const i=$('#qty');i.value=Math.max(1,(parseFloat(i.value)||0)+d)}
+async function confirmar(){if(!actual||busy) return; busy=true; const cant=parseFloat($('#qty').value);
+  try{const r=await fetch('/api/inventario/escanear',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({codigo_barras:actual.codigo,tipo,almacen_id:+$('#alm').value,cantidad:cant})}); const j=await r.json();
+    if(!j.ok){beep(false);$('#panel').insertAdjacentHTML('afterbegin',`<div class="res err">${esc(j.error)}</div>`);return}
+    beep(true); $('#hist').insertAdjacentHTML('afterbegin',`<div>${j.tipo=='entrada'?'⬇':'⬆'} ${j.cantidad} ${esc(j.material.unidad)} · ${esc(j.material.nombre)} · ${esc(j.almacen)} → <b>${j.stock}</b></div>`);
+    $('#panel').innerHTML=`<div class="res ok">✔ ${j.tipo=='entrada'?'Entrada':'Salida'} registrada: ${j.cantidad} ${esc(j.material.unidad)} de ${esc(j.material.nombre)}. Nuevo stock en ${esc(j.almacen)}: <b>${j.stock}</b></div>`;
+    actual=null; reanudar();
+  }catch(e){beep(false)} finally{busy=false}}
+function limpiar(){actual=null;$('#panel').innerHTML='';$('#cb').value='';reanudar()}
+$('#manual').onsubmit=e=>{e.preventDefault();buscar($('#cb').value);$('#cb').value=''};
+function pausar(){try{scanner&&scanner.pause(true)}catch(e){}} function reanudar(){try{scanner&&scanner.resume()}catch(e){}}
+$('#cam').onclick=async()=>{ if(scanner){await scanner.stop();scanner=null;$('#cam').textContent='📷 Activar cámara';return}
+  if(!window.Html5Qrcode){$('#panel').innerHTML='<div class="res err">No se pudo cargar el lector de cámara (sin internet). Usa captura manual.</div>';return}
+  const F=Html5QrcodeSupportedFormats; scanner=new Html5Qrcode('reader',{formatsToSupport:[F.EAN_13,F.EAN_8,F.UPC_A,F.UPC_E,F.CODE_128,F.CODE_39,F.QR_CODE],useBarCodeDetectorIfSupported:true});
+  let ultimo='',t=0;
+  try{await scanner.start({facingMode:'environment'},{fps:10,qrbox:(w,h)=>({width:Math.min(w*.9,320),height:Math.min(h*.5,140)})},txt=>{const n=Date.now(); if(txt==ultimo&&n-t<2500) return; ultimo=txt;t=n; buscar(txt)});
+    $('#cam').textContent='⏹ Detener cámara';
+  }catch(e){scanner=null;beep(false);$('#panel').innerHTML='<div class="res err">No se pudo abrir la cámara: '+esc(e)+'. Requiere HTTPS y permiso de cámara.</div>'}};
+$('#cb').focus();
+</script>{% endblock %}
