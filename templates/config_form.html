@@ -6,7 +6,8 @@
 {% for c in campos %}{% if c[0] not in encols %}{{ campo(c, r) }}{% endif %}
 {% if c[0]=='energia' and enb %}{% for b,cs in enb.items() %}<details class="blk-en" id="blk_{{b}}" data-en="{{b}}" open style="grid-column:1/-1;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc">
 <summary style="font-weight:600;cursor:pointer">{{ {'CFE':'⚡ CFE','Solar':'☀️ Solar','Generador':'⛽ Generador'}[b] }}</summary><div class="grid g2" style="margin-top:6px">
-{% for c2 in campos %}{% if c2[0] in cs %}{{ campo(c2, r) }}{% endif %}{% endfor %}</div></details>{% endfor %}{% endif %}{% endfor %}
+{% for c2 in campos %}{% if c2[0] in cs %}{{ campo(c2, r) }}{% endif %}{% endfor %}
+{% if b=='CFE' and k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fc=sitio_fotos_ctx(rid) %}{% if fc.CAT_CFE in fc.permitidas %}{{ cat_incrustada(fc, fc.CAT_CFE, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}</div></details>{% endfor %}{% endif %}{% endfor %}
 <label><input type="checkbox" name="activo" style="width:auto" {{'checked' if r.get(e.act)!=0}}> Activo</label></div></fieldset>
 {% if k=='vehiculos' %}<p class="muted">Al guardar se crea o renombra automáticamente su almacén “Vehículo NN” y se sincroniza la cuadrilla.</p>{% endif %}
 {% if k=='sites' %}
@@ -36,5 +37,5 @@ if(bk.dataset.en==='Generador')['gen_tipo','gen_kw','gen_combustible'].forEach(f
 var ac=document.querySelector('[name=acceso]'),ws2=['anticipacion_valor','anticipacion_unidad','contacto_permiso'].map(function(n){return document.getElementById('w_'+n);});
 function k(){var on=ac.value==='Requiere permiso';ws2.forEach(function(w){w.style.display=on?'':'none';var x=w.querySelector('input,select');if(!on)x.value='';});
 ws2[0].querySelector('input').required=on;ws2[0].querySelector('input').min=on?'1':'';ws2[1].querySelector('select').required=on;}ac.addEventListener('change',k);k();})();</script>{% endif %}
-<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion %}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
-{{ seccion(sitio_fotos_ctx(rid), '/configuracion/sites/' ~ rid ~ '/editar') }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}
+<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion, cat_forms %}{% set fc=sitio_fotos_ctx(rid) %}{{ cat_forms(fc, fc.CAT_CFE, '/configuracion/sites/' ~ rid ~ '/editar') }}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
+{{ seccion(fc, '/configuracion/sites/' ~ rid ~ '/editar', [fc.CAT_CFE] if fc.CAT_CFE in fc.permitidas else []) }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}

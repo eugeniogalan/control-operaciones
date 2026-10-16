@@ -3,7 +3,8 @@ import os, uuid, datetime
 from flask import request, redirect, abort, render_template
 from PIL import Image, ImageOps
 
-CATEGORIAS = ['Fachada exterior', 'Gabinete / Site', 'Torre / Mástil']
+CATEGORIAS = ['Fachada exterior', 'Gabinete / Site', 'Torre / Mástil', 'Recibo CFE']
+CAT_CFE = 'Recibo CFE'
 CAT_TORRE = 'Torre / Mástil'
 SUB = 'sitios'
 UP_DIR = None
@@ -13,7 +14,9 @@ def migrar(c):
         categoria TEXT NOT NULL, archivo TEXT NOT NULL, fecha TEXT DEFAULT (datetime('now','localtime')), comentario TEXT)''')
     c.execute('CREATE INDEX IF NOT EXISTS ix_sitio_fotos ON sitio_fotos(sitio_id)')
 
-def cats_permitidas(tipo): return [x for x in CATEGORIAS if x != CAT_TORRE or 'Torre' in (tipo or '')]
+def cats_permitidas(s):
+    en = (s['energia'] or '').split(',')
+    return [x for x in CATEGORIAS if (x != CAT_TORRE or 'Torre' in (s['tipo'] or '')) and (x != CAT_CFE or 'CFE' in en)]
 
 def guardar_imagen(fs, carpeta):
     img = Image.open(fs.stream); img = ImageOps.exif_transpose(img).convert('RGB')
@@ -35,7 +38,7 @@ def registrar(app, q, db, UP):
         s = q('SELECT * FROM sitios WHERE id=?', (sid,), one=True) or abort(404)
         fotos = q('SELECT * FROM sitio_fotos WHERE sitio_id=? ORDER BY fecha, id', (sid,))
         return dict(sitio=s, fotos={c: [f for f in fotos if f['categoria'] == c] for c in CATEGORIAS},
-                    permitidas=cats_permitidas(s['tipo']), CATEGORIAS=CATEGORIAS, SUB=SUB)
+                    permitidas=cats_permitidas(s), CATEGORIAS=CATEGORIAS, SUB=SUB, CAT_CFE=CAT_CFE)
     app.jinja_env.globals['sitio_fotos_ctx'] = ctx
 
     @app.route('/sites/<int:sid>/fotos')
@@ -47,7 +50,7 @@ def registrar(app, q, db, UP):
         s = q('SELECT * FROM sitios WHERE id=?', (sid,), one=True) or abort(404)
         cat = request.form.get('categoria'); volver = request.form.get('volver') or f'/sites/{sid}/fotos'
         if not volver.startswith('/') or volver.startswith('//'): volver = f'/sites/{sid}/fotos'
-        if cat not in cats_permitidas(s['tipo']): return redirect(volver + ('&' if '?' in volver else '?') + 'msg=Categoría no permitida para este tipo de site')
+        if cat not in cats_permitidas(s): return redirect(volver + ('&' if '?' in volver else '?') + 'msg=Categoría no permitida para este tipo de site')
         com = (request.form.get('comentario') or '').strip() or None; n = err = 0
         for fs in request.files.getlist('fotos'):
             if not fs or not fs.filename: continue
