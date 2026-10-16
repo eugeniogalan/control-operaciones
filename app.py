@@ -30,6 +30,7 @@ app.config.update(SESSION_COOKIE_SECURE=_HTTPS, SESSION_COOKIE_HTTPONLY=True, SE
 @app.before_request
 def _auth():
     if request.endpoint in ('login',) or session.get('ok'): return
+    if request.path == '/static/logo-spectro.png': return  # logo visible en la pantalla de login
     if request.path.startswith('/api/'): return jsonify(error='no autorizado'), 401
     return redirect(url_for('login', next=request.full_path))
 
