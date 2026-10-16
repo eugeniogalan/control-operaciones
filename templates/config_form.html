@@ -33,4 +33,5 @@ function h(){ws.style.display=sol.checked?'':'none';if(!sol.checked)ws.querySele
 var ac=document.querySelector('[name=acceso]'),ws2=['anticipacion_valor','anticipacion_unidad','contacto_permiso'].map(function(n){return document.getElementById('w_'+n);});
 function k(){var on=ac.value==='Requiere permiso';ws2.forEach(function(w){w.style.display=on?'':'none';var x=w.querySelector('input,select');if(!on)x.value='';});
 ws2[0].querySelector('input').required=on;ws2[0].querySelector('input').min=on?'1':'';ws2[1].querySelector('select').required=on;}ac.addEventListener('change',k);k();})();</script>{% endif %}
-<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% endblock %}
+<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion %}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
+{{ seccion(sitio_fotos_ctx(rid), '/configuracion/sites/' ~ rid ~ '/editar') }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}

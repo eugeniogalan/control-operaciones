@@ -650,10 +650,13 @@ def init_db():
     c.execute('CREATE INDEX IF NOT EXISTS ix_mat_np ON materiales(numero_parte)')
     sembrar_imagenes_ejemplo(c)
     CM.migrar(c)
+    SF.migrar(c)
     c.commit(); c.close()
 import syscom_client as SC
 import config_mod as CM
+import sitio_fotos as SF
 CONFIG = CM.registrar(app, q, db)
+SF.registrar(app, q, db, UP)
 
 @app.route('/proveedores/syscom', methods=['GET','POST'])
 def syscom_config():

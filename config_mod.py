@@ -142,6 +142,10 @@ def registrar(app, q, db):
     CLI = opts("SELECT id, nombre FROM clientes WHERE activo=1 ORDER BY nombre")
     PROV = opts("SELECT id, razon_social FROM proveedores WHERE activo=1 ORDER BY razon_social")
     VEH = opts("SELECT id, 'Vehículo '||numero FROM vehiculos WHERE activo=1 ORDER BY numero")
+    def sitio_del(i):
+        import sitio_fotos as SF
+        for f in q('SELECT archivo FROM sitio_fotos WHERE sitio_id=?', (i,)): SF.borrar_archivos(SF.UP_DIR, f['archivo'])
+        db().execute('DELETE FROM sitio_fotos WHERE sitio_id=?', (i,))
     def existe(sql, a): return bool(q(sql, a, one=True))
 
     # ---- hooks ----
@@ -252,12 +256,12 @@ def registrar(app, q, db):
      'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
         buscar=['codigo','nombre','ciudad','tipo'],
         sql="""SELECT *, CASE WHEN acceso='Requiere permiso' THEN 'Requiere permiso ('||COALESCE(anticipacion_valor,'?')||' '||COALESCE(anticipacion_unidad,'')||')'
-               ||CASE WHEN COALESCE(contacto_permiso,'')<>'' THEN ' · '||contacto_permiso ELSE '' END ELSE COALESCE(acceso,'Libre 24 hrs') END acceso_txt FROM sitios""",
-        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia','Energía'),('voltaje_cfe','Voltaje CFE'),('voltaje_solar','Voltaje Solar (CD)'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
+               ||CASE WHEN COALESCE(contacto_permiso,'')<>'' THEN ' · '||contacto_permiso ELSE '' END ELSE COALESCE(acceso,'Libre 24 hrs') END acceso_txt, (SELECT COUNT(*) FROM sitio_fotos f WHERE f.sitio_id=sitios.id) nfotos FROM sitios""",
+        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia','Energía'),('voltaje_cfe','Voltaje CFE'),('voltaje_solar','Voltaje Solar (CD)'),('nfotos','📷 Fotos'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
         campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje CFE disponible','checks',VOLTAJES),('voltaje_solar','Voltaje Solar (CD)','select',VOLT_SOLAR),('direccion','Dirección','text'),
                 ('ciudad','Ciudad','text'),('estado','Estado','text'),('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid,
-        pre_del=lambda i: None),
+        pre_del=sitio_del, ver_url='/sites/{id}/fotos'),
      'almacenes': dict(titulo='Almacenes', icono='🏬', tabla='almacenes', act='activo', orden="tipo, nombre", desc='Bodegas (Torrelit, Autosound) y vehículos 01–18.',
         buscar=['nombre','tipo'],
         sql="SELECT a.*, c.nombre cuadrilla, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat FROM almacenes a LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id",

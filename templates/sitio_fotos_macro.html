@@ -1,0 +1,16 @@
+{% macro seccion(c, volver) %}{% set sitio=c.sitio %}
+<fieldset id="fotos" style="margin:12px 0"><legend>📷 Fotografías</legend>
+{% for cat in c.CATEGORIAS %}{% set fs=c.fotos[cat] %}{% set ok = cat in c.permitidas %}
+<div style="margin-bottom:14px{{';opacity:.7' if not ok}}"><h3 style="margin:6px 0">{{cat}} <span class="muted">({{fs|length}})</span></h3>
+<div style="display:flex;flex-wrap:wrap;gap:8px">{% for f in fs %}
+<div style="width:104px;text-align:center"><a href="/uploads/{{c.SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{c.SUB}}/t_{{f.archivo}}" loading="lazy" style="width:104px;height:104px;object-fit:cover;border-radius:6px;border:1px solid #ccc" alt="{{cat}}"></a>
+<div class="muted" style="font-size:11px">{{f.fecha[:16]}}{% if f.comentario %}<br>{{f.comentario}}{% endif %}</div>
+<form method="post" action="/sites/fotos/{{f.id}}/borrar" onsubmit="return confirm('¿Eliminar esta foto?')"><input type="hidden" name="volver" value="{{volver}}"><button class="btn rojo" style="padding:2px 8px;font-size:12px">Eliminar</button></form></div>
+{% else %}<span class="muted">Sin fotos</span>{% endfor %}</div>
+{% if ok %}<form method="post" enctype="multipart/form-data" action="/sites/{{sitio.id}}/fotos/subir" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+<input type="hidden" name="categoria" value="{{cat}}"><input type="hidden" name="volver" value="{{volver}}">
+<label class="btn sec" style="margin:0">📸 Cámara<input type="file" name="fotos" accept="image/*" capture="environment" style="display:none" onchange="this.form.submit()"></label>
+<label class="btn sec" style="margin:0">🖼 Galería<input type="file" name="fotos" accept="image/*" multiple style="display:none" onchange="this.form.submit()"></label>
+<input name="comentario" placeholder="Comentario (opcional)" style="flex:1;min-width:140px"></form>
+{% else %}<p class="muted" style="margin:4px 0">Este tipo de site no tiene torre; no se pueden agregar fotos en esta categoría.</p>{% endif %}</div>
+{% endfor %}</fieldset>{% endmacro %}
