@@ -1,14 +1,14 @@
 {% extends 'base.html' %}{% block title %}Escanear · Inventario{% endblock %}
 {% block head %}<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <style>
-.sc{max-width:480px;margin:0 auto}.seg{display:flex;gap:6px;margin-bottom:10px}.seg button{flex:1;padding:14px;font-size:17px;font-weight:700;border:2px solid #c5ccd6;border-radius:10px;background:#fff;cursor:pointer}
-.seg button.on[data-t=entrada]{background:#1f8a4c;border-color:#1f8a4c;color:#fff}.seg button.on[data-t=salida]{background:#c0392b;border-color:#c0392b;color:#fff}
-.sc select,.sc input{width:100%;padding:12px;font-size:17px;border:1px solid #c5ccd6;border-radius:9px;box-sizing:border-box}
+.sc{max-width:480px;margin:0 auto}.seg{display:flex;gap:6px;margin-bottom:10px}.seg button{flex:1;padding:14px;font-size:17px;font-weight:700;border:2px solid #2e2e33;border-radius:10px;background:#161618;cursor:pointer}
+.seg button.on[data-t=entrada]{background:#1f8a4c;border-color:#22c55e;color:#fff}.seg button.on[data-t=salida]{background:#c0392b;border-color:#ef4444;color:#fff}
+.sc select,.sc input{width:100%;padding:12px;font-size:17px;border:1px solid #2e2e33;border-radius:9px;box-sizing:border-box}
 #reader{width:100%;min-height:60px;border-radius:10px;overflow:hidden;background:#111;margin:10px 0}#reader video{border-radius:10px}
 .row{display:flex;gap:6px}.row .btn{padding:12px 14px;font-size:16px}.big{width:100%;padding:14px!important;font-size:18px!important;margin-top:8px}
-.res{padding:12px;border-radius:10px;margin-top:10px;border:1px solid #ddd;background:#fff}.ok{background:#e3f6ea;border-color:#9fd8b4}.err{background:#fde0e0;border-color:#f3b4b4}
-.qty{display:flex;align-items:center;gap:8px;margin:10px 0}.qty button{width:52px;height:52px;font-size:26px;border-radius:10px;border:1px solid #c5ccd6;background:#f4f6f9}.qty input{text-align:center;font-size:22px;font-weight:700}
-.hist{font-size:14px;margin-top:12px}.hist div{padding:6px 0;border-bottom:1px solid #eee}
+.res{padding:12px;border-radius:10px;margin-top:10px;border:1px solid #26262a;background:#161618}.ok{background:#0f2e1c;border-color:#1f5c36}.err{background:#3a1517;border-color:#6b2224}
+.qty{display:flex;align-items:center;gap:8px;margin:10px 0}.qty button{width:52px;height:52px;font-size:26px;border-radius:10px;border:1px solid #2e2e33;background:#1c1c1f}.qty input{text-align:center;font-size:22px;font-weight:700}
+.hist{font-size:14px;margin-top:12px}.hist div{padding:6px 0;border-bottom:1px solid #26262a}
 </style>{% endblock %}
 {% block body %}<div class="sc">
 <h1 style="margin:4px 0 10px">Escanear material</h1>

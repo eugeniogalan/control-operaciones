@@ -1,5 +1,5 @@
 {% extends 'base.html' %}{% block body %}
-<h1>{{'Editar' if mid else 'Nuevo'}} material</h1>{% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">{{err}}</div>{% endif %}
+<h1>{{'Editar' if mid else 'Nuevo'}} material</h1>{% if err %}<div class="ej" style="background:#3a1517;border-color:#6b2224;color:#ff8a85">{{err}}</div>{% endif %}
 <form method="post" class="f card" style="max-width:640px"><input type="hidden" name="next" value="{{nxt}}"><div class="grid g2">
 <label>SKU / código *<input name="sku" required value="{{m.sku or '' if m else ''}}"></label>
 <label>Código de barras<input name="codigo_barras" autocomplete="off" value="{{m.codigo_barras or '' if m else ''}}" placeholder="EAN-13 / CODE128 (opcional)"></label>

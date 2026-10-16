@@ -1,7 +1,12 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Iniciar sesión</title>
-<style>body{margin:0;font-family:system-ui,sans-serif;background:#0b4f8a;display:flex;min-height:100vh;align-items:center;justify-content:center}
-form{background:#fff;border-radius:14px;padding:24px;width:92%;max-width:360px}h1{font-size:20px;margin:0 0 16px}label{display:block;font-size:14px;color:#4a5260;margin-bottom:12px}
-input{width:100%;box-sizing:border-box;padding:12px;font-size:17px;border:1px solid #c5ccd6;border-radius:8px;margin-top:4px}button{width:100%;padding:14px;font-size:17px;font-weight:700;background:#0b4f8a;color:#fff;border:0;border-radius:10px}.e{color:#b42318;margin-bottom:10px}</style></head>
-<body><form method="post"><h1>⚙ Control de Operaciones</h1>{% if err %}<div class="e">{{err}}</div>{% endif %}
+<meta name="theme-color" content="#000000"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 600px at 50% -10%,#1a1d24 0%,#000 60%);color:#f4f4f5;display:flex;min-height:100vh;align-items:center;justify-content:center;color-scheme:dark}
+form{background:rgba(18,18,20,.9);border:1px solid #26262a;border-radius:22px;padding:34px 26px;width:92%;max-width:380px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+.brand{font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:13px;color:#a1a1aa;display:flex;align-items:center;gap:8px;margin-bottom:22px}.brand i{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e}
+h1{font-size:26px;font-weight:600;letter-spacing:-.02em;margin:0 0 24px}label{display:block;font-size:12.5px;color:#a1a1aa;margin-bottom:14px;font-weight:500}
+input{width:100%;padding:13px 14px;font-size:16px;border:1px solid #33333a;border-radius:12px;margin-top:6px;background:#0b0b0c;color:#f4f4f5;font-family:inherit;outline:none}input:focus{border-color:#71717a}
+button{width:100%;margin-top:8px;padding:14px;font-size:16px;font-weight:600;background:#f4f4f5;color:#000;border:0;border-radius:999px;cursor:pointer;font-family:inherit}button:hover{background:#fff}
+.e{color:#f87171;background:#2a1011;border:1px solid #5c2222;border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:14px}</style></head>
+<body><form method="post"><div class="brand"><i></i>Spectro Networks</div><h1>Control de Operaciones</h1>{% if err %}<div class="e">{{err}}</div>{% endif %}
 <label>Usuario<input name="usuario" autocomplete="username" autocapitalize="none" required></label>
-<label>Contraseña<input name="clave" type="password" autocomplete="current-password" required></label><button>Entrar</button></form></body></html>
+<label>Contraseña<input name="clave" type="password" autocomplete="current-password" required></label><button>Iniciar sesión</button></form></body></html>

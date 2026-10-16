@@ -1,6 +1,6 @@
 {% extends 'base.html' %}{% block body %}<h1>Registrar {{TIPOS_MOV[tipo]|lower}}</h1>
 <p style="display:flex;flex-wrap:wrap;gap:6px">{% for t in ['entrada','salida','ajuste','transferencia'] %}<a class="btn {{'' if t==tipo else 'sec'}}" href="?tipo={{t}}{{'&material_id='~sel if sel}}">{{TIPOS_MOV[t]}}</a>{% endfor %}</p>
-{% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">{{err}}</div>{% endif %}
+{% if err %}<div class="ej" style="background:#3a1517;border-color:#6b2224;color:#ff8a85">{{err}}</div>{% endif %}
 {% if warn %}<div class="ej">⚠ {{warn}}</div>{% endif %}
 <form method="post" class="f card" style="max-width:640px"><input type="hidden" name="tipo" value="{{tipo}}">
 <label>Material<input list="mlist" id="mbus" placeholder="Escribe para buscar…" oninput="selm(this.value)" autocomplete="off">

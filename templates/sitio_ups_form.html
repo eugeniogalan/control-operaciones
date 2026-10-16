@@ -1,21 +1,21 @@
 {% extends 'base.html' %}{% block body %}
 <div class="muted"><a href="/configuracion">Configuración</a> › <a href="/configuracion/sites">Sites</a> › <a href="/configuracion/sites/{{s.id}}/editar">{{s.codigo}}</a> › UPS</div>
 <h1>🔌 {{ 'Cambios' if uid else 'Alta' }} · UPS de {{s.codigo}}</h1>
-{% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{err}}</div>{% endif %}
-{% if msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34">{{msg}}</div>{% endif %}
+{% if err %}<div class="ej" style="background:#3a1517;border-color:#6b2224;color:#ff8a85">⚠ {{err}}</div>{% endif %}
+{% if msg %}<div class="ej" style="background:#0f2e1c;border-color:#1f5c36;color:#4ade80">{{msg}}</div>{% endif %}
 <form class="f" method="post"><fieldset><legend>UPS</legend><div class="grid g2">
 <label>Marca<input name="marca" value="{{u.marca or ''}}"></label><label>Modelo<input name="modelo" value="{{u.modelo or ''}}"></label>
 <label>Capacidad (kVA) *<input name="capacidad_kva" type="number" step="0.1" min="0.1" inputmode="decimal" required value="{{'' if u.capacidad_kva is none else u.capacidad_kva}}"></label>
 <label>Autonomía (minutos)<input name="autonomia_min" type="number" min="1" value="{{'' if u.autonomia_min is none else u.autonomia_min}}"></label>
 <label>Número de baterías<input name="num_baterias" type="number" min="1" value="{{'' if u.num_baterias is none else u.num_baterias}}"></label>
 <label>Fecha de instalación de baterías<input name="bat_instalacion" type="date" value="{{u.bat_instalacion or ''}}"></label>
-<label>Fecha de cambio requerida (+3 años)<input id="ro_bat_cambio" value="{{u.bat_cambio or ''}}" readonly tabindex="-1" style="background:#eef1f5;color:#333" placeholder="Se calcula automáticamente"></label>
+<label>Fecha de cambio requerida (+3 años)<input id="ro_bat_cambio" value="{{u.bat_cambio or ''}}" readonly tabindex="-1" style="background:#1c1c1f;color:#d4d4d8" placeholder="Se calcula automáticamente"></label>
 </div></fieldset><button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/sites/{{s.id}}/editar#blk_UPS">Cancelar</a></form>
 <script>(function(){var fi=document.querySelector('[name=bat_instalacion]'),fc=document.getElementById('ro_bat_cambio');
 function cal(){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(fi.value);if(!m){fc.value='';return;}var d=m[3];if(m[2]==='02'&&d==='29')d='28';fc.value=(+m[1]+3)+'-'+m[2]+'-'+d;}
 fi.addEventListener('input',cal);fi.addEventListener('change',cal);cal();})();</script>
 {% if uid %}<fieldset id="fotos" style="margin:12px 0"><legend>📷 Fotos de este UPS ({{fotos|length}})</legend>
-<div style="display:flex;flex-wrap:wrap;gap:8px">{% for f in fotos %}<div style="width:104px;text-align:center"><a href="/uploads/{{SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{SUB}}/t_{{f.archivo}}" loading="lazy" style="width:104px;height:104px;object-fit:cover;border-radius:6px;border:1px solid #ccc" alt="UPS"></a>
+<div style="display:flex;flex-wrap:wrap;gap:8px">{% for f in fotos %}<div style="width:104px;text-align:center"><a href="/uploads/{{SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{SUB}}/t_{{f.archivo}}" loading="lazy" style="width:104px;height:104px;object-fit:cover;border-radius:6px;border:1px solid #2e2e33" alt="UPS"></a>
 <div class="muted" style="font-size:11px">{{f.fecha[:16]}}{% if f.comentario %}<br>{{f.comentario}}{% endif %}</div>
 <form method="post" action="/sites/fotos/{{f.id}}/borrar" onsubmit="return confirm('¿Eliminar esta foto?')"><input type="hidden" name="volver" value="/sites/ups/{{uid}}/editar"><button class="btn rojo" style="padding:2px 8px;font-size:12px">Eliminar</button></form></div>
 {% else %}<span class="muted">Sin fotos</span>{% endfor %}</div>

@@ -3,7 +3,7 @@
 {% for cat in c.GENERALES + extra if cat not in omitir %}{% set fs=c.fotos[cat] %}{% set ok = cat in c.permitidas %}
 <div style="margin-bottom:14px{{';opacity:.7' if not ok}}"><h3 id="fcat_{{loop.index}}" style="margin:6px 0">{{cat}} <span class="muted">({{fs|length}})</span></h3>
 <div style="display:flex;flex-wrap:wrap;gap:8px">{% for f in fs %}
-<div style="width:104px;text-align:center"><a href="/uploads/{{c.SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{c.SUB}}/t_{{f.archivo}}" loading="lazy" style="width:104px;height:104px;object-fit:cover;border-radius:6px;border:1px solid #ccc" alt="{{cat}}"></a>
+<div style="width:104px;text-align:center"><a href="/uploads/{{c.SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{c.SUB}}/t_{{f.archivo}}" loading="lazy" style="width:104px;height:104px;object-fit:cover;border-radius:6px;border:1px solid #2e2e33" alt="{{cat}}"></a>
 <div class="muted" style="font-size:11px">{{f.fecha[:16]}}{% if f.comentario %}<br>{{f.comentario}}{% endif %}</div>
 <form method="post" action="/sites/fotos/{{f.id}}/borrar" onsubmit="return confirm('¿Eliminar esta foto?')"><input type="hidden" name="volver" value="{{volver}}"><button class="btn rojo" style="padding:2px 8px;font-size:12px">Eliminar</button></form></div>
 {% else %}<span class="muted">Sin fotos</span>{% endfor %}</div>
@@ -17,9 +17,9 @@
 
 {# Galería de una categoría para incrustar DENTRO de otro <form>: usa el atributo form= hacia formularios externos #}
 {% macro cat_incrustada(c, cat, volver) %}{% set fs=c.fotos[cat] %}{% set fid='fup_' ~ (cat|replace(' ','_')|replace('/','')) %}
-{% set es_rec = cat==c.CAT_CFE %}<div id="fotos_{{ {'Recibo CFE':'recibo','Banco de baterías':'baterias','UPS':'ups','Torre / Mástil':'torre'}.get(cat,'x') }}" style="grid-column:1/-1;border-top:1px dashed #cfd8e3;padding-top:6px"><b>{{ {'Recibo CFE':'🧾','Banco de baterías':'🔋','UPS':'🔌','Torre / Mástil':'🗼'}.get(cat,'📷') }} {{cat}}</b> <span class="muted">({{fs|length}})</span>{% if cat in c.GENERALES %} <span class="muted" style="font-size:11px">· también en 📷 Fotografías</span>{% endif %}
+{% set es_rec = cat==c.CAT_CFE %}<div id="fotos_{{ {'Recibo CFE':'recibo','Banco de baterías':'baterias','UPS':'ups','Torre / Mástil':'torre'}.get(cat,'x') }}" style="grid-column:1/-1;border-top:1px dashed #2a2a2e;padding-top:6px"><b>{{ {'Recibo CFE':'🧾','Banco de baterías':'🔋','UPS':'🔌','Torre / Mástil':'🗼'}.get(cat,'📷') }} {{cat}}</b> <span class="muted">({{fs|length}})</span>{% if cat in c.GENERALES %} <span class="muted" style="font-size:11px">· también en 📷 Fotografías</span>{% endif %}
 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">{% for f in fs %}
-<div style="width:96px;text-align:center"><a href="/uploads/{{c.SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{c.SUB}}/t_{{f.archivo}}" loading="lazy" style="width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #ccc" alt="{{cat}}"></a>
+<div style="width:96px;text-align:center"><a href="/uploads/{{c.SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{c.SUB}}/t_{{f.archivo}}" loading="lazy" style="width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #2e2e33" alt="{{cat}}"></a>
 <div class="muted" style="font-size:11px">{{f.fecha[:10]}}{% if f.comentario %}<br>{{f.comentario}}{% endif %}</div>
 <button form="fdel_{{f.id}}" class="btn rojo" style="padding:2px 8px;font-size:12px" onclick="return confirm('¿Eliminar esta foto?')">Eliminar</button></div>
 {% else %}<span class="muted">{{ 'Sin recibos' if es_rec else 'Sin fotos' }}</span>{% endfor %}</div>
