@@ -137,7 +137,7 @@ def dashboard():
         SELECT id, codigo, nombre, 'Solar' fuente, NULL ups_id, solar_num_baterias num_baterias, solar_bat_marca marca, solar_bat_cambio cambio, alerta FROM (SELECT *, {CM.BAT_ALERTA_SQL} alerta FROM sitios WHERE activo=1)
         UNION ALL SELECT id, codigo, nombre, 'UPS', ups_id, num_baterias, TRIM(COALESCE(marca,'')||' '||(CASE WHEN capacidad_kva=CAST(capacidad_kva AS INT) THEN CAST(capacidad_kva AS INT) ELSE capacidad_kva END)||'kVA'), bat_cambio, alerta FROM ({UPS.PANEL_SQL})
         ) WHERE alerta IS NOT NULL ORDER BY cambio""")
-    contratos = q(f"SELECT id, codigo, nombre, arr_nombre, arr_vence, arr_renta, alerta FROM (SELECT *, {SD.ALERTA_SQL} alerta FROM sitios WHERE activo=1) WHERE alerta IS NOT NULL ORDER BY arr_vence")
+    contratos = q(f"SELECT id, codigo, nombre, tenencia, CASE tenencia WHEN 'Rentado' THEN arr_nombre ELSE int_nombre END contraparte, vence, CASE WHEN tenencia='Rentado' THEN arr_renta END arr_renta, alerta FROM (SELECT *, {SD.VENCE_SQL} vence, {SD.ALERTA_SQL} alerta FROM sitios WHERE activo=1) WHERE alerta IS NOT NULL ORDER BY vence")
     total = sum(por_estado.values()); maxc = max([r['total'] for r in por_cuad] + [1])
     return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, contratos=contratos, hoy=dt.date.today())
 

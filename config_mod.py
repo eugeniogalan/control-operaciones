@@ -22,7 +22,8 @@ ACC_SPN = {'SPN-POP-01':(48,'horas','Administración Plaza Juárez · 33 1234 56
 TENENCIAS = ['Rentado','Propio','Intercambio']
 TEN_SPN = {'SPN-TR-001':'Propio','SPN-POP-01':'Rentado','SPN-CS-003':'Rentado','SPN-RP-004':'Intercambio','SPN-TR-005':'Propio'}
 ARR = ['arr_nombre','arr_tel','arr_email','arr_inicio','arr_vence','arr_renta','arr_notas']
-TENENCIA_BLK = ['tenencia'] + ARR
+INTER = ['int_modo','int_nombre','int_tel','int_email','int_vence']
+TENENCIA_BLK = ['tenencia'] + ARR + INTER
 COLS_ARR = [('arr_nombre','TEXT'),('arr_tel','TEXT'),('arr_email','TEXT'),('arr_inicio','TEXT'),('arr_vence','TEXT'),('arr_renta','REAL'),('arr_notas','TEXT')]
 def _seed_arr():
     import datetime as _dt
@@ -103,6 +104,19 @@ def sitio_valid(d, rid):
         if d.get('arr_renta') is not None and d['arr_renta'] < 0: return 'Monto de renta no puede ser negativo'
     elif 'arr_vence' in d:
         for col in ARR: d[col] = None
+    if d['tenencia'] == 'Intercambio' and 'int_modo' in d:
+        import datetime as _dt
+        if not d.get('int_modo'): return 'Modo de intercambio es obligatorio'
+        if d.get('int_tel'):
+            t = _re.sub(r'[\s\-\.\(\)]', '', d['int_tel']); t = t[3:] if t.startswith('+52') else t
+            if not (len(t) == 10 and t.isdigit()): return 'Teléfono de la contraparte debe tener 10 dígitos'
+            d['int_tel'] = t
+        if d.get('int_email') and not _re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', d['int_email']): return 'Correo de la contraparte inválido'
+        if d.get('int_vence'):
+            try: _dt.date.fromisoformat(d['int_vence'])
+            except ValueError: return 'Fecha de vencimiento del intercambio inválida'
+    elif 'int_modo' in d:
+        for col in INTER: d[col] = None
     en = (d.get('energia') or '').split(',')
     for blq, cols in BLOQUES_ENERGIA.items():
         if blq not in en:
@@ -261,6 +275,12 @@ def migrar(c, N_VEH=18):
         c.execute("ALTER TABLE sitios ADD COLUMN tenencia TEXT DEFAULT 'Propio'")
         for cod, tn in TEN_SPN.items(): c.execute('UPDATE sitios SET tenencia=? WHERE codigo=? AND ejemplo=1', (tn, cod))
     c.execute("UPDATE sitios SET tenencia='Propio' WHERE tenencia IS NULL OR tenencia=''")
+    if 'int_modo' not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]:  # después de crear tenencia (BD nueva)
+        for col in INTER: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} TEXT')
+        import datetime as _dt
+        c.execute("UPDATE sitios SET int_modo=?, int_nombre=?, int_tel=?, int_email=?, int_vence=? WHERE codigo='SPN-RP-004' AND ejemplo=1 AND tenencia='Intercambio'",
+                  ('Uso del terreno y energía solar a cambio de internet gratuito (20 Mbps) para la casa ejidal y la escuela de La Cruz; Spectro da mantenimiento al camino de acceso.',
+                   'Comisariado Ejidal La Cruz', '3434321100', 'comisariado.lacruz@gmail.com', (_dt.date.today() + _dt.timedelta(days=50)).isoformat()))
     if 'arr_vence' not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]:
         for col, typ in COLS_ARR: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
         for cod, vals in _seed_arr().items():
@@ -510,13 +530,13 @@ def registrar(app, q, db):
                ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Generador,%' THEN 'Gen'||COALESCE(' '||(CASE WHEN gen_kw=CAST(gen_kw AS INT) THEN CAST(gen_kw AS INT) ELSE gen_kw END)||'kW','')||COALESCE(' '||gen_combustible,'') END,''),4) energia_txt_base, """+BAT_ALERTA_SQL+""" bat_alerta,
                CASE WHEN ','||COALESCE(energia,'')||',' LIKE '%,UPS,%' THEN """+__import__('sitio_ups').RESUMEN_SQL+""" END ups_txt,
                """+__import__('sitio_ups').ALERTA_SITIO_SQL+""" ups_alerta, """+__import__('sitio_ups').CAMBIO_MIN_SQL+""" ups_cambio,
-               """+_DOM_SQL+""" domicilio_txt, """+__import__('sitio_docs').ALERTA_SQL+""" contrato_alerta,
+               """+_DOM_SQL+""" domicilio_txt, """+__import__('sitio_docs').ALERTA_SQL+""" contrato_alerta, """+__import__('sitio_docs').VENCE_SQL+""" contrato_vence,
                CASE WHEN tipo LIKE '%Torre%' THEN NULLIF(TRIM(COALESCE(tipo_torre,'')||COALESCE(' '||(CASE WHEN altura_torre=CAST(altura_torre AS INT) THEN CAST(altura_torre AS INT) ELSE altura_torre END)||'m','')),'') END torre_txt
                FROM sitios""",
         post_sql=lambda rows: [dict(r, energia_txt=' · '.join(x for x in (r['energia_txt_base'], r['ups_txt']) if x)) for r in rows],
         cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('torre_txt','Torre'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('domicilio_txt','Domicilio')],
         campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('arr_nombre','Arrendador (nombre) *','text'),('arr_tel','Teléfono (10 dígitos)','tel'),('arr_email','Correo','email'),
-                ('arr_inicio','Fecha inicio contrato','date'),('arr_vence','Fecha vencimiento *','date'),('arr_renta','Monto renta mensual (MXN)','decimal'),('arr_notas','Notas del arrendamiento','textarea'),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación *','number'),('anticipacion_unidad','Unidad *','select',UNIDADES_ANT),
+                ('arr_inicio','Fecha inicio contrato','date'),('arr_vence','Fecha vencimiento *','date'),('arr_renta','Monto renta mensual (MXN)','decimal'),('arr_notas','Notas del arrendamiento','textarea'),('int_modo','Modo de intercambio *','textarea'),('int_nombre','Contraparte (nombre)','text'),('int_tel','Teléfono (10 dígitos)','tel'),('int_email','Correo','email'),('int_vence','Fecha vencimiento','date'),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación *','number'),('anticipacion_unidad','Unidad *','select',UNIDADES_ANT),
                 ('contacto_nombre','Nombre *','text'),('contacto_tel','Teléfono (10 dígitos) *','tel'),('contacto_email','Correo electrónico','email'),
                 ('acceso_dias','Días de acceso','checks',DIAS),('acceso_todo_dia','Todo el día (24 h)','bool'),('acceso_hora_ini','Hora inicio','time'),('acceso_hora_fin','Hora fin','time'),('acceso_instrucciones','Instrucciones de acceso / llaves','textarea'),('torre_categoria','Categoría *','select',CATS_TORRE),('torre_modelo','Modelo *','select',TODOS_MODELOS),('altura_torre','Altura (m) *','decimal'),('torre_secciones','Número de secciones','number'),
                 ('torre_balizamiento','Balizamiento / iluminación','select',SI_NO),('torre_pararrayos','Pararrayos','select',SI_NO),('torre_tierras','Sistema de tierras','select',SI_NO),
