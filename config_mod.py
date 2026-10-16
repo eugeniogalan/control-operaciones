@@ -21,6 +21,22 @@ UNIDADES_ANT = ['horas','días']
 ACC_SPN = {'SPN-POP-01':(48,'horas','Administración Plaza Juárez · 33 1234 5678'),'SPN-CS-003':(2,'días','Vigilancia Av. Patria'),'SPN-RP-004':(24,'horas','Ejido La Cruz · Comisariado')}
 TENENCIAS = ['Rentado','Propio','Intercambio']
 TEN_SPN = {'SPN-TR-001':'Propio','SPN-POP-01':'Rentado','SPN-CS-003':'Rentado','SPN-RP-004':'Intercambio','SPN-TR-005':'Propio'}
+SERVICIOS_CFE = ['Monofásico','Bifásico','Trifásico']
+TIPOS_BATERIA = ['Plomo-ácido','AGM','Gel','Litio']
+TIPOS_GEN = ['Estacionario','Portátil']
+COMBUSTIBLES = ['Gas LP','Gasolina','Diesel']
+ARRANQUES = ['Automático','Manual','Remoto']
+BLOQUES_ENERGIA = {'CFE': ['voltaje_cfe','cfe_servicio','cfe_tipo_servicio','cfe_interruptor_a'],
+    'Solar': ['voltaje_solar','solar_paneles_w','solar_num_paneles','solar_baterias_ah','solar_tipo_bateria'],
+    'Generador': ['gen_tipo','gen_marca','gen_modelo','gen_kw','gen_combustible','gen_arranque']}
+COLS_ENERGIA = [('cfe_servicio','TEXT'),('cfe_tipo_servicio','TEXT'),('cfe_interruptor_a','REAL'),('solar_paneles_w','REAL'),('solar_num_paneles','INTEGER'),
+    ('solar_baterias_ah','REAL'),('solar_tipo_bateria','TEXT'),('gen_tipo','TEXT'),('gen_marca','TEXT'),('gen_modelo','TEXT'),('gen_kw','REAL'),('gen_combustible','TEXT'),('gen_arranque','TEXT')]
+SEED_ENERGIA = {
+    'SPN-TR-001': dict(cfe_servicio='RPU 123456789012', cfe_tipo_servicio='Bifásico', cfe_interruptor_a=60, gen_tipo='Estacionario', gen_marca='Cummins', gen_modelo='C30 D6', gen_kw=30, gen_combustible='Diesel', gen_arranque='Automático,Remoto'),
+    'SPN-POP-01': dict(cfe_servicio='RPU 987654321098', cfe_tipo_servicio='Trifásico', cfe_interruptor_a=100, gen_tipo='Estacionario', gen_marca='Generac', gen_modelo='RG027', gen_kw=27, gen_combustible='Gas LP', gen_arranque='Automático'),
+    'SPN-CS-003': dict(cfe_servicio='RPU 555111222333', cfe_tipo_servicio='Monofásico', cfe_interruptor_a=30),
+    'SPN-RP-004': dict(solar_paneles_w=550, solar_num_paneles=8, solar_baterias_ah=400, solar_tipo_bateria='Litio', gen_tipo='Portátil', gen_marca='Honda', gen_modelo='EU7000iS', gen_kw=5.5, gen_combustible='Gasolina', gen_arranque='Manual,Remoto'),
+    'SPN-TR-005': dict(cfe_servicio='RPU 444333222111', cfe_tipo_servicio='Monofásico', cfe_interruptor_a=40, solar_paneles_w=450, solar_num_paneles=4, solar_baterias_ah=200, solar_tipo_bateria='AGM')}
 VOLT_SOLAR = ['12V','24V','48V']
 VSOL_SPN = {'SPN-RP-004':'48V','SPN-TR-005':'24V'}
 VOLTAJES = ['110V','220V','440V']
@@ -35,9 +51,24 @@ def sitio_valid(d, rid):
         if d.get('anticipacion_unidad') not in UNIDADES_ANT: return 'Unidad de anticipación inválida (horas o días)'
     else: d['anticipacion_valor'] = d['anticipacion_unidad'] = d['contacto_permiso'] = None
     if d.get('tenencia') not in TENENCIAS: return 'Tenencia inválida (Rentado, Propio o Intercambio)'
-    if 'CFE' not in (d.get('energia') or '').split(','): d['voltaje_cfe'] = None
-    if 'Solar' not in (d.get('energia') or '').split(','): d['voltaje_solar'] = None
-    elif d.get('voltaje_solar') not in (None, *VOLT_SOLAR): return 'Voltaje Solar (CD) inválido'
+    en = (d.get('energia') or '').split(',')
+    for blq, cols in BLOQUES_ENERGIA.items():
+        if blq not in en:
+            for col in cols: d[col] = None
+    def opc(col, ops, lab):
+        if d.get(col) is not None and d[col] not in ops: return f'{lab} inválido'
+    for col, ops, lab in (('voltaje_solar',VOLT_SOLAR,'Voltaje Solar (CD)'),('cfe_tipo_servicio',SERVICIOS_CFE,'Tipo de servicio CFE'),
+                          ('solar_tipo_bateria',TIPOS_BATERIA,'Tipo de batería'),('gen_tipo',TIPOS_GEN,'Tipo de generador'),('gen_combustible',COMBUSTIBLES,'Combustible')):
+        m = opc(col, ops, lab)
+        if m: return m
+    for col, lab in (('cfe_interruptor_a','Interruptor principal'),('solar_paneles_w','Capacidad de paneles'),('solar_baterias_ah','Banco de baterías')):
+        if d.get(col) is not None and d[col] <= 0: return f'{lab} debe ser mayor a 0'
+    if d.get('solar_num_paneles') is not None and d['solar_num_paneles'] < 0: return 'Número de paneles no puede ser negativo'
+    if 'Generador' in en:
+        if not d.get('gen_tipo'): return 'Tipo de generador es obligatorio'
+        if d.get('gen_kw') is None or d['gen_kw'] <= 0: return 'Capacidad del generador (kW) debe ser mayor a 0'
+        if not d.get('gen_combustible'): return 'Combustible del generador es obligatorio'
+        if not d.get('gen_arranque'): return 'Selecciona al menos un tipo de arranque del generador'
     if 'Torre' in (d.get('tipo') or ''):
         if d.get('altura_torre') is None: return 'Altura de torre (m) es obligatoria cuando el tipo incluye Torre'
         if d['altura_torre'] <= 0: return 'Altura de torre debe ser mayor a 0'
@@ -73,6 +104,12 @@ def migrar(c, N_VEH=18):
         for cod, (v, u, ct) in ACC_SPN.items():
             c.execute("UPDATE sitios SET acceso='Requiere permiso', anticipacion_valor=?, anticipacion_unidad=?, contacto_permiso=? WHERE codigo=? AND ejemplo=1", (v, u, ct, cod))
     c.execute("UPDATE sitios SET acceso='Libre 24 hrs' WHERE acceso IS NULL OR acceso=''")
+    sc2 = [r[1] for r in c.execute('PRAGMA table_info(sitios)')]
+    if 'gen_kw' not in sc2:
+        for col, typ in COLS_ENERGIA:
+            if col not in sc2: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
+        for cod, vals in SEED_ENERGIA.items():
+            ks = list(vals); c.execute(f"UPDATE sitios SET {', '.join(k+'=?' for k in ks)} WHERE codigo=? AND ejemplo=1", [vals[k] for k in ks] + [cod])
     for cod, vv in VSOL_SPN.items():
         c.execute("UPDATE sitios SET voltaje_solar=? WHERE codigo=? AND ejemplo=1 AND voltaje_solar IS NULL AND ','||COALESCE(energia,'Solar')||',' LIKE '%,Solar,%'", (vv, cod))
     for cod, vv in VOLT_SPN.items():
@@ -256,11 +293,17 @@ def registrar(app, q, db):
      'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
         buscar=['codigo','nombre','ciudad','tipo'],
         sql="""SELECT *, CASE WHEN acceso='Requiere permiso' THEN 'Requiere permiso ('||COALESCE(anticipacion_valor,'?')||' '||COALESCE(anticipacion_unidad,'')||')'
-               ||CASE WHEN COALESCE(contacto_permiso,'')<>'' THEN ' · '||contacto_permiso ELSE '' END ELSE COALESCE(acceso,'Libre 24 hrs') END acceso_txt, (SELECT COUNT(*) FROM sitio_fotos f WHERE f.sitio_id=sitios.id) nfotos FROM sitios""",
-        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia','Energía'),('voltaje_cfe','Voltaje CFE'),('voltaje_solar','Voltaje Solar (CD)'),('nfotos','📷 Fotos'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
-        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje CFE disponible','checks',VOLTAJES),('voltaje_solar','Voltaje Solar (CD)','select',VOLT_SOLAR),('direccion','Dirección','text'),
+               ||CASE WHEN COALESCE(contacto_permiso,'')<>'' THEN ' · '||contacto_permiso ELSE '' END ELSE COALESCE(acceso,'Libre 24 hrs') END acceso_txt, (SELECT COUNT(*) FROM sitio_fotos f WHERE f.sitio_id=sitios.id) nfotos,
+               SUBSTR(COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,CFE,%' THEN 'CFE'||COALESCE(' '||REPLACE(voltaje_cfe,',','/'),'')||COALESCE(' '||LOWER(cfe_tipo_servicio),'') END,'')
+               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Solar,%' THEN 'Solar'||COALESCE(' '||voltaje_solar,'')||CASE WHEN solar_num_paneles>0 AND solar_paneles_w>0 THEN ' '||solar_num_paneles||'×'||CAST(solar_paneles_w AS INT)||'W' ELSE '' END END,'')
+               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Generador,%' THEN 'Gen'||COALESCE(' '||(CASE WHEN gen_kw=CAST(gen_kw AS INT) THEN CAST(gen_kw AS INT) ELSE gen_kw END)||'kW','')||COALESCE(' '||gen_combustible,'') END,''),4) energia_txt
+               FROM sitios""",
+        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
+        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje disponible','checks',VOLTAJES),('cfe_servicio','No. de servicio / medidor CFE','text'),('cfe_tipo_servicio','Tipo de servicio','select',SERVICIOS_CFE),('cfe_interruptor_a','Interruptor principal (A)','decimal'),
+                ('voltaje_solar','Voltaje CD','select',VOLT_SOLAR),('solar_paneles_w','Capacidad por panel (W)','decimal'),('solar_num_paneles','Número de paneles','number'),('solar_baterias_ah','Banco de baterías (Ah)','decimal'),('solar_tipo_bateria','Tipo de batería','select',TIPOS_BATERIA),
+                ('gen_tipo','Tipo de generador','select',TIPOS_GEN),('gen_marca','Marca','text'),('gen_modelo','Modelo','text'),('gen_kw','Capacidad (kW) *','decimal'),('gen_combustible','Combustible','select',COMBUSTIBLES),('gen_arranque','Arranque','checks',ARRANQUES),('direccion','Dirección','text'),
                 ('ciudad','Ciudad','text'),('estado','Estado','text'),('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
-        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid,
+        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA,
         pre_del=sitio_del, ver_url='/sites/{id}/fotos'),
      'almacenes': dict(titulo='Almacenes', icono='🏬', tabla='almacenes', act='activo', orden="tipo, nombre", desc='Bodegas (Torrelit, Autosound) y vehículos 01–18.',
         buscar=['nombre','tipo'],
@@ -317,7 +360,9 @@ def registrar(app, q, db):
                 col, typ = f[0], f[2]
                 if typ.endswith('*'): continue
                 v = (F.get(col) or '').strip() or None
-                if v is not None and typ in ('fk','number'): v = int(v)
+                if v is not None and typ in ('fk','number'):
+                    try: v = int(v)
+                    except ValueError: err = f'{f[1]} debe ser un número entero'; v = None
                 if typ == 'checks':
                     sel = F.getlist(col); v = ','.join(o for o in f[3] if o in sel) or None
                 if v is not None and typ == 'decimal':

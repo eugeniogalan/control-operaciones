@@ -2,7 +2,11 @@
 <h1>{{ ('Cambios · ' if rid else 'Alta · ') ~ e.titulo }}</h1>
 {% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{err}}</div>{% endif %}
 <form class="f" method="post"><fieldset><legend>{{e.titulo}}</legend><div class="grid g2">
-{% for c in campos %}{{ campo(c, r) }}{% endfor %}
+{% set enb = e.bloques or {} %}{% set encols = [] %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
+{% for c in campos %}{% if c[0] not in encols %}{{ campo(c, r) }}{% endif %}
+{% if c[0]=='energia' and enb %}{% for b,cs in enb.items() %}<details class="blk-en" id="blk_{{b}}" data-en="{{b}}" open style="grid-column:1/-1;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc">
+<summary style="font-weight:600;cursor:pointer">{{ {'CFE':'⚡ CFE','Solar':'☀️ Solar','Generador':'⛽ Generador'}[b] }}</summary><div class="grid g2" style="margin-top:6px">
+{% for c2 in campos %}{% if c2[0] in cs %}{{ campo(c2, r) }}{% endif %}{% endfor %}</div></details>{% endfor %}{% endif %}{% endfor %}
 <label><input type="checkbox" name="activo" style="width:auto" {{'checked' if r.get(e.act)!=0}}> Activo</label></div></fieldset>
 {% if k=='vehiculos' %}<p class="muted">Al guardar se crea o renombra automáticamente su almacén “Vehículo NN” y se sincroniza la cuadrilla.</p>{% endif %}
 {% if k=='sites' %}
@@ -26,10 +30,9 @@ navigator.geolocation.getCurrentPosition(function(p){poner(p.coords.latitude,p.c
 gml();setTimeout(function(){m.invalidateSize();},200);})();</script>
 <script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('w_altura_torre'),i=w.querySelector('input'),w2=document.getElementById('w_tipo_torre');
 function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=w2.style.display=on?'':'none';i.required=on;if(!on){i.value='';w2.querySelector('input').value='';}}t.addEventListener('change',f);f();
-var wv=document.getElementById('w_voltaje_cfe'),cfe=document.querySelector('[name=energia][value=CFE]');
-function g(){wv.style.display=cfe.checked?'':'none';if(!cfe.checked)wv.querySelectorAll('input').forEach(function(x){x.checked=false});}cfe.addEventListener('change',g);g();
-var ws=document.getElementById('w_voltaje_solar'),sol=document.querySelector('[name=energia][value=Solar]');
-function h(){ws.style.display=sol.checked?'':'none';if(!sol.checked)ws.querySelector('select').value='';}sol.addEventListener('change',h);h();
+document.querySelectorAll('.blk-en').forEach(function(bk){var cb=document.querySelector('[name=energia][value="'+bk.dataset.en+'"]');
+function u(){var on=cb.checked;bk.style.display=on?'':'none';if(!on)bk.querySelectorAll('input,select').forEach(function(x){if(x.type==='checkbox')x.checked=false;else x.value='';});
+if(bk.dataset.en==='Generador')['gen_tipo','gen_kw','gen_combustible'].forEach(function(n){bk.querySelector('[name='+n+']').required=on;});}cb.addEventListener('change',u);u();});
 var ac=document.querySelector('[name=acceso]'),ws2=['anticipacion_valor','anticipacion_unidad','contacto_permiso'].map(function(n){return document.getElementById('w_'+n);});
 function k(){var on=ac.value==='Requiere permiso';ws2.forEach(function(w){w.style.display=on?'':'none';var x=w.querySelector('input,select');if(!on)x.value='';});
 ws2[0].querySelector('input').required=on;ws2[0].querySelector('input').min=on?'1':'';ws2[1].querySelector('select').required=on;}ac.addEventListener('change',k);k();})();</script>{% endif %}
