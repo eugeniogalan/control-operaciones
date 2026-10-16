@@ -17,7 +17,7 @@
 
 {# Galería de una categoría para incrustar DENTRO de otro <form>: usa el atributo form= hacia formularios externos #}
 {% macro cat_incrustada(c, cat, volver) %}{% set fs=c.fotos[cat] %}{% set fid='fup_' ~ (cat|replace(' ','_')|replace('/','')) %}
-{% set es_rec = cat==c.CAT_CFE %}<div id="fotos_{{ {'Recibo CFE':'recibo','Banco de baterías':'baterias','UPS':'ups'}.get(cat,'x') }}" style="grid-column:1/-1;border-top:1px dashed #cfd8e3;padding-top:6px"><b>{{ {'Recibo CFE':'🧾','Banco de baterías':'🔋','UPS':'🔌'}.get(cat,'📷') }} {{cat}}</b> <span class="muted">({{fs|length}})</span>
+{% set es_rec = cat==c.CAT_CFE %}<div id="fotos_{{ {'Recibo CFE':'recibo','Banco de baterías':'baterias','UPS':'ups','Torre / Mástil':'torre'}.get(cat,'x') }}" style="grid-column:1/-1;border-top:1px dashed #cfd8e3;padding-top:6px"><b>{{ {'Recibo CFE':'🧾','Banco de baterías':'🔋','UPS':'🔌','Torre / Mástil':'🗼'}.get(cat,'📷') }} {{cat}}</b> <span class="muted">({{fs|length}})</span>
 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">{% for f in fs %}
 <div style="width:96px;text-align:center"><a href="/uploads/{{c.SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{c.SUB}}/t_{{f.archivo}}" loading="lazy" style="width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #ccc" alt="{{cat}}"></a>
 <div class="muted" style="font-size:11px">{{f.fecha[:10]}}{% if f.comentario %}<br>{{f.comentario}}{% endif %}</div>

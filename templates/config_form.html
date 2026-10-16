@@ -2,8 +2,12 @@
 <h1>{{ ('Cambios · ' if rid else 'Alta · ') ~ e.titulo }}</h1>
 {% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{err}}</div>{% endif %}
 <form class="f" method="post"><fieldset><legend>{{e.titulo}}</legend><div class="grid g2">
-{% set enb = e.bloques or {} %}{% set encols = (e.domicilio or [])|list %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
-{% for c in campos %}{% if c[0] not in encols %}{{ campo(c, r) }}{% endif %}
+{% set enb = e.bloques or {} %}{% set encols = (e.domicilio or [])|list + (e.torre or [])|list %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
+{% for c in campos %}{% if c[0]=='tipo' and e.torre %}<fieldset id="blk_tipo" style="grid-column:1/-1;margin:4px 0"><legend>🏗 Tipo de site</legend><div class="grid g2">{{ campo(c, r) }}</div>
+<details id="blk_torre" open style="margin-top:8px;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc"><summary style="font-weight:600;cursor:pointer">🗼 Torre / Mástil</summary><div class="grid g2" style="margin-top:6px">
+{% for c2 in campos %}{% if c2[0] in e.torre %}{{ campo(c2, r) }}{% endif %}{% endfor %}
+{% if rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fct=sitio_fotos_ctx(rid) %}{% if 'Torre / Mástil' in fct.permitidas %}{{ cat_incrustada(fct, 'Torre / Mástil', '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}
+</div></details></fieldset>{% elif c[0] not in encols %}{{ campo(c, r) }}{% endif %}
 {% if c[0]=='energia' and enb %}{% for b,cs in enb.items() %}<details class="blk-en" id="blk_{{b}}" data-en="{{b}}" open style="grid-column:1/-1;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc">
 <summary style="font-weight:600;cursor:pointer">{{ {'CFE':'⚡ CFE','Solar':'☀️ Solar','Generador':'⛽ Generador','UPS':'🔌 UPS'}[b] }}</summary><div class="grid g2" style="margin-top:6px">
 {% for c2 in campos %}{% if c2[0] in cs %}{{ campo(c2, r) }}{% endif %}{% endfor %}
@@ -39,8 +43,8 @@ function sync(){var a=parseFloat(la.value),b=parseFloat(ln.value);if(!isNaN(a)&&
 document.getElementById('btnGeo').onclick=function(){if(!navigator.geolocation){alert('Tu navegador no soporta geolocalización');return;}
 navigator.geolocation.getCurrentPosition(function(p){poner(p.coords.latitude,p.coords.longitude,17);},function(e){alert('No se pudo obtener la ubicación: '+e.message);},{enableHighAccuracy:true,timeout:15000});};
 gml();setTimeout(function(){m.invalidateSize();},200);})();</script>
-<script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('w_altura_torre'),i=w.querySelector('input'),w2=document.getElementById('w_tipo_torre');
-function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=w2.style.display=on?'':'none';i.required=on;if(!on){i.value='';w2.querySelector('input').value='';}}t.addEventListener('change',f);f();
+<script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('blk_torre'),i=document.querySelector('[name=altura_torre]');
+function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=on?'':'none';i.required=on;if(!on)w.querySelectorAll('input[name],select[name],textarea[name]').forEach(function(x){if(!x.getAttribute('form'))x.value='';});}t.addEventListener('change',f);f();
 (function(){var fi=document.querySelector('[name=solar_bat_instalacion]'),fc=document.getElementById('ro_solar_bat_cambio');if(!fi||!fc)return;
 function cal(){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(fi.value);if(!m){fc.value='';return;}var y=+m[1]+3,mo=m[2],d=m[3];if(mo==='02'&&d==='29')d='28';fc.value=y+'-'+mo+'-'+d;}
 fi.addEventListener('input',cal);fi.addEventListener('change',cal);cal();})();
@@ -50,5 +54,5 @@ if(bk.dataset.en==='Generador')['gen_tipo','gen_kw','gen_combustible'].forEach(f
 var ac=document.querySelector('[name=acceso]'),ws2=['anticipacion_valor','anticipacion_unidad','contacto_permiso'].map(function(n){return document.getElementById('w_'+n);});
 function k(){var on=ac.value==='Requiere permiso';ws2.forEach(function(w){w.style.display=on?'':'none';var x=w.querySelector('input,select');if(!on)x.value='';});
 ws2[0].querySelector('input').required=on;ws2[0].querySelector('input').min=on?'1':'';ws2[1].querySelector('select').required=on;}ac.addEventListener('change',k);k();})();</script>{% endif %}
-<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion, cat_forms %}{% set fc=sitio_fotos_ctx(rid) %}{% for u in sitio_ups_unidades(rid) %}<form id="fdelups_{{u.id}}" method="post" action="/sites/ups/{{u.id}}/borrar" style="display:none"></form>{% endfor %}{% for ce in fc.CAT_ENERGIA if ce!='UPS' %}{{ cat_forms(fc, ce, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endfor %}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
-{{ seccion(fc, '/configuracion/sites/' ~ rid ~ '/editar', fc.CAT_ENERGIA|select('in', fc.permitidas)|reject('equalto','UPS')|list) }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}
+<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion, cat_forms %}{% set fc=sitio_fotos_ctx(rid) %}{% for u in sitio_ups_unidades(rid) %}<form id="fdelups_{{u.id}}" method="post" action="/sites/ups/{{u.id}}/borrar" style="display:none"></form>{% endfor %}{% for ce in (fc.CAT_ENERGIA|list|reject('equalto','UPS')|list) + ['Torre / Mástil'] %}{{ cat_forms(fc, ce, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endfor %}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
+{{ seccion(fc, '/configuracion/sites/' ~ rid ~ '/editar', (fc.CAT_ENERGIA|list + ['Torre / Mástil'])|select('in', fc.permitidas)|reject('equalto','UPS')|list) }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}
