@@ -16,10 +16,16 @@
 <label>Nombre<input name="ordena_nombre" value="{{v.ordena_nombre or ''}}"></label>
 <label>Puesto<select name="ordena_puesto"><option></option>{% for p in PUESTOS_ORDENA %}<option {{'selected' if v.ordena_puesto==p}}>{{p}}</option>{% endfor %}</select></label></div></fieldset>
 <fieldset><legend>Cliente y lugar</legend><div class="grid g2">
-<label>Cliente / nombre<input name="cliente" value="{{v.cliente or ''}}"></label>
+<div><label>Cliente <span class="muted">(buscar en catálogo)</span> · <a href="/configuracion/clientes/nuevo" target="_blank">+ nuevo cliente</a>
+<input id="cli_q" placeholder="Escribe para filtrar…" oninput="filt('cli')" autocomplete="off">
+<select name="cliente_id" id="cli" onchange="cliSel()"><option value="">— Selecciona cliente —</option>{% for c in clientes_cat %}<option value="{{c.id}}" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}}</option>{% endfor %}</select></label>
+{% if v.cliente and not v.cliente_id %}<div class="muted">Valor anterior (orden antigua): <b>{{v.cliente}}</b> — elige el cliente del catálogo para actualizarla.</div>{% endif %}
+<input type="hidden" name="cliente" value="{{v.cliente or ''}}"></div>
 <label>Tipo de cliente<select name="tipo_cliente"><option></option>{% for p in TIPOS_CLIENTE %}<option {{'selected' if v.tipo_cliente==p}}>{{p}}</option>{% endfor %}</select></label>
-<label>Site del catálogo <span class="muted">(opcional)</span><select name="site_id"><option value="">— ninguno —</option>{% for st in sitios %}<option value="{{st.id}}" {{'selected' if v.site_id==st.id}}>{{st.codigo}} · {{st.nombre}}</option>{% endfor %}</select></label>
-<label>Sitio / lugar de la orden<input name="sitio" value="{{v.sitio or ''}}"></label>
+<div><label>Site Spectro <span class="muted">(opcional, infraestructura propia)</span> · <a href="/configuracion/sites/nuevo" id="site_new" target="_blank">+ nuevo site</a>
+<input id="site_q" placeholder="Escribe para filtrar…" oninput="filt('site')" autocomplete="off">
+<select name="site_id" id="site"><option value="">— Selecciona site —</option>{% for st in sitios %}<option value="{{st.id}}" {{'selected' if v.site_id==st.id}}>{{st.codigo}} · {{st.nombre}}</option>{% endfor %}</select></label>
+{% if v.sitio and not v.site_id %}<details open><summary class="muted">Sitio en texto libre (orden antigua)</summary><input name="sitio" value="{{v.sitio}}"></details>{% else %}<details><summary class="muted">¿No está en el catálogo? Texto libre</summary><input name="sitio" value="{{'' if v.site_id else (v.sitio or '')}}"></details>{% endif %}</div>
 <label>Calle y No.<input name="calle" value="{{v.calle or ''}}"></label>
 <label>Ciudad<input name="ciudad" value="{{v.ciudad or ''}}"></label><label>Estado (entidad)<input name="estado_geo" value="{{v.estado_geo or ''}}"></label>
 <label>Persona de contacto<input name="contacto" value="{{v.contacto or ''}}"></label><label>Teléfono<input name="telefono" value="{{v.telefono or ''}}"></label>
@@ -48,4 +54,10 @@ const ini={g:{{(v.tipo_grupo or '')|tojson}},t:{{(v.tipo_orden or '')|tojson}}};
 function fill(s,arr,sel){s.innerHTML=arr.map(x=>`<option ${x==sel?'selected':''}>${x}</option>`).join('')}
 function upG(){fill(grp,Object.keys(T[cat.value]),ini.g);upT()} function upT(){fill(tip,T[cat.value][grp.value]||[],ini.t)}
 cat.onchange=upG;grp.onchange=upT;upG();
+</script><script>
+function filt(k){const q=document.getElementById(k+'_q').value.toLowerCase(),s=document.getElementById(k);
+ for(const o of s.options){if(!o.value)continue;let ok=o.text.toLowerCase().includes(q);o.hidden=!ok&&!o.selected;}}
+function fillIf(n,v){const e=document.querySelector('[name='+n+']');if(e&&v&&!e.value)e.value=v;}
+function cliSel(){const o=document.getElementById('cli').selectedOptions[0];
+ if(o.value){fillIf('tipo_cliente',o.dataset.tipo);fillIf('calle',o.dataset.calle);fillIf('ciudad',o.dataset.ciudad);fillIf('estado_geo',o.dataset.estado);fillIf('contacto',o.dataset.contacto);fillIf('telefono',o.dataset.tel);}}
 </script>{% endblock %}

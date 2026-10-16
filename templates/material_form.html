@@ -4,6 +4,7 @@
 <label>SKU / código *<input name="sku" required value="{{m.sku or '' if m else ''}}"></label>
 <label>Código de barras<input name="codigo_barras" autocomplete="off" value="{{m.codigo_barras or '' if m else ''}}" placeholder="EAN-13 / CODE128 (opcional)"></label>
 <label>No. de parte / modelo Syscom<input name="numero_parte" value="{{m.numero_parte or '' if m else ''}}" placeholder="p.ej. DS-2CD1023G0E-I"></label>
+<label>Proveedor<select name="proveedor_id"><option value="">— ninguno —</option>{% for p in provs %}<option value="{{p.id}}" {{'selected' if m and m.proveedor_id==p.id}}>{{p.razon_social}}</option>{% endfor %}</select></label>
 <label>Marca<input name="marca" value="{{m.marca or '' if m else ''}}"></label>
 <label>ID Syscom<input name="syscom_id" value="{{m.syscom_id or '' if m else ''}}" placeholder="se llena al sincronizar"></label>
 <label>URL de imagen<input name="imagen_url" value="{{m.imagen_url or '' if m else ''}}" placeholder="https://… (se llena al sincronizar)"></label>

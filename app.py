@@ -158,7 +158,7 @@ def ordenes():
     return render_template('ordenes.html', rows=rows, f=f, total=total, page=page, pages=pages, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), clientes=clientes, qs=qs)
 
 CAMPOS = ['categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
- 'cliente','tipo_cliente','calle','ciudad','estado_geo','contacto','telefono','coordenadas','coordenadas_b','sitio','site_id','descripcion','cuadrilla_id','ejecuto_puesto',
+ 'cliente','cliente_id','tipo_cliente','calle','ciudad','estado_geo','contacto','telefono','coordenadas','coordenadas_b','sitio','site_id','descripcion','cuadrilla_id','ejecuto_puesto',
  'personas_adicionales','observaciones','notas','folio_evidencias','audito_nombre','audito_puesto','fecha_auditoria','aprobacion','obs_auditoria']
 
 def siguiente_folio(cat):
@@ -174,8 +174,10 @@ def orden_form(oid=None):
     if oid and not o: abort(404)
     if request.method == 'POST':
         d = {k: (request.form.get(k) or None) for k in CAMPOS}
-        if d['site_id'] and not d['sitio']:
-            st = q('SELECT codigo, nombre FROM sitios WHERE id=?', (d['site_id'],), one=True); d['sitio'] = f"{st['codigo']} · {st['nombre']}" if st else None
+        if d['cliente_id']:   # catálogo manda; el texto libre solo queda para órdenes antiguas
+            cl = q('SELECT nombre FROM clientes WHERE id=?', (d['cliente_id'],), one=True); d['cliente'] = cl['nombre'] if cl else d['cliente']
+        if d['site_id']:
+            st = q('SELECT codigo, nombre FROM sitios WHERE id=?', (d['site_id'],), one=True); d['sitio'] = f"{st['codigo']} · {st['nombre']}" if st else d['sitio']
         if d['cuadrilla_id'] and d['estado'] == 'pendiente': d['estado'] = 'asignada'
         if d['estado'] == 'completada' and not d['fecha_cierre']: d['fecha_cierre'] = ahora()
         folio = request.form.get('folio') or (o['folio'] if o else siguiente_folio(d['categoria'] or 'INST'))
@@ -186,7 +188,8 @@ def orden_form(oid=None):
             cur = db().execute(f"INSERT INTO ordenes(folio,{','.join(CAMPOS)}) VALUES(?{',?'*len(CAMPOS)})", [folio]+[d[k] for k in CAMPOS]); oid = cur.lastrowid
             log(oid, 'Orden creada')
         db().commit(); return redirect(url_for('orden_ver', oid=oid))
-    return render_template('orden_form.html', o=o, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre FROM sitios WHERE activo=1 OR id=? ORDER BY codigo', ((o['site_id'] if o else None),)))
+    return render_template('orden_form.html', o=o, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, cliente_id, direccion, ciudad, estado, lat, lng, contacto FROM sitios WHERE activo=1 OR id=? ORDER BY codigo', ((o['site_id'] if o else None),)),
+        clientes_cat=q('SELECT * FROM clientes WHERE activo=1 OR id=? ORDER BY nombre', ((o['cliente_id'] if o else None),)))
 
 @app.route('/ordenes/<int:oid>')
 def orden_ver(oid):
@@ -437,6 +440,7 @@ def material_form(mid=None):
         d['stock_minimo'] = float(request.form.get('stock_minimo') or 0); d['activo'] = 1 if request.form.get('activo') else 0
         d['codigo_barras'] = (request.form.get('codigo_barras') or '').strip() or None
         for k in ('numero_parte','syscom_id','marca','imagen_url'): d[k] = (request.form.get(k) or '').strip() or None
+        d['proveedor_id'] = int(request.form['proveedor_id']) if (request.form.get('proveedor_id') or '').isdigit() else None
         if d['imagen_url'] and not (d['imagen_url'].startswith(('https://','http://','/static/','/uploads/'))): d['imagen_url'] = None
         if not d['sku'] or not d['nombre']: err = 'SKU y nombre son obligatorios'
         elif d['codigo_barras'] and q('SELECT 1 FROM materiales WHERE codigo_barras=? AND id IS NOT ?', (d['codigo_barras'], mid), one=True): err = 'Ese código de barras ya está asignado a otro material'
@@ -453,7 +457,7 @@ def material_form(mid=None):
             return redirect(nxt if nxt.startswith('/inventario/escanear') else url_for('material_ver', mid=mid))
         m = d
     if not m and request.args.get('codigo'): m = {'codigo_barras': request.args['codigo'], 'activo': 1}
-    return render_template('material_form.html', m=m, mid=mid, err=err, nxt=request.values.get('next',''), CATS_MAT=CATS_MAT, UNIDADES=UNIDADES, alms=almacenes())
+    return render_template('material_form.html', m=m, mid=mid, err=err, nxt=request.values.get('next',''), CATS_MAT=CATS_MAT, UNIDADES=UNIDADES, alms=almacenes(), provs=q('SELECT id, razon_social FROM proveedores WHERE activo=1 OR id=? ORDER BY razon_social', (m.get('proveedor_id') if isinstance(m, dict) else (m['proveedor_id'] if m else None),)))
 
 @app.route('/inventario/<int:mid>')
 def material_ver(mid):

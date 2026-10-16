@@ -163,7 +163,7 @@ def _aplicar(conn, mid, p, upload_dir, descargar_imagenes, res):
     img_local = descargar_miniatura(p['imagen'], os.path.join(upload_dir, 'productos'), p['modelo']) if descargar_imagenes else None
     if img_local: res['imagenes'] += 1
     conn.execute('''UPDATE materiales SET numero_parte=?, syscom_id=?, marca=COALESCE(?,marca), imagen_url=COALESCE(?,imagen_url),
-        imagen_local=COALESCE(?,imagen_local), precio_syscom=?, syscom_link=?, syscom_sync=? WHERE id=?''',
+        imagen_local=COALESCE(?,imagen_local), precio_syscom=?, syscom_link=?, syscom_sync=?, proveedor_id=COALESCE(proveedor_id,(SELECT id FROM proveedores WHERE codigo='SYSCOM')) WHERE id=?''',
         (p['modelo'], p['syscom_id'], p['marca'], p['imagen'], img_local, p['precio'], p['link'], _ahora(), mid))
     res['actualizados'] += 1
 

@@ -4,13 +4,17 @@ from flask import render_template, request, redirect, url_for, abort
 SCHEMA_CFG = '''
 CREATE TABLE IF NOT EXISTS sitios(id INTEGER PRIMARY KEY, codigo TEXT UNIQUE, nombre TEXT NOT NULL, cliente TEXT, direccion TEXT, ciudad TEXT, estado TEXT,
  lat REAL, lng REAL, tipo TEXT, contacto TEXT, notas TEXT, activo INTEGER DEFAULT 1, ejemplo INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS clientes(id INTEGER PRIMARY KEY, nombre TEXT UNIQUE NOT NULL, tipo_cliente TEXT, rfc TEXT, contacto TEXT, telefono TEXT, email TEXT,
+ calle TEXT, ciudad TEXT, estado TEXT, notas TEXT, activo INTEGER DEFAULT 1, ejemplo INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS proveedores(id INTEGER PRIMARY KEY, codigo TEXT, razon_social TEXT UNIQUE NOT NULL, rfc TEXT, contacto TEXT, telefono TEXT, email TEXT,
+ sitio_web TEXT, categoria TEXT, condiciones_pago TEXT, notas TEXT, activo INTEGER DEFAULT 1);
 CREATE TABLE IF NOT EXISTS vehiculos(id INTEGER PRIMARY KEY, numero TEXT UNIQUE NOT NULL, placas TEXT, marca TEXT, modelo TEXT, anio INTEGER,
  cuadrilla_id INTEGER REFERENCES cuadrillas(id) ON DELETE SET NULL, almacen_id INTEGER REFERENCES almacenes(id) ON DELETE SET NULL, activo INTEGER DEFAULT 1, notas TEXT);
 CREATE TABLE IF NOT EXISTS herramientas(id INTEGER PRIMARY KEY, codigo TEXT, numero_serie TEXT, nombre TEXT NOT NULL, tipo TEXT, marca TEXT, modelo TEXT,
  estado TEXT DEFAULT 'disponible', cuadrilla_id INTEGER REFERENCES cuadrillas(id) ON DELETE SET NULL, personal_id INTEGER REFERENCES tecnicos(id) ON DELETE SET NULL,
  almacen_id INTEGER REFERENCES almacenes(id) ON DELETE SET NULL, fecha_calibracion TEXT, notas TEXT, activo INTEGER DEFAULT 1, ejemplo INTEGER DEFAULT 0);
 '''
-TIPOS_SITIO = ['Torre','Nodo','Cliente','Repetidor','Oficina','Data center','Otro']
+TIPOS_SITIO = ['Torre','Caseta','POP','Repetidor','Data center','Oficina','Otro']  # solo sitios propios de Spectro Networks
 TIPOS_HERR = ['Herramienta','Equipo de medición','EPP','Equipo de fusión','Escalera / altura','Vehículo / remolque','Otro']
 ESTADOS_HERR = ['disponible','asignado','en reparación','baja']
 PUESTOS = ['Director','Gerente','Supervisor','Técnico Instalador','Vendedor','Almacenista','Proveedor Externo']
@@ -23,19 +27,17 @@ def migrar(c, N_VEH=18):
         if col not in tc: c.execute(f'ALTER TABLE tecnicos ADD COLUMN {col} {typ}')
     if 'site_id' not in [r[1] for r in c.execute('PRAGMA table_info(ordenes)')]:
         c.execute('ALTER TABLE ordenes ADD COLUMN site_id INTEGER REFERENCES sitios(id) ON DELETE SET NULL')
-    # vehículos: uno por cada almacén "Vehículo NN" existente
-    if not c.execute('SELECT 1 FROM vehiculos LIMIT 1').fetchone():
-        for aid, nom, cid, act in c.execute("SELECT id,nombre,cuadrilla_id,activo FROM almacenes WHERE tipo='vehiculo' ORDER BY nombre").fetchall():
-            num = nom.replace('Vehículo','').strip() or str(aid)
-            c.execute('INSERT OR IGNORE INTO vehiculos(numero,cuadrilla_id,almacen_id,activo) VALUES(?,?,?,?)', (num, cid, aid, act))
-    if not c.execute('SELECT 1 FROM sitios LIMIT 1').fetchone():
-        for s in [('TR-001','Torre Cerro del Cuatro','Torrelit','Cerro del Cuatro s/n','Tlaquepaque','Jalisco',20.5952,-103.3640,'Torre','Ing. Ramírez 33 1111 2222'),
-                  ('ND-010','Nodo Centro','Torrelit','Av. Juárez 120','Guadalajara','Jalisco',20.6748,-103.3470,'Nodo','NOC 33 3000 0000'),
-                  ('ND-011','Nodo Zapopan Norte','Torrelit','Av. Patria 2000','Zapopan','Jalisco',20.7270,-103.4060,'Nodo',''),
-                  ('RP-003','Repetidor Tapalpa','Torrelit','Cerro La Cruz','Tapalpa','Jalisco',19.9440,-103.7590,'Repetidor',''),
-                  ('CL-101','Plaza Andares (cliente)','Grupo DMI','Blvd. Puerta de Hierro 4965','Zapopan','Jalisco',20.7106,-103.4110,'Cliente','Lic. Torres 33 4444 5555'),
-                  ('CL-102','Hospital San Javier (cliente)','Hospital San Javier','Av. Pablo Casals 640','Guadalajara','Jalisco',20.6890,-103.3950,'Cliente','')]:
-            c.execute('INSERT INTO sitios(codigo,nombre,cliente,direccion,ciudad,estado,lat,lng,tipo,contacto,notas,ejemplo) VALUES(?,?,?,?,?,?,?,?,?,?,?,1)', s+('EJEMPLO',))
+    if 'cliente_id' not in [r[1] for r in c.execute('PRAGMA table_info(ordenes)')]:
+        c.execute('ALTER TABLE ordenes ADD COLUMN cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL')
+    if 'cliente_id' not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]:
+        c.execute('ALTER TABLE sitios ADD COLUMN cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL')
+    _sembrar_sitios(c)
+    for t in ('materiales','herramientas'):
+        if 'proveedor_id' not in [r[1] for r in c.execute(f'PRAGMA table_info({t})')]:
+            c.execute(f'ALTER TABLE {t} ADD COLUMN proveedor_id INTEGER REFERENCES proveedores(id) ON DELETE SET NULL')
+    if not c.execute("SELECT 1 FROM proveedores WHERE razon_social LIKE 'Syscom%' OR codigo='SYSCOM'").fetchone():
+        c.execute("INSERT INTO proveedores(codigo,razon_social,sitio_web,categoria,notas) VALUES('SYSCOM','Syscom','https://www.syscom.mx','materiales','Distribuidor de seguridad, redes y telecom. Integración API en Proveedores › Syscom.')")
+    c.execute("UPDATE materiales SET proveedor_id=(SELECT id FROM proveedores WHERE codigo='SYSCOM') WHERE proveedor_id IS NULL AND (syscom_id IS NOT NULL OR syscom_sync IS NOT NULL)")
     if not c.execute('SELECT 1 FROM herramientas LIMIT 1').fetchone():
         alm = {n: i for i, n in c.execute('SELECT id,nombre FROM almacenes')}
         cu = [r[0] for r in c.execute('SELECT id FROM cuadrillas ORDER BY id LIMIT 3')] + [None]*3
@@ -49,12 +51,47 @@ def migrar(c, N_VEH=18):
                   ('EPP-001','','Arnés de cuerpo completo','EPP','3M','DBI-Sala','asignado',None,pe[1],None,None),
                   ('HE-007','','Kit de herramienta de red (ponchadora, probador)','Herramienta','Klein Tools','VDV001','asignado',cu[2],None,None,None)]:
             c.execute('INSERT INTO herramientas(codigo,numero_serie,nombre,tipo,marca,modelo,estado,cuadrilla_id,personal_id,almacen_id,fecha_calibracion,notas,ejemplo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1)', h+('EJEMPLO',))
+    # Clientes: se crean a partir de los nombres ya capturados en órdenes y sites (sin perder el texto original)
+    if not c.execute('SELECT 1 FROM clientes LIMIT 1').fetchone():
+        for (n, tc, ca, ci, es, co, te) in c.execute('''SELECT TRIM(cliente), MAX(tipo_cliente), MAX(calle), MAX(ciudad), MAX(estado_geo), MAX(contacto), MAX(telefono)
+                FROM ordenes WHERE TRIM(COALESCE(cliente,''))<>'' GROUP BY TRIM(cliente)''').fetchall():
+            c.execute('INSERT OR IGNORE INTO clientes(nombre,tipo_cliente,calle,ciudad,estado,contacto,telefono) VALUES(?,?,?,?,?,?,?)', (n, tc, ca, ci, es, co, te))
+    c.execute("UPDATE ordenes SET cliente_id=(SELECT id FROM clientes WHERE nombre=TRIM(ordenes.cliente)) WHERE cliente_id IS NULL AND TRIM(COALESCE(cliente,''))<>''")
+    _limpiar_sitios_cliente(c)
+    # vehículos: uno por cada almacén "Vehículo NN" existente
+    if not c.execute('SELECT 1 FROM vehiculos LIMIT 1').fetchone():
+        for aid, nom, cid, act in c.execute("SELECT id,nombre,cuadrilla_id,activo FROM almacenes WHERE tipo='vehiculo' ORDER BY nombre").fetchall():
+            num = nom.replace('Vehículo','').strip() or str(aid)
+            c.execute('INSERT OR IGNORE INTO vehiculos(numero,cuadrilla_id,almacen_id,activo) VALUES(?,?,?,?)', (num, cid, aid, act))
+
+SITIOS_SPN = [('SPN-TR-001','Torre Cerro del Cuatro','Cerro del Cuatro s/n','Tlaquepaque','Jalisco',20.5952,-103.3640,'Torre','NOC Spectro'),
+    ('SPN-POP-01','POP Guadalajara Centro','Av. Juárez 120','Guadalajara','Jalisco',20.6748,-103.3470,'POP','NOC Spectro'),
+    ('SPN-CS-003','Caseta Zapopan Norte','Av. Patria 2000','Zapopan','Jalisco',20.7270,-103.4060,'Caseta',''),
+    ('SPN-RP-004','Repetidor Tapalpa','Cerro La Cruz','Tapalpa','Jalisco',19.9440,-103.7590,'Repetidor',''),
+    ('SPN-TR-005','Torre Cerro de la Reina','Cerro de la Reina','Tonalá','Jalisco',20.6170,-103.2330,'Torre','')]
+def _sembrar_sitios(c):
+    if not c.execute("SELECT 1 FROM sitios WHERE codigo LIKE 'SPN-%' LIMIT 1").fetchone():
+        for s in SITIOS_SPN:
+            c.execute('INSERT OR IGNORE INTO sitios(codigo,nombre,direccion,ciudad,estado,lat,lng,tipo,contacto,notas,ejemplo) VALUES(?,?,?,?,?,?,?,?,?,?,1)', s+('EJEMPLO',))
+
+def _limpiar_sitios_cliente(c):
+    """Sites = solo infraestructura propia de Spectro Networks. Quita los ejemplos de nodo/cliente y la liga a clientes."""
+    viejos = ('TR-001','ND-010','ND-011','RP-003','CL-101','CL-102')
+    nombres = [r[0] for r in c.execute(f"SELECT DISTINCT cliente FROM sitios WHERE ejemplo=1 AND codigo IN ({','.join('?'*len(viejos))}) AND cliente IS NOT NULL", viejos)]
+    for (sid, usado) in c.execute(f"SELECT id, EXISTS(SELECT 1 FROM ordenes WHERE site_id=sitios.id) FROM sitios WHERE ejemplo=1 AND codigo IN ({','.join('?'*len(viejos))})", viejos).fetchall():
+        if usado: c.execute('UPDATE sitios SET activo=0 WHERE id=?', (sid,))
+        else: c.execute('DELETE FROM sitios WHERE id=?', (sid,))
+    c.execute('UPDATE sitios SET cliente_id=NULL, cliente=NULL WHERE cliente_id IS NOT NULL OR cliente IS NOT NULL')
+    for n in nombres:   # clientes creados solo a partir de esos sites de ejemplo
+        c.execute("DELETE FROM clientes WHERE nombre=? AND NOT EXISTS(SELECT 1 FROM ordenes o WHERE o.cliente_id=clientes.id OR TRIM(o.cliente)=clientes.nombre)", (n,))
 
 def registrar(app, q, db):
     def opts(sql): return lambda: [(r[0], r[1]) for r in q(sql)]
     CUAD = opts("SELECT id, nombre FROM cuadrillas WHERE activa=1 OR activa IS NULL ORDER BY id")
     PERS = opts("SELECT id, nombre FROM tecnicos WHERE COALESCE(activo,1)=1 ORDER BY nombre")
     ALM = opts("SELECT id, nombre FROM almacenes WHERE activo=1 ORDER BY tipo, nombre")
+    CLI = opts("SELECT id, nombre FROM clientes WHERE activo=1 ORDER BY nombre")
+    PROV = opts("SELECT id, razon_social FROM proveedores WHERE activo=1 ORDER BY razon_social")
     VEH = opts("SELECT id, 'Vehículo '||numero FROM vehiculos WHERE activo=1 ORDER BY numero")
     def existe(sql, a): return bool(q(sql, a, one=True))
 
@@ -122,7 +159,8 @@ def registrar(app, q, db):
     E = {
      'materiales': dict(titulo='Materiales', icono='📦', tabla='materiales', act='activo', orden='categoria, nombre', desc='Catálogo con SKU, código de barras, número de parte Syscom, mínimos y foto.',
         buscar=['sku','nombre','codigo_barras','numero_parte','marca','categoria'],
-        cols=[('sku','SKU'),('nombre','Nombre'),('categoria','Categoría'),('codigo_barras','Código de barras'),('numero_parte','No. parte'),('marca','Marca'),('unidad','Unidad'),('stock_actual','Stock')],
+        sql='SELECT m.*, p.razon_social proveedor FROM materiales m LEFT JOIN proveedores p ON p.id=m.proveedor_id',
+        cols=[('sku','SKU'),('nombre','Nombre'),('proveedor','Proveedor'),('categoria','Categoría'),('codigo_barras','Código de barras'),('numero_parte','No. parte'),('marca','Marca'),('unidad','Unidad'),('stock_actual','Stock')],
         alta_url='/inventario/nuevo', editar_url='/inventario/{id}/editar', ver_url='/inventario/{id}', hist=mat_hist, campos=[]),
      'personal': dict(titulo='Personal', icono='👷', tabla='tecnicos', act='activo', orden='nombre', desc='Empleados y técnicos; asignación a cuadrilla como líder o técnico.',
         buscar=['nombre','puesto','telefono','email','especialidad'],
@@ -147,10 +185,25 @@ def registrar(app, q, db):
         campos=[('nombre','Nombre','text',True),('especialidad','Especialidad','select',ESPEC),('zona','Zona','text'),
                 ('lider_id','Líder','fk*',PERS),('tecnico_id','Técnico','fk*',PERS),('vehiculos','Vehículos','multi*',VEH)],
         extra=cuad_extra, post=cuad_post, hist=lambda i: existe('SELECT 1 FROM ordenes WHERE cuadrilla_id=? LIMIT 1', (i,)), pre_del=cuad_del),
-     'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Torres, nodos y sitios de cliente con coordenadas; se eligen en las órdenes.',
-        buscar=['codigo','nombre','cliente','ciudad','tipo'],
-        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('cliente','Cliente'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
-        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('cliente','Cliente','text'),('direccion','Dirección','text'),
+     'proveedores': dict(titulo='Proveedores', icono='🚛', tabla='proveedores', act='activo', orden='razon_social', desc='Proveedores de materiales, herramientas y servicios (incluye Syscom).',
+        buscar=['codigo','razon_social','rfc','contacto','categoria'],
+        cols=[('codigo','Código'),('razon_social','Razón social'),('rfc','RFC'),('categoria','Categoría'),('contacto','Contacto'),('telefono','Teléfono'),('sitio_web','Sitio web')],
+        campos=[('codigo','Código','text'),('razon_social','Razón social','text',True),('rfc','RFC','text'),('contacto','Contacto','text'),('telefono','Teléfono','tel'),('email','Email','email'),
+                ('sitio_web','Sitio web','url'),('categoria','Categoría','select',['materiales','herramientas','servicios','otros']),('condiciones_pago','Condiciones de pago','text'),('notas','Notas','textarea')],
+        hist=lambda i: existe('SELECT 1 FROM materiales WHERE proveedor_id=?', (i,)) or existe('SELECT 1 FROM herramientas WHERE proveedor_id=?', (i,)),
+        unico=[('razon_social','Ese proveedor ya existe')]),
+     'clientes': dict(titulo='Clientes', icono='🏢', tabla='clientes', act='activo', orden='nombre', desc='Catálogo de clientes; se eligen en las órdenes de trabajo.',
+        buscar=['nombre','rfc','contacto','ciudad','tipo_cliente'],
+        cols=[('nombre','Nombre'),('tipo_cliente','Tipo'),('rfc','RFC'),('contacto','Contacto'),('telefono','Teléfono'),('ciudad','Ciudad')],
+        campos=[('nombre','Nombre / razón social','text',True),('tipo_cliente','Tipo de cliente','select',['Empresa','PYME','Residencial','Gobierno']),('rfc','RFC','text'),
+                ('contacto','Persona de contacto','text'),('telefono','Teléfono','tel'),('email','Email','email'),('calle','Calle y No.','text'),('ciudad','Ciudad','text'),
+                ('estado','Estado','text'),('notas','Notas','textarea')],
+        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE cliente_id=? LIMIT 1', (i,)),
+        unico=[('nombre','Ese cliente ya existe')]),
+     'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
+        buscar=['codigo','nombre','ciudad','tipo'],
+        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
+        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('direccion','Dirección','text'),
                 ('ciudad','Ciudad','text'),('estado','Estado','text'),('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')],
         pre_del=lambda i: None),
@@ -168,10 +221,10 @@ def registrar(app, q, db):
         cols=[('codigo','Código'),('numero_serie','No. serie'),('nombre','Nombre'),('tipo','Tipo'),('marca','Marca'),('estado','Estado'),('asignado','Asignado a'),('fecha_calibracion','Calibración')],
         campos=[('codigo','Código','text'),('numero_serie','Número de serie','text'),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_HERR),('marca','Marca','text'),
                 ('modelo','Modelo','text'),('estado','Estado','select',ESTADOS_HERR,True),('cuadrilla_id','Asignado a cuadrilla','fk',CUAD),('personal_id','Asignado a persona','fk',PERS),
-                ('almacen_id','Ubicado en almacén / vehículo','fk',ALM),('fecha_calibracion','Próxima calibración','date'),('notas','Notas','textarea')],
+                ('almacen_id','Ubicado en almacén / vehículo','fk',ALM),('fecha_calibracion','Próxima calibración','date'),('proveedor_id','Proveedor','fk',PROV),('notas','Notas','textarea')],
         valid=herr_valid, hist=lambda i: True, soft=lambda i: db().execute("UPDATE herramientas SET estado='baja' WHERE id=?", (i,))),
     }
-    SQLCOL = {'personal':'t','vehiculos':'v','cuadrillas':'c','almacenes':'a','herramientas':'h'}
+    SQLCOL = {'materiales':'m','personal':'t','vehiculos':'v','cuadrillas':'c','almacenes':'a','herramientas':'h'}
 
     @app.route('/configuracion')
     def configuracion():
@@ -199,6 +252,9 @@ def registrar(app, q, db):
         if k == 'materiales': return redirect(e['editar_url'].format(id=rid) if rid else e['alta_url'])
         r = dict(q(f"SELECT * FROM {e['tabla']} WHERE id=?", (rid,), one=True) or abort(404)) if rid else {e['act']: 1}
         if e.get('extra'): r.update(e['extra'](rid))
+        if not rid:
+            for f in e['campos']:
+                if request.args.get(f[0]): r[f[0]] = int(request.args[f[0]]) if f[2] == 'fk' and request.args[f[0]].isdigit() else request.args[f[0]]
         err = None
         if request.method == 'POST':
             F = request.form; d = {}
