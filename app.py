@@ -137,8 +137,9 @@ def dashboard():
         SELECT id, codigo, nombre, 'Solar' fuente, NULL ups_id, solar_num_baterias num_baterias, solar_bat_marca marca, solar_bat_cambio cambio, alerta FROM (SELECT *, {CM.BAT_ALERTA_SQL} alerta FROM sitios WHERE activo=1)
         UNION ALL SELECT id, codigo, nombre, 'UPS', ups_id, num_baterias, TRIM(COALESCE(marca,'')||' '||(CASE WHEN capacidad_kva=CAST(capacidad_kva AS INT) THEN CAST(capacidad_kva AS INT) ELSE capacidad_kva END)||'kVA'), bat_cambio, alerta FROM ({UPS.PANEL_SQL})
         ) WHERE alerta IS NOT NULL ORDER BY cambio""")
+    contratos = q(f"SELECT id, codigo, nombre, arr_nombre, arr_vence, arr_renta, alerta FROM (SELECT *, {SD.ALERTA_SQL} alerta FROM sitios WHERE activo=1) WHERE alerta IS NOT NULL ORDER BY arr_vence")
     total = sum(por_estado.values()); maxc = max([r['total'] for r in por_cuad] + [1])
-    return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, hoy=dt.date.today())
+    return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, contratos=contratos, hoy=dt.date.today())
 
 # ---------- Órdenes ----------
 @app.route('/ordenes')
@@ -656,15 +657,19 @@ def init_db():
     CM.migrar(c)
     SF.migrar(c)
     UPS.migrar(c)
+    SD.migrar(c)
     c.commit(); c.close()
 import syscom_client as SC
 import config_mod as CM
 import sitio_fotos as SF
 import sitio_ups as UPS
+import sitio_docs as SD
 app.jinja_env.filters['todate'] = lambda v: dt.date.fromisoformat(v)
 CONFIG = CM.registrar(app, q, db)
 SF.registrar(app, q, db, UP)
 UPS.registrar(app, q, db)
+SD.registrar(app, q, db)
+app.config.setdefault('MAX_CONTENT_LENGTH', 80 * 1024 * 1024)
 
 @app.route('/proveedores/syscom', methods=['GET','POST'])
 def syscom_config():

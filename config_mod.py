@@ -21,6 +21,15 @@ UNIDADES_ANT = ['horas','días']
 ACC_SPN = {'SPN-POP-01':(48,'horas','Administración Plaza Juárez · 33 1234 5678'),'SPN-CS-003':(2,'días','Vigilancia Av. Patria'),'SPN-RP-004':(24,'horas','Ejido La Cruz · Comisariado')}
 TENENCIAS = ['Rentado','Propio','Intercambio']
 TEN_SPN = {'SPN-TR-001':'Propio','SPN-POP-01':'Rentado','SPN-CS-003':'Rentado','SPN-RP-004':'Intercambio','SPN-TR-005':'Propio'}
+ARR = ['arr_nombre','arr_tel','arr_email','arr_inicio','arr_vence','arr_renta','arr_notas']
+TENENCIA_BLK = ['tenencia'] + ARR
+COLS_ARR = [('arr_nombre','TEXT'),('arr_tel','TEXT'),('arr_email','TEXT'),('arr_inicio','TEXT'),('arr_vence','TEXT'),('arr_renta','REAL'),('arr_notas','TEXT')]
+def _seed_arr():
+    import datetime as _dt
+    h = _dt.date.today(); f = lambda d: (h + _dt.timedelta(days=d)).isoformat()
+    return {'SPN-POP-01': ('Inmobiliaria Plaza Juárez S.A. de C.V.', '3312345678', 'contratos@plazajuarez.mx', f(-385), f(-20), 18500, 'Renovación pendiente de firma'),   # vencido
+            'SPN-CS-003': ('Gasolinera Patria (Lic. Ortega)', '3398765432', None, f(-325), f(40), 4500, 'Incluye energía CFE'),                              # vence pronto
+            'SPN-TR-005': ('Ejido Cerro de la Reina', '3337001122', 'ejido.reina@gmail.com', f(-365), f(730), 7000, 'Pago anual por adelantado')}            # bien
 SERVICIOS_CFE = ['Monofásico','Bifásico','Trifásico']
 TIPOS_BATERIA = ['Plomo-ácido','AGM','Gel','Litio']
 TIPOS_GEN = ['Estacionario','Portátil']
@@ -78,6 +87,22 @@ def sitio_valid(d, rid):
     else:
         for col in PERMISO + ['contacto_permiso']: d[col] = None
     if d.get('tenencia') not in TENENCIAS: return 'Tenencia inválida (Rentado, Propio o Intercambio)'
+    if d['tenencia'] == 'Rentado' and 'arr_vence' in d:
+        import datetime as _dt
+        if not d.get('arr_nombre'): return 'Nombre del arrendador es obligatorio'
+        if d.get('arr_tel'):
+            t = _re.sub(r'[\s\-\.\(\)]', '', d['arr_tel']); t = t[3:] if t.startswith('+52') else t
+            if not (len(t) == 10 and t.isdigit()): return 'Teléfono del arrendador debe tener 10 dígitos'
+            d['arr_tel'] = t
+        if d.get('arr_email') and not _re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+', d['arr_email']): return 'Correo del arrendador inválido'
+        if not d.get('arr_vence'): return 'Fecha de vencimiento del contrato es obligatoria'
+        try:
+            fv = _dt.date.fromisoformat(d['arr_vence']); fi = _dt.date.fromisoformat(d['arr_inicio']) if d.get('arr_inicio') else None
+        except ValueError: return 'Fecha de contrato inválida'
+        if fi and fv <= fi: return 'Fecha de vencimiento debe ser posterior a la de inicio'
+        if d.get('arr_renta') is not None and d['arr_renta'] < 0: return 'Monto de renta no puede ser negativo'
+    elif 'arr_vence' in d:
+        for col in ARR: d[col] = None
     en = (d.get('energia') or '').split(',')
     for blq, cols in BLOQUES_ENERGIA.items():
         if blq not in en:
@@ -236,6 +261,11 @@ def migrar(c, N_VEH=18):
         c.execute("ALTER TABLE sitios ADD COLUMN tenencia TEXT DEFAULT 'Propio'")
         for cod, tn in TEN_SPN.items(): c.execute('UPDATE sitios SET tenencia=? WHERE codigo=? AND ejemplo=1', (tn, cod))
     c.execute("UPDATE sitios SET tenencia='Propio' WHERE tenencia IS NULL OR tenencia=''")
+    if 'arr_vence' not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]:
+        for col, typ in COLS_ARR: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
+        for cod, vals in _seed_arr().items():
+            if cod == 'SPN-TR-005': c.execute("UPDATE sitios SET tenencia='Rentado' WHERE codigo=? AND ejemplo=1", (cod,))
+            c.execute(f"UPDATE sitios SET {', '.join(k+'=?' for k, _ in COLS_ARR)} WHERE codigo=? AND ejemplo=1 AND tenencia='Rentado'", vals + (cod,))
     if 'acceso' not in sc:
         c.execute("ALTER TABLE sitios ADD COLUMN acceso TEXT DEFAULT 'Libre 24 hrs'")
         for col in ('anticipacion_valor INTEGER', 'anticipacion_unidad TEXT', 'contacto_permiso TEXT'):
@@ -361,6 +391,9 @@ def registrar(app, q, db):
         import sitio_fotos as SF
         for f in q('SELECT archivo FROM sitio_fotos WHERE sitio_id=?', (i,)): SF.borrar_archivos(SF.UP_DIR, f['archivo'])
         db().execute('DELETE FROM sitio_fotos WHERE sitio_id=?', (i,))
+        import sitio_docs as SD
+        for d_ in q('SELECT * FROM sitio_documentos WHERE sitio_id=?', (i,)): SD.borrar_archivo(d_)
+        db().execute('DELETE FROM sitio_documentos WHERE sitio_id=?', (i,))
     def existe(sql, a): return bool(q(sql, a, one=True))
 
     # ---- hooks ----
@@ -477,12 +510,13 @@ def registrar(app, q, db):
                ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Generador,%' THEN 'Gen'||COALESCE(' '||(CASE WHEN gen_kw=CAST(gen_kw AS INT) THEN CAST(gen_kw AS INT) ELSE gen_kw END)||'kW','')||COALESCE(' '||gen_combustible,'') END,''),4) energia_txt_base, """+BAT_ALERTA_SQL+""" bat_alerta,
                CASE WHEN ','||COALESCE(energia,'')||',' LIKE '%,UPS,%' THEN """+__import__('sitio_ups').RESUMEN_SQL+""" END ups_txt,
                """+__import__('sitio_ups').ALERTA_SITIO_SQL+""" ups_alerta, """+__import__('sitio_ups').CAMBIO_MIN_SQL+""" ups_cambio,
-               """+_DOM_SQL+""" domicilio_txt,
+               """+_DOM_SQL+""" domicilio_txt, """+__import__('sitio_docs').ALERTA_SQL+""" contrato_alerta,
                CASE WHEN tipo LIKE '%Torre%' THEN NULLIF(TRIM(COALESCE(tipo_torre,'')||COALESCE(' '||(CASE WHEN altura_torre=CAST(altura_torre AS INT) THEN CAST(altura_torre AS INT) ELSE altura_torre END)||'m','')),'') END torre_txt
                FROM sitios""",
         post_sql=lambda rows: [dict(r, energia_txt=' · '.join(x for x in (r['energia_txt_base'], r['ups_txt']) if x)) for r in rows],
         cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('torre_txt','Torre'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('domicilio_txt','Domicilio')],
-        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación *','number'),('anticipacion_unidad','Unidad *','select',UNIDADES_ANT),
+        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('arr_nombre','Arrendador (nombre) *','text'),('arr_tel','Teléfono (10 dígitos)','tel'),('arr_email','Correo','email'),
+                ('arr_inicio','Fecha inicio contrato','date'),('arr_vence','Fecha vencimiento *','date'),('arr_renta','Monto renta mensual (MXN)','decimal'),('arr_notas','Notas del arrendamiento','textarea'),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación *','number'),('anticipacion_unidad','Unidad *','select',UNIDADES_ANT),
                 ('contacto_nombre','Nombre *','text'),('contacto_tel','Teléfono (10 dígitos) *','tel'),('contacto_email','Correo electrónico','email'),
                 ('acceso_dias','Días de acceso','checks',DIAS),('acceso_todo_dia','Todo el día (24 h)','bool'),('acceso_hora_ini','Hora inicio','time'),('acceso_hora_fin','Hora fin','time'),('acceso_instrucciones','Instrucciones de acceso / llaves','textarea'),('torre_categoria','Categoría *','select',CATS_TORRE),('torre_modelo','Modelo *','select',TODOS_MODELOS),('altura_torre','Altura (m) *','decimal'),('torre_secciones','Número de secciones','number'),
                 ('torre_balizamiento','Balizamiento / iluminación','select',SI_NO),('torre_pararrayos','Pararrayos','select',SI_NO),('torre_tierras','Sistema de tierras','select',SI_NO),
@@ -493,7 +527,7 @@ def registrar(app, q, db):
                 ('calle','Calle','text',True),('num_ext','Número exterior','text'),('num_int','Número interior','text'),('entre_calle','Entre calle','text'),('y_calle','Y calle','text'),
                 ('colonia','Colonia','text',True),('cp','Código postal','cp'),('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('referencias','Referencias','textarea'),
                 ('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
-        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA, domicilio=DOMICILIO, acceso_blk=ACCESO_BLK, torre=TORRE, modelos_torre=MODELOS_TORRE,
+        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA, domicilio=DOMICILIO, tenencia_blk=TENENCIA_BLK, acceso_blk=ACCESO_BLK, torre=TORRE, modelos_torre=MODELOS_TORRE,
         pre_del=sitio_del, ver_url='/sites/{id}/fotos'),
      'almacenes': dict(titulo='Almacenes', icono='🏬', tabla='almacenes', act='activo', orden="tipo, nombre", desc='Bodegas (Torrelit, Autosound) y vehículos 01–18.',
         buscar=['nombre','tipo'],
