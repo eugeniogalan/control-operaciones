@@ -625,11 +625,17 @@ def registrar(app, q, db):
             for col, m in e.get('unico', []):
                 if not err and d.get(col) and q(f"SELECT 1 FROM {e['tabla']} WHERE {col}=? AND id IS NOT ?", (d[col], rid), one=True): err = m
             if not err:
-                ks = list(d)
+                ks = list(d); nuevo = not rid
                 if rid: db().execute(f"UPDATE {e['tabla']} SET {', '.join(c+'=?' for c in ks)} WHERE id=?", [d[c] for c in ks]+[rid])
                 else: rid = db().execute(f"INSERT INTO {e['tabla']}({','.join(ks)}) VALUES({','.join('?'*len(ks))})", [d[c] for c in ks]).lastrowid
                 if e.get('post'): e['post'](rid, d)
-                db().commit(); return redirect(url_for('cfg_lista', k=k, msg='Guardado'))
+                extra = ''
+                if k == 'sites' and nuevo:
+                    import sitio_fotos as SF
+                    extra = SF.adjuntos_nuevo(db, rid, d.get('tenencia'))
+                db().commit()
+                if k == 'sites' and nuevo and extra: return redirect(f'/configuracion/sites/{rid}/editar?msg=' + 'Site guardado con ' + extra + '#fotos')
+                return redirect(url_for('cfg_lista', k=k, msg='Guardado'))
             db().rollback(); r.update(d)
             for f in e['campos']:
                 if f[2] == 'multi*': r[f[0]] = [int(x) for x in F.getlist(f[0])]

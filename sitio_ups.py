@@ -73,7 +73,7 @@ def registrar(app, q, db):
                 db().commit(); return redirect(volver + '?msg=UPS guardado#blk_UPS')
             u.update(d)
         fotos = q('SELECT * FROM sitio_fotos WHERE ups_id=? ORDER BY fecha, id', (uid,)) if uid else []
-        return render_template('sitio_ups_form.html', s=s, u=u, uid=uid, err=err, fotos=fotos, SUB=SF.SUB, puede_fotos=ups_activo(s), msg=request.args.get('msg'))
+        return render_template('sitio_ups_form.html', s=s, u=u, uid=uid, err=err, fotos=fotos, SUB=SF.SUB, puede_fotos=True, msg=request.args.get('msg'))
 
     @app.route('/sites/ups/<int:uid>/borrar', methods=['POST'])
     def sitio_ups_borrar(uid):

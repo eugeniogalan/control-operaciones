@@ -3,7 +3,9 @@ import os, uuid, datetime
 from flask import request, redirect, abort, render_template
 from PIL import Image, ImageOps
 
-CATEGORIAS = ['Fachada exterior', 'Gabinete / Site', 'Torre / Mástil', 'Recibo CFE', 'Banco de baterías', 'UPS']
+GENERALES = ['Fachada exterior', 'Interior del sitio', 'Interior del gabinete', 'Torre / Mástil', 'Banco de baterías', 'Generador', 'UPS', 'Medidor de electricidad']
+CATEGORIAS = GENERALES + ['Recibo CFE']
+RENOMBRAR = {'Gabinete / Site': 'Interior del gabinete'}
 CAT_CFE = 'Recibo CFE'
 CAT_BAT = 'Banco de baterías'
 # categoría -> tipo de energía requerido (se muestran dentro del bloque de esa energía)
@@ -17,10 +19,11 @@ def migrar(c):
     c.execute('''CREATE TABLE IF NOT EXISTS sitio_fotos(id INTEGER PRIMARY KEY, sitio_id INTEGER NOT NULL REFERENCES sitios(id) ON DELETE CASCADE,
         categoria TEXT NOT NULL, archivo TEXT NOT NULL, fecha TEXT DEFAULT (datetime('now','localtime')), comentario TEXT)''')
     c.execute('CREATE INDEX IF NOT EXISTS ix_sitio_fotos ON sitio_fotos(sitio_id)')
+    for a, b in RENOMBRAR.items(): c.execute('UPDATE sitio_fotos SET categoria=? WHERE categoria=?', (b, a))
 
 def cats_permitidas(s):
-    en = (s['energia'] or '').split(',')
-    return [x for x in CATEGORIAS if (x != CAT_TORRE or 'Torre' in (s['tipo'] or '')) and (x not in CAT_ENERGIA or CAT_ENERGIA[x] in en)]
+    # Las fotos SIEMPRE se pueden subir en cualquier categoría, sin importar tipo de site ni energía
+    return list(CATEGORIAS)
 
 def guardar_imagen(fs, carpeta):
     img = Image.open(fs.stream); img = ImageOps.exif_transpose(img).convert('RGB')
@@ -42,8 +45,9 @@ def registrar(app, q, db, UP):
         s = q('SELECT * FROM sitios WHERE id=?', (sid,), one=True) or abort(404)
         fotos = q('SELECT * FROM sitio_fotos WHERE sitio_id=? ORDER BY fecha, id', (sid,))
         return dict(sitio=s, fotos={c: [f for f in fotos if f['categoria'] == c] for c in CATEGORIAS},
-                    permitidas=cats_permitidas(s), CATEGORIAS=CATEGORIAS, SUB=SUB, CAT_CFE=CAT_CFE, CAT_ENERGIA=CAT_ENERGIA, CAT_POR_ENERGIA={v: k for k, v in CAT_ENERGIA.items()})
+                    permitidas=cats_permitidas(s), CATEGORIAS=CATEGORIAS, GENERALES=GENERALES, SUB=SUB, CAT_CFE=CAT_CFE, CAT_ENERGIA=CAT_ENERGIA, CAT_POR_ENERGIA={v: k for k, v in CAT_ENERGIA.items()})
     app.jinja_env.globals['sitio_fotos_ctx'] = ctx
+    app.jinja_env.globals['FOTO_CATS'] = CATEGORIAS
 
     @app.route('/sites/<int:sid>/fotos')
     def sitio_fotos(sid):
@@ -54,7 +58,7 @@ def registrar(app, q, db, UP):
         s = q('SELECT * FROM sitios WHERE id=?', (sid,), one=True) or abort(404)
         cat = request.form.get('categoria'); volver = request.form.get('volver') or f'/sites/{sid}/fotos'
         if not volver.startswith('/') or volver.startswith('//'): volver = f'/sites/{sid}/fotos'
-        if cat not in cats_permitidas(s): return redirect(volver + ('&' if '?' in volver else '?') + 'msg=Categoría no permitida para este tipo de site')
+        if cat not in CATEGORIAS: return redirect(volver + ('&' if '?' in volver else '?') + 'msg=Categoría de foto desconocida')
         ups_id = request.form.get('ups_id')
         if ups_id:
             if cat != CAT_UPS or not ups_id.isdigit() or not q('SELECT 1 FROM sitio_ups WHERE id=? AND sitio_id=?', (int(ups_id), sid), one=True): abort(400)
@@ -77,3 +81,26 @@ def registrar(app, q, db, UP):
         volver = request.form.get('volver') or f"/sites/{f['sitio_id']}/fotos"
         if not volver.startswith('/') or volver.startswith('//'): volver = f"/sites/{f['sitio_id']}/fotos"
         return redirect(volver + ('&' if '?' in volver else '?') + 'msg=Foto eliminada#fotos')
+
+
+def adjuntos_nuevo(db, sid, tenencia):
+    """Procesa fotos/documentos enviados junto con el formulario de ALTA del site. Devuelve resumen."""
+    import sitio_docs as SD
+    carpeta = os.path.join(UP_DIR, SUB); n = 0; malos = []
+    for i, cat in enumerate(CATEGORIAS):
+        com = (request.form.get(f'nfc_{i}') or '').strip() or None
+        for fs in request.files.getlist(f'nf_{i}'):
+            if not fs or not fs.filename: continue
+            try: arch = guardar_imagen(fs, carpeta)
+            except Exception: malos.append(fs.filename); continue
+            db().execute('INSERT INTO sitio_fotos(sitio_id,categoria,archivo,comentario) VALUES(?,?,?,?)', (sid, cat, arch, com)); n += 1
+    nd = 0
+    for slug, cat in (('arr', 'Contrato arrendamiento'), ('int', 'Acuerdo intercambio')):
+        if SD.CATS[cat] != tenencia: continue
+        com = (request.form.get(f'ndc_{slug}') or '').strip() or None
+        for fs in request.files.getlist(f'nd_{slug}'):
+            if not fs or not fs.filename: continue
+            e = SD.guardar_doc(db, sid, cat, fs, com)
+            if e: malos.append(e)
+            else: nd += 1
+    return (f'{n} foto(s)' + (f', {nd} documento(s)' if nd else '') + (('; rechazados: ' + ', '.join(malos)) if malos else '')) if (n or nd or malos) else ''

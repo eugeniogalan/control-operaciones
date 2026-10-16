@@ -2,4 +2,4 @@
 <div class="muted"><a href="/configuracion">Configuración</a> › <a href="/configuracion/sites">Sites</a> › {{sitio.codigo}}</div>
 <h1>📷 {{sitio.codigo}} · {{sitio.nombre}}</h1><p class="muted">{{sitio.tipo}}{% if sitio.ciudad %} · {{sitio.ciudad}}{% endif %} · <a href="/configuracion/sites/{{sitio.id}}/editar">Editar site</a></p>
 {% if msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34">{{msg}}</div>{% endif %}
-{{ seccion(sitio_fotos_ctx(sitio.id), '/sites/' ~ sitio.id ~ '/fotos') }}{% endblock %}
+{{ seccion(sitio_fotos_ctx(sitio.id), '/sites/' ~ sitio.id ~ '/fotos', extra=['Recibo CFE']) }}{% endblock %}
