@@ -59,6 +59,12 @@ def sitio_valid(d, rid):
     if d.get('estado') is not None and d['estado'] not in ESTADOS_MX: return 'Estado inválido'
     if 'calle' in d: d['direccion'] = (' '.join(x for x in (d.get('calle'), d.get('num_ext')) if x) or None); d['ciudad'] = d.get('municipio')  # compatibilidad
     if d.get('acceso') not in ACCESOS: return 'Acceso inválido (Libre 24 hrs o Requiere permiso)'
+    if 'acceso_dias' in d:
+        for col in ('acceso_hora_ini','acceso_hora_fin'):
+            if d.get(col) and not _re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', d[col]): return 'Hora de acceso inválida (HH:MM)'
+        if d.get('acceso_todo_dia'): d['acceso_hora_ini'] = d['acceso_hora_fin'] = None
+        elif d.get('acceso_hora_ini') and d.get('acceso_hora_fin') and d['acceso_hora_fin'] <= d['acceso_hora_ini']: return 'Hora fin debe ser posterior a hora inicio'
+        d['acceso_horario'] = resumen_horario((d.get('acceso_dias') or '').split(','), d.get('acceso_todo_dia'), d.get('acceso_hora_ini'), d.get('acceso_hora_fin'))  # compatibilidad
     if d['acceso'] == 'Requiere permiso':
         if not d.get('anticipacion_valor') or d['anticipacion_valor'] <= 0: return 'Anticipación para solicitar permiso debe ser mayor a 0'
         if d.get('anticipacion_unidad') not in UNIDADES_ANT: return 'Unidad de anticipación inválida (horas o días)'
@@ -138,7 +144,41 @@ SEED_TORRE = {
     'SPN-RP-004': (3, 'No', 'Sí', 'Sí', 2012, 'Revisar tornillería de la sección 2'),
     'SPN-TR-005': (7, 'Sí', 'Sí', 'No', 2019, 'Pendiente instalar sistema de tierras')}
 PERMISO = ['anticipacion_valor','anticipacion_unidad','contacto_nombre','contacto_tel','contacto_email']
-ACCESO_BLK = ['acceso'] + PERMISO + ['acceso_horario','acceso_instrucciones']
+ACCESO_BLK = ['acceso'] + PERMISO + ['acceso_dias','acceso_todo_dia','acceso_hora_ini','acceso_hora_fin','acceso_instrucciones']
+DIAS = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+_ABR = {'Lun':'L','Mar':'M','Mié':'Mi','Jue':'J','Vie':'V','Sáb':'S','Dom':'D'}
+def resumen_horario(dias, todo, ini, fin):
+    idx = sorted(DIAS.index(x) for x in dias if x in DIAS)
+    if len(idx) == 7: txt = 'Todos los días'
+    else:
+        grupos, g = [], []
+        for i in idx:
+            if g and i == g[-1] + 1: g.append(i)
+            else:
+                if g: grupos.append(g)
+                g = [i]
+        if g: grupos.append(g)
+        txt = ', '.join(_ABR[DIAS[x[0]]] if len(x) == 1 else (_ABR[DIAS[x[0]]] + ('-' if len(x) > 2 else ', ') + _ABR[DIAS[x[-1]]]) for x in grupos)
+    hrs = '24 h' if todo else (f'{ini}-{fin}' if ini and fin else (f'desde {ini}' if ini else (f'hasta {fin}' if fin else '')))
+    return ' '.join(x for x in (txt, hrs) if x) or None
+def _parse_horario(t):
+    """best-effort: 'L–V 9–18, S 9–14' / 'Todos los días 7–19 h' / '24 h' -> (dias, todo, ini, fin) del primer tramo"""
+    import re as r_
+    t = (t or '').strip(); u = t.replace('–', '-').replace('—', '-')
+    if not t: return None
+    if r_.fullmatch(r'24\s*h(rs)?', u, r_.I): return (DIAS[:], 1, None, None)
+    seg = u.split(',')[0].strip(); dias = []
+    letras = {'L':0,'M':1,'MI':2,'J':3,'V':4,'S':5,'D':6}
+    if seg.lower().startswith('todos'): dias = DIAS[:]
+    else:
+        m = r_.match(r'\s*([A-Za-zé]{1,2})\s*(?:-\s*([A-Za-zé]{1,2}))?', seg)
+        if m and m.group(1).upper() in letras:
+            a = letras[m.group(1).upper()]; b = letras.get((m.group(2) or '').upper(), a)
+            dias = DIAS[a:b + 1] if b >= a else DIAS[a:] + DIAS[:b + 1]
+    h = r_.search(r'(\d{1,2})(?::(\d{2}))?\s*-\s*(\d{1,2})(?::(\d{2}))?', seg)
+    ini = f'{int(h.group(1)):02d}:{h.group(2) or "00"}' if h else None; fin = f'{int(h.group(3)):02d}:{h.group(4) or "00"}' if h else None
+    if not dias and not h: return None
+    return (dias, 0, ini, fin)
 COLS_ACC = [('contacto_nombre','TEXT'),('contacto_tel','TEXT'),('contacto_email','TEXT'),('acceso_horario','TEXT'),('acceso_instrucciones','TEXT')]
 SEED_ACC = {
     'SPN-TR-001': (None, None, None, 'Todos los días 7–19 h', 'Candado combinación 4821 en el portón; llave de caseta en el vehículo 03'),
@@ -210,6 +250,11 @@ def migrar(c, N_VEH=18):
         for cod, (n, t, em, h, ins) in SEED_ACC.items():
             c.execute("UPDATE sitios SET contacto_nombre=COALESCE(?,contacto_nombre), contacto_tel=COALESCE(?,contacto_tel), contacto_email=?, acceso_horario=?, acceso_instrucciones=? WHERE codigo=? AND ejemplo=1",
                       (n, t, em, h, ins, cod))
+    if 'acceso_dias' not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]:
+        for col, typ in (('acceso_dias','TEXT'),('acceso_hora_ini','TEXT'),('acceso_hora_fin','TEXT'),('acceso_todo_dia','INTEGER')): c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
+    for sid, h in c.execute("SELECT id, acceso_horario FROM sitios WHERE acceso_dias IS NULL AND COALESCE(acceso_todo_dia,0)=0 AND acceso_hora_ini IS NULL AND TRIM(COALESCE(acceso_horario,''))<>''").fetchall():
+        p_ = _parse_horario(h)
+        if p_: c.execute('UPDATE sitios SET acceso_dias=?, acceso_todo_dia=?, acceso_hora_ini=?, acceso_hora_fin=? WHERE id=?', (','.join(p_[0]) or None, p_[1], p_[2], p_[3], sid))
     sc2 = [r[1] for r in c.execute('PRAGMA table_info(sitios)')]
     if 'gen_kw' not in sc2:
         for col, typ in COLS_ENERGIA:
@@ -439,7 +484,7 @@ def registrar(app, q, db):
         cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('torre_txt','Torre'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('domicilio_txt','Domicilio')],
         campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación *','number'),('anticipacion_unidad','Unidad *','select',UNIDADES_ANT),
                 ('contacto_nombre','Nombre *','text'),('contacto_tel','Teléfono (10 dígitos) *','tel'),('contacto_email','Correo electrónico','email'),
-                ('acceso_horario','Horario de acceso','text'),('acceso_instrucciones','Instrucciones de acceso / llaves','textarea'),('torre_categoria','Categoría *','select',CATS_TORRE),('torre_modelo','Modelo *','select',TODOS_MODELOS),('altura_torre','Altura (m) *','decimal'),('torre_secciones','Número de secciones','number'),
+                ('acceso_dias','Días de acceso','checks',DIAS),('acceso_todo_dia','Todo el día (24 h)','bool'),('acceso_hora_ini','Hora inicio','time'),('acceso_hora_fin','Hora fin','time'),('acceso_instrucciones','Instrucciones de acceso / llaves','textarea'),('torre_categoria','Categoría *','select',CATS_TORRE),('torre_modelo','Modelo *','select',TODOS_MODELOS),('altura_torre','Altura (m) *','decimal'),('torre_secciones','Número de secciones','number'),
                 ('torre_balizamiento','Balizamiento / iluminación','select',SI_NO),('torre_pararrayos','Pararrayos','select',SI_NO),('torre_tierras','Sistema de tierras','select',SI_NO),
                 ('torre_anio','Año de instalación','number'),('torre_obs','Observaciones de torre','textarea'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje disponible','checks',VOLTAJES),('cfe_servicio','No. de servicio / medidor CFE','text'),('cfe_tipo_servicio','Tipo de servicio','select',SERVICIOS_CFE),('cfe_interruptor_a','Interruptor principal (A)','decimal'),
                 ('voltaje_solar','Voltaje CD','select',VOLT_SOLAR),('solar_paneles_w','Capacidad por panel (W)','decimal'),('solar_num_paneles','Número de paneles','number'),('solar_baterias_ah','Banco de baterías (Ah)','decimal'),('solar_tipo_bateria','Tipo de batería','select',TIPOS_BATERIA),('solar_num_baterias','Número de baterías','number'),('solar_bat_marca','Marca batería','text'),('solar_bat_modelo','Modelo batería','text'),
@@ -509,6 +554,7 @@ def registrar(app, q, db):
                 if v is not None and typ in ('fk','number'):
                     try: v = int(v)
                     except ValueError: err = f'{f[1]} debe ser un número entero'; v = None
+                if typ == 'bool': v = 1 if F.get(col) else 0
                 if typ == 'checks':
                     sel = F.getlist(col); v = ','.join(o for o in f[3] if o in sel) or None
                 if v is not None and typ == 'decimal':
