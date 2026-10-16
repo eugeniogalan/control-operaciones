@@ -2,8 +2,14 @@
 <h1>{{ ('Cambios · ' if rid else 'Alta · ') ~ e.titulo }}</h1>
 {% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{err}}</div>{% endif %}
 <form class="f" method="post"><fieldset><legend>{{e.titulo}}</legend><div class="grid g2">
-{% set enb = e.bloques or {} %}{% set encols = (e.domicilio or [])|list + (e.torre or [])|list %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
-{% for c in campos %}{% if c[0]=='tipo' and e.torre %}<fieldset id="blk_tipo" style="grid-column:1/-1;margin:4px 0"><legend>🏗 Tipo de site</legend><div class="grid g2">{{ campo(c, r) }}</div>
+{% set enb = e.bloques or {} %}{% set encols = (e.domicilio or [])|list + (e.torre or [])|list + (e.acceso_blk or [])|list %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
+{% for c in campos %}{% if c[0]=='acceso' and e.acceso_blk %}{% set cm = {} %}{% for x in campos %}{% set _ = cm.update({x[0]: x}) %}{% endfor %}
+<fieldset id="blk_acceso" style="grid-column:1/-1;margin:4px 0"><legend>🔑 Acceso</legend><div class="grid g2">{{ campo(c, r) }}</div>
+<details id="blk_permiso" open style="margin-top:8px;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc"><summary style="font-weight:600;cursor:pointer">📝 Permiso</summary>
+<div class="grid g2" style="margin-top:6px">{{ campo(cm['anticipacion_valor'], r) }}{{ campo(cm['anticipacion_unidad'], r) }}</div>
+<h3 style="margin:10px 0 4px">👤 Contacto para permiso</h3><div class="grid g2">{{ campo(cm['contacto_nombre'], r) }}{{ campo(cm['contacto_tel'], r) }}{{ campo(cm['contacto_email'], r) }}</div></details>
+<div class="grid g2" style="margin-top:8px">{{ campo(cm['acceso_horario'], r) }}{{ campo(cm['acceso_instrucciones'], r) }}</div></fieldset>
+{% elif c[0]=='tipo' and e.torre %}<fieldset id="blk_tipo" style="grid-column:1/-1;margin:4px 0"><legend>🏗 Tipo de site</legend><div class="grid g2">{{ campo(c, r) }}</div>
 <details id="blk_torre" open style="margin-top:8px;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc"><summary style="font-weight:600;cursor:pointer">🗼 Torre / Mástil</summary><div class="grid g2" style="margin-top:6px">
 {% for c2 in campos %}{% if c2[0] in e.torre %}{{ campo(c2, r) }}{% endif %}{% endfor %}
 {% if rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fct=sitio_fotos_ctx(rid) %}{% if 'Torre / Mástil' in fct.permitidas %}{{ cat_incrustada(fct, 'Torre / Mástil', '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}
@@ -55,8 +61,9 @@ fi.addEventListener('input',cal);fi.addEventListener('change',cal);cal();})();
 document.querySelectorAll('.blk-en').forEach(function(bk){var cb=document.querySelector('[name=energia][value="'+bk.dataset.en+'"]');
 function u(){var on=cb.checked;bk.style.display=on?'':'none';if(!on)bk.querySelectorAll('input,select').forEach(function(x){if(x.type==='checkbox')x.checked=false;else x.value='';});
 if(bk.dataset.en==='Generador')['gen_tipo','gen_kw','gen_combustible'].forEach(function(n){bk.querySelector('[name='+n+']').required=on;});}cb.addEventListener('change',u);u();});
-var ac=document.querySelector('[name=acceso]'),ws2=['anticipacion_valor','anticipacion_unidad','contacto_permiso'].map(function(n){return document.getElementById('w_'+n);});
-function k(){var on=ac.value==='Requiere permiso';ws2.forEach(function(w){w.style.display=on?'':'none';var x=w.querySelector('input,select');if(!on)x.value='';});
-ws2[0].querySelector('input').required=on;ws2[0].querySelector('input').min=on?'1':'';ws2[1].querySelector('select').required=on;}ac.addEventListener('change',k);k();})();</script>{% endif %}
+var ac=document.querySelector('[name=acceso]'),bp=document.getElementById('blk_permiso');
+var tl=document.querySelector('[name=contacto_tel]');if(tl){tl.setAttribute('inputmode','tel');tl.setAttribute('pattern','[0-9 ()+.\\-]{10,16}');tl.placeholder='33 1234 5678';}
+function k(){var on=ac.value==='Requiere permiso';bp.style.display=on?'':'none';bp.querySelectorAll('input[name],select[name]').forEach(function(x){if(!on)x.value='';});
+['anticipacion_valor','anticipacion_unidad','contacto_nombre','contacto_tel'].forEach(function(n){bp.querySelector('[name='+n+']').required=on;});bp.querySelector('[name=anticipacion_valor]').min=on?'1':'';}ac.addEventListener('change',k);k();})();</script>{% endif %}
 <button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion, cat_forms %}{% set fc=sitio_fotos_ctx(rid) %}{% for u in sitio_ups_unidades(rid) %}<form id="fdelups_{{u.id}}" method="post" action="/sites/ups/{{u.id}}/borrar" style="display:none"></form>{% endfor %}{% for ce in (fc.CAT_ENERGIA|list|reject('equalto','UPS')|list) + ['Torre / Mástil'] %}{{ cat_forms(fc, ce, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endfor %}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
 {{ seccion(fc, '/configuracion/sites/' ~ rid ~ '/editar', (fc.CAT_ENERGIA|list + ['Torre / Mástil'])|select('in', fc.permitidas)|reject('equalto','UPS')|list) }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}
