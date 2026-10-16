@@ -90,6 +90,12 @@ def sitio_valid(d, rid):
     if 'Torre' in (d.get('tipo') or ''):
         if d.get('altura_torre') is None: return 'Altura de torre (m) es obligatoria cuando el tipo incluye Torre'
         if d['altura_torre'] <= 0: return 'Altura de torre debe ser mayor a 0'
+        cat, mod = d.get('torre_categoria'), d.get('torre_modelo')
+        if cat not in CATS_TORRE: return 'Categoría de torre es obligatoria (Torre arriostrada, Torre autosoportada o Mástil)'
+        if MODELOS_TORRE[cat]:
+            if mod not in MODELOS_TORRE[cat]: return f"Modelo de {cat.lower()} es obligatorio ({', '.join(MODELOS_TORRE[cat])})"
+        else: d['torre_modelo'] = mod = None
+        d['tipo_torre'] = etiqueta_torre(cat, mod)  # compatibilidad
         if d.get('torre_secciones') is not None and d['torre_secciones'] <= 0: return 'Número de secciones debe ser mayor a 0'
         if d.get('torre_anio') is not None and not (1950 <= d['torre_anio'] <= __import__('datetime').date.today().year + 1): return 'Año de instalación de torre inválido'
         for col, lab in (('torre_balizamiento','Balizamiento'),('torre_pararrayos','Pararrayos'),('torre_tierras','Sistema de tierras')):
@@ -111,7 +117,14 @@ _DOM_SQL = """TRIM(COALESCE(NULLIF(TRIM(COALESCE(calle,'')||COALESCE(' '||num_ex
     ||COALESCE(', Col. '||colonia,'')||COALESCE(', C.P. '||cp,'')||COALESCE(', '||COALESCE(municipio,ciudad),'')||COALESCE(', '||estado,''), ', ')"""
 SI_NO = ['Sí','No']
 COLS_TORRE = [('torre_secciones','INTEGER'),('torre_balizamiento','TEXT'),('torre_pararrayos','TEXT'),('torre_tierras','TEXT'),('torre_capacidad','TEXT'),('torre_anio','INTEGER'),('torre_obs','TEXT')]
-TORRE = ['tipo_torre','altura_torre'] + [c for c, _ in COLS_TORRE]
+CATS_TORRE = ['Torre arriostrada','Torre autosoportada','Mástil']
+MODELOS_TORRE = {'Torre arriostrada': ['TZ30','TZ45','T60'], 'Torre autosoportada': [], 'Mástil': ['Arriostrado','Fijo a pared']}
+TODOS_MODELOS = [m for v in MODELOS_TORRE.values() for m in v]
+def etiqueta_torre(cat, mod):
+    if cat == 'Torre arriostrada': return 'Arriostrada ' + mod
+    if cat == 'Torre autosoportada': return 'Autosoportada'
+    if cat == 'Mástil': return 'Mástil ' + mod.lower()
+TORRE = ['torre_categoria','torre_modelo','tipo_torre','altura_torre'] + [c for c, _ in COLS_TORRE]
 SEED_TORRE = {
     'SPN-TR-001': (5, 'Sí', 'Sí', 'Sí', '3 espacios libres a 24–30 m; carga disponible ~40 kg', 2015, 'Pintura en buen estado'),
     'SPN-RP-004': (3, 'No', 'Sí', 'Sí', '1 espacio libre a 15 m', 2012, 'Revisar tornillería de la sección 2'),
@@ -149,6 +162,8 @@ def migrar(c, N_VEH=18):
         for col, typ in COLS_TORRE: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
         for cod, vals in SEED_TORRE.items():
             c.execute(f"UPDATE sitios SET {', '.join(k+'=?' for k, _ in COLS_TORRE)} WHERE codigo=? AND ejemplo=1 AND tipo LIKE '%Torre%'", vals + (cod,))
+    if 'torre_categoria' not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]:
+        c.execute('ALTER TABLE sitios ADD COLUMN torre_categoria TEXT'); c.execute('ALTER TABLE sitios ADD COLUMN torre_modelo TEXT')
     if 'tenencia' not in sc:
         c.execute("ALTER TABLE sitios ADD COLUMN tenencia TEXT DEFAULT 'Propio'")
         for cod, tn in TEN_SPN.items(): c.execute('UPDATE sitios SET tenencia=? WHERE codigo=? AND ejemplo=1', (tn, cod))
@@ -218,6 +233,20 @@ def migrar(c, N_VEH=18):
         for aid, nom, cid, act in c.execute("SELECT id,nombre,cuadrilla_id,activo FROM almacenes WHERE tipo='vehiculo' ORDER BY nombre").fetchall():
             num = nom.replace('Vehículo','').strip() or str(aid)
             c.execute('INSERT OR IGNORE INTO vehiculos(numero,cuadrilla_id,almacen_id,activo) VALUES(?,?,?,?)', (num, cid, aid, act))
+    _mapear_torre(c)
+
+def _mapear_torre(c):
+    # tipo_torre libre -> categoría/modelo (solo filas aún sin categoría)
+    for sid, tt, obs in c.execute("SELECT id, TRIM(COALESCE(tipo_torre,'')), torre_obs FROM sitios WHERE tipo LIKE '%Torre%' AND torre_categoria IS NULL AND TRIM(COALESCE(tipo_torre,''))<>''").fetchall():
+        u = tt.upper()
+        if u in ('TZ30','TZ45','T60'): cat, mod = 'Torre arriostrada', u
+        elif u.startswith('AUTOSOPORT'): cat, mod = 'Torre autosoportada', None
+        elif 'MÁSTIL' in u or 'MASTIL' in u: cat, mod = 'Mástil', 'Fijo a pared' if 'PARED' in u else 'Arriostrado'
+        elif u.startswith('ARRIOSTRADA '): cat, mod = 'Torre arriostrada', u.split()[-1] if u.split()[-1] in ('TZ30','TZ45','T60') else None
+        else:  # valor libre desconocido: se conserva en observaciones y se limpia
+            c.execute("UPDATE sitios SET torre_obs=?, tipo_torre=NULL WHERE id=?", (('Tipo anterior: ' + tt) + (' · ' + obs if obs else ''), sid)); continue
+        if cat == 'Torre arriostrada' and not mod: continue
+        c.execute('UPDATE sitios SET torre_categoria=?, torre_modelo=?, tipo_torre=? WHERE id=?', (cat, mod, etiqueta_torre(cat, mod), sid))
 
 SITIOS_SPN = [('SPN-TR-001','Torre Cerro del Cuatro','Cerro del Cuatro s/n','Tlaquepaque','Jalisco',20.5952,-103.3640,'Site + Torre','NOC Spectro'),
     ('SPN-POP-01','POP Guadalajara Centro','Av. Juárez 120','Guadalajara','Jalisco',20.6748,-103.3470,'Site','NOC Spectro'),
@@ -373,7 +402,7 @@ def registrar(app, q, db):
                FROM sitios""",
         post_sql=lambda rows: [dict(r, energia_txt=' · '.join(x for x in (r['energia_txt_base'], r['ups_txt']) if x)) for r in rows],
         cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('torre_txt','Torre'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('domicilio_txt','Domicilio')],
-        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura (m) *','decimal'),('torre_secciones','Número de secciones','number'),
+        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('torre_categoria','Categoría *','select',CATS_TORRE),('torre_modelo','Modelo *','select',TODOS_MODELOS),('altura_torre','Altura (m) *','decimal'),('torre_secciones','Número de secciones','number'),
                 ('torre_balizamiento','Balizamiento / iluminación','select',SI_NO),('torre_pararrayos','Pararrayos','select',SI_NO),('torre_tierras','Sistema de tierras','select',SI_NO),
                 ('torre_anio','Año de instalación','number'),('torre_capacidad','Capacidad de carga / espacios disponibles para antenas','textarea'),('torre_obs','Observaciones de torre','textarea'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje disponible','checks',VOLTAJES),('cfe_servicio','No. de servicio / medidor CFE','text'),('cfe_tipo_servicio','Tipo de servicio','select',SERVICIOS_CFE),('cfe_interruptor_a','Interruptor principal (A)','decimal'),
                 ('voltaje_solar','Voltaje CD','select',VOLT_SOLAR),('solar_paneles_w','Capacidad por panel (W)','decimal'),('solar_num_paneles','Número de paneles','number'),('solar_baterias_ah','Banco de baterías (Ah)','decimal'),('solar_tipo_bateria','Tipo de batería','select',TIPOS_BATERIA),('solar_num_baterias','Número de baterías','number'),('solar_bat_marca','Marca batería','text'),('solar_bat_modelo','Modelo batería','text'),
@@ -382,7 +411,7 @@ def registrar(app, q, db):
                 ('calle','Calle','text',True),('num_ext','Número exterior','text'),('num_int','Número interior','text'),('entre_calle','Entre calle','text'),('y_calle','Y calle','text'),
                 ('colonia','Colonia','text',True),('cp','Código postal','cp'),('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('referencias','Referencias','textarea'),
                 ('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
-        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA, domicilio=DOMICILIO, torre=TORRE,
+        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA, domicilio=DOMICILIO, torre=TORRE, modelos_torre=MODELOS_TORRE,
         pre_del=sitio_del, ver_url='/sites/{id}/fotos'),
      'almacenes': dict(titulo='Almacenes', icono='🏬', tabla='almacenes', act='activo', orden="tipo, nombre", desc='Bodegas (Torrelit, Autosound) y vehículos 01–18.',
         buscar=['nombre','tipo'],

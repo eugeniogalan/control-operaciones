@@ -45,6 +45,10 @@ navigator.geolocation.getCurrentPosition(function(p){poner(p.coords.latitude,p.c
 gml();setTimeout(function(){m.invalidateSize();},200);})();</script>
 <script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('blk_torre'),i=document.querySelector('[name=altura_torre]');
 function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=on?'':'none';i.required=on;if(!on)w.querySelectorAll('input[name],select[name],textarea[name]').forEach(function(x){if(!x.getAttribute('form'))x.value='';});}t.addEventListener('change',f);f();
+var tc=document.querySelector('[name=torre_categoria]'),tm=document.querySelector('[name=torre_modelo]');if(tc&&tm){var MOD={{ e.modelos_torre|tojson if e.modelos_torre else '{}' }},cur=tm.value,wm=document.getElementById('w_torre_modelo');
+function fm(){var ms=MOD[tc.value]||[],on=(t.value||'').indexOf('Torre')>=0;tm.innerHTML='<option value="">—</option>'+ms.map(function(m){return '<option'+(m===cur?' selected':'')+'>'+m+'</option>';}).join('');
+if(ms.indexOf(cur)<0)tm.value='';wm.style.display=ms.length?'':'none';tm.required=on&&ms.length>0;tc.required=on;}
+tc.addEventListener('change',function(){cur=tm.value;fm();});tm.addEventListener('change',function(){cur=tm.value;});t.addEventListener('change',fm);fm();}
 (function(){var fi=document.querySelector('[name=solar_bat_instalacion]'),fc=document.getElementById('ro_solar_bat_cambio');if(!fi||!fc)return;
 function cal(){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(fi.value);if(!m){fc.value='';return;}var y=+m[1]+3,mo=m[2],d=m[3];if(mo==='02'&&d==='29')d='28';fc.value=y+'-'+mo+'-'+d;}
 fi.addEventListener('input',cal);fi.addEventListener('change',cal);cal();})();
