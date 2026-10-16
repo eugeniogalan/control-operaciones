@@ -12,21 +12,21 @@
 <label class="btn sec" style="margin:0">📸 Cámara<input type="file" name="fotos" accept="image/*" capture="environment" style="display:none" onchange="this.form.submit()"></label>
 <label class="btn sec" style="margin:0">🖼 Galería<input type="file" name="fotos" accept="image/*" multiple style="display:none" onchange="this.form.submit()"></label>
 <input name="comentario" placeholder="Comentario (opcional)" style="flex:1;min-width:140px"></form>
-{% else %}<p class="muted" style="margin:4px 0">{{ 'Este site no tiene energía CFE; no se pueden agregar recibos.' if cat==c.CAT_CFE else 'Este tipo de site no tiene torre; no se pueden agregar fotos en esta categoría.' }}</p>{% endif %}</div>
+{% else %}<p class="muted" style="margin:4px 0">{{ ('Este site no tiene energía ' ~ c.CAT_ENERGIA[cat] ~ '; no se pueden agregar fotos en esta categoría.') if cat in c.CAT_ENERGIA else 'Este tipo de site no tiene torre; no se pueden agregar fotos en esta categoría.' }}</p>{% endif %}</div>
 {% endfor %}</fieldset>{% endmacro %}
 
 {# Galería de una categoría para incrustar DENTRO de otro <form>: usa el atributo form= hacia formularios externos #}
 {% macro cat_incrustada(c, cat, volver) %}{% set fs=c.fotos[cat] %}{% set fid='fup_' ~ (cat|replace(' ','_')|replace('/','')) %}
-<div id="fotos_recibo" style="grid-column:1/-1;border-top:1px dashed #cfd8e3;padding-top:6px"><b>🧾 {{cat}}</b> <span class="muted">({{fs|length}})</span>
+{% set es_rec = cat==c.CAT_CFE %}<div id="fotos_{{ {'Recibo CFE':'recibo','Banco de baterías':'baterias','UPS':'ups'}.get(cat,'x') }}" style="grid-column:1/-1;border-top:1px dashed #cfd8e3;padding-top:6px"><b>{{ {'Recibo CFE':'🧾','Banco de baterías':'🔋','UPS':'🔌'}.get(cat,'📷') }} {{cat}}</b> <span class="muted">({{fs|length}})</span>
 <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">{% for f in fs %}
 <div style="width:96px;text-align:center"><a href="/uploads/{{c.SUB}}/{{f.archivo}}" target="_blank"><img src="/uploads/{{c.SUB}}/t_{{f.archivo}}" loading="lazy" style="width:96px;height:96px;object-fit:cover;border-radius:6px;border:1px solid #ccc" alt="{{cat}}"></a>
 <div class="muted" style="font-size:11px">{{f.fecha[:10]}}{% if f.comentario %}<br>{{f.comentario}}{% endif %}</div>
-<button form="fdel_{{f.id}}" class="btn rojo" style="padding:2px 8px;font-size:12px" onclick="return confirm('¿Eliminar este recibo?')">Eliminar</button></div>
-{% else %}<span class="muted">Sin recibos</span>{% endfor %}</div>
+<button form="fdel_{{f.id}}" class="btn rojo" style="padding:2px 8px;font-size:12px" onclick="return confirm('¿Eliminar esta foto?')">Eliminar</button></div>
+{% else %}<span class="muted">{{ 'Sin recibos' if es_rec else 'Sin fotos' }}</span>{% endfor %}</div>
 <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
 <label class="btn sec" style="margin:0">📸 Cámara<input form="{{fid}}" type="file" name="fotos" accept="image/*" capture="environment" style="display:none" onchange="this.form.submit()"></label>
 <label class="btn sec" style="margin:0">🖼 Galería<input form="{{fid}}" type="file" name="fotos" accept="image/*" multiple style="display:none" onchange="this.form.submit()"></label>
-<input form="{{fid}}" name="comentario" placeholder="Periodo, ej. Sep–Oct 2026" style="flex:1;min-width:140px"></div></div>{% endmacro %}
+<input form="{{fid}}" name="comentario" placeholder="{{ 'Periodo, ej. Sep–Oct 2026' if es_rec else 'Comentario (opcional)' }}" style="flex:1;min-width:140px"></div></div>{% endmacro %}
 {% macro cat_forms(c, cat, volver) %}{% set fid='fup_' ~ (cat|replace(' ','_')|replace('/','')) %}
 <form id="{{fid}}" method="post" enctype="multipart/form-data" action="/sites/{{c.sitio.id}}/fotos/subir" style="display:none"><input type="hidden" name="categoria" value="{{cat}}"><input type="hidden" name="volver" value="{{volver}}"></form>
 {% for f in c.fotos[cat] %}<form id="fdel_{{f.id}}" method="post" action="/sites/fotos/{{f.id}}/borrar" style="display:none"><input type="hidden" name="volver" value="{{volver}}"></form>{% endfor %}{% endmacro %}

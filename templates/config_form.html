@@ -2,18 +2,28 @@
 <h1>{{ ('Cambios · ' if rid else 'Alta · ') ~ e.titulo }}</h1>
 {% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{err}}</div>{% endif %}
 <form class="f" method="post"><fieldset><legend>{{e.titulo}}</legend><div class="grid g2">
-{% set enb = e.bloques or {} %}{% set encols = [] %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
+{% set enb = e.bloques or {} %}{% set encols = (e.domicilio or [])|list %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
 {% for c in campos %}{% if c[0] not in encols %}{{ campo(c, r) }}{% endif %}
 {% if c[0]=='energia' and enb %}{% for b,cs in enb.items() %}<details class="blk-en" id="blk_{{b}}" data-en="{{b}}" open style="grid-column:1/-1;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc">
-<summary style="font-weight:600;cursor:pointer">{{ {'CFE':'⚡ CFE','Solar':'☀️ Solar','Generador':'⛽ Generador'}[b] }}</summary><div class="grid g2" style="margin-top:6px">
+<summary style="font-weight:600;cursor:pointer">{{ {'CFE':'⚡ CFE','Solar':'☀️ Solar','Generador':'⛽ Generador','UPS':'🔌 UPS'}[b] }}</summary><div class="grid g2" style="margin-top:6px">
 {% for c2 in campos %}{% if c2[0] in cs %}{{ campo(c2, r) }}{% endif %}{% endfor %}
-{% if b=='CFE' and k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fc=sitio_fotos_ctx(rid) %}{% if fc.CAT_CFE in fc.permitidas %}{{ cat_incrustada(fc, fc.CAT_CFE, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}</div></details>{% endfor %}{% endif %}{% endfor %}
+{% if b=='UPS' %}<div style="grid-column:1/-1">{% if rid %}{% set us=sitio_ups_unidades(rid) %}
+{% if us %}<div class="tw"><table><tr><th>UPS</th><th>kVA</th><th>Autonomía</th><th>Baterías</th><th>Cambio baterías</th><th>📷</th><th></th></tr>
+{% for u in us %}<tr><td><b>{{u.marca or '—'}}</b> <span class="muted">{{u.modelo or ''}}</span></td><td>{{'%g'|format(u.capacidad_kva)}}</td><td>{{ (u.autonomia_min ~ ' min') if u.autonomia_min else '—' }}</td><td>{{u.num_baterias or '—'}}</td>
+<td style="white-space:nowrap">{{u.bat_cambio or '—'}}{% if u.alerta %} <span style="padding:1px 6px;border-radius:10px;font-size:11px;font-weight:700;{{'background:#fde0e0;color:#a32020' if u.alerta=='vencido' else 'background:#fff1d6;color:#8a5a00'}}">{{u.alerta}}</span>{% endif %}</td>
+<td>{{u.nfotos}}</td><td style="white-space:nowrap"><a href="/sites/ups/{{u.id}}/editar">Cambiar</a> · <button form="fdelups_{{u.id}}" class="btn rojo" style="padding:2px 8px;font-size:12px" onclick="return confirm('¿Eliminar este UPS y sus fotos?')">Baja</button></td></tr>{% endfor %}</table></div>
+{% else %}<p class="muted" style="margin:4px 0">Sin unidades UPS registradas.</p>{% endif %}
+{% if 'UPS' in (r.energia or '').split(',') %}<a class="btn sec" href="/sites/{{rid}}/ups/nuevo">+ Agregar UPS</a>{% else %}<p class="muted" style="margin:4px 0">Guarda el site con UPS marcado para agregar unidades.</p>{% endif %}
+{% else %}<p class="muted" style="margin:4px 0">Guarda el site para poder agregar unidades UPS.</p>{% endif %}</div>{% endif %}
+{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fc=sitio_fotos_ctx(rid) %}{% set catb=fc.CAT_POR_ENERGIA.get(b) if b!='UPS' %}{% if catb and catb in fc.permitidas %}{{ cat_incrustada(fc, catb, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}</div></details>{% endfor %}{% endif %}{% endfor %}
 <label><input type="checkbox" name="activo" style="width:auto" {{'checked' if r.get(e.act)!=0}}> Activo</label></div></fieldset>
 {% if k=='vehiculos' %}<p class="muted">Al guardar se crea o renombra automáticamente su almacén “Vehículo NN” y se sincroniza la cuadrilla.</p>{% endif %}
 {% if k=='sites' %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<fieldset style="margin:10px 0"><legend>📍 Ubicación</legend>
+<fieldset style="margin:10px 0" id="blk_domicilio"><legend>📍 Domicilio y ubicación</legend><div class="grid g2">
+{% for c in campos %}{% if c[0] in (e.domicilio or []) and c[0] not in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
+<h3 style="margin:10px 0 4px">Ubicación en mapa</h3><div class="grid g2">{% for c in campos %}{% if c[0] in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
 <p class="muted" style="margin:0 0 6px">Toca el mapa para colocar el pin; arrástralo para ajustar. Llena Latitud/Longitud.</p>
 <div id="mapa" style="height:300px;width:100%;border-radius:8px;border:1px solid #ccc"></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn sec" id="btnGeo">📡 Usar mi ubicación</button>
@@ -40,5 +50,5 @@ if(bk.dataset.en==='Generador')['gen_tipo','gen_kw','gen_combustible'].forEach(f
 var ac=document.querySelector('[name=acceso]'),ws2=['anticipacion_valor','anticipacion_unidad','contacto_permiso'].map(function(n){return document.getElementById('w_'+n);});
 function k(){var on=ac.value==='Requiere permiso';ws2.forEach(function(w){w.style.display=on?'':'none';var x=w.querySelector('input,select');if(!on)x.value='';});
 ws2[0].querySelector('input').required=on;ws2[0].querySelector('input').min=on?'1':'';ws2[1].querySelector('select').required=on;}ac.addEventListener('change',k);k();})();</script>{% endif %}
-<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion, cat_forms %}{% set fc=sitio_fotos_ctx(rid) %}{{ cat_forms(fc, fc.CAT_CFE, '/configuracion/sites/' ~ rid ~ '/editar') }}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
-{{ seccion(fc, '/configuracion/sites/' ~ rid ~ '/editar', [fc.CAT_CFE] if fc.CAT_CFE in fc.permitidas else []) }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}
+<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import seccion, cat_forms %}{% set fc=sitio_fotos_ctx(rid) %}{% for u in sitio_ups_unidades(rid) %}<form id="fdelups_{{u.id}}" method="post" action="/sites/ups/{{u.id}}/borrar" style="display:none"></form>{% endfor %}{% for ce in fc.CAT_ENERGIA if ce!='UPS' %}{{ cat_forms(fc, ce, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endfor %}{% if request.args.msg %}<div class="ej" style="background:#d8f5e1;border-color:#9fd8b2;color:#146c34;margin-top:12px">{{request.args.msg}}</div>{% endif %}
+{{ seccion(fc, '/configuracion/sites/' ~ rid ~ '/editar', fc.CAT_ENERGIA|select('in', fc.permitidas)|reject('equalto','UPS')|list) }}{% elif k=='sites' %}<p class="muted">📷 Guarda el site para poder agregar fotografías.</p>{% endif %}{% endblock %}

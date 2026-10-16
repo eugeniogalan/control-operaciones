@@ -3,8 +3,12 @@ import os, uuid, datetime
 from flask import request, redirect, abort, render_template
 from PIL import Image, ImageOps
 
-CATEGORIAS = ['Fachada exterior', 'Gabinete / Site', 'Torre / Mástil', 'Recibo CFE']
+CATEGORIAS = ['Fachada exterior', 'Gabinete / Site', 'Torre / Mástil', 'Recibo CFE', 'Banco de baterías', 'UPS']
 CAT_CFE = 'Recibo CFE'
+CAT_BAT = 'Banco de baterías'
+# categoría -> tipo de energía requerido (se muestran dentro del bloque de esa energía)
+CAT_UPS = 'UPS'
+CAT_ENERGIA = {CAT_CFE: 'CFE', CAT_BAT: 'Solar', CAT_UPS: 'UPS'}
 CAT_TORRE = 'Torre / Mástil'
 SUB = 'sitios'
 UP_DIR = None
@@ -16,7 +20,7 @@ def migrar(c):
 
 def cats_permitidas(s):
     en = (s['energia'] or '').split(',')
-    return [x for x in CATEGORIAS if (x != CAT_TORRE or 'Torre' in (s['tipo'] or '')) and (x != CAT_CFE or 'CFE' in en)]
+    return [x for x in CATEGORIAS if (x != CAT_TORRE or 'Torre' in (s['tipo'] or '')) and (x not in CAT_ENERGIA or CAT_ENERGIA[x] in en)]
 
 def guardar_imagen(fs, carpeta):
     img = Image.open(fs.stream); img = ImageOps.exif_transpose(img).convert('RGB')
@@ -38,7 +42,7 @@ def registrar(app, q, db, UP):
         s = q('SELECT * FROM sitios WHERE id=?', (sid,), one=True) or abort(404)
         fotos = q('SELECT * FROM sitio_fotos WHERE sitio_id=? ORDER BY fecha, id', (sid,))
         return dict(sitio=s, fotos={c: [f for f in fotos if f['categoria'] == c] for c in CATEGORIAS},
-                    permitidas=cats_permitidas(s), CATEGORIAS=CATEGORIAS, SUB=SUB, CAT_CFE=CAT_CFE)
+                    permitidas=cats_permitidas(s), CATEGORIAS=CATEGORIAS, SUB=SUB, CAT_CFE=CAT_CFE, CAT_ENERGIA=CAT_ENERGIA, CAT_POR_ENERGIA={v: k for k, v in CAT_ENERGIA.items()})
     app.jinja_env.globals['sitio_fotos_ctx'] = ctx
 
     @app.route('/sites/<int:sid>/fotos')
@@ -51,12 +55,17 @@ def registrar(app, q, db, UP):
         cat = request.form.get('categoria'); volver = request.form.get('volver') or f'/sites/{sid}/fotos'
         if not volver.startswith('/') or volver.startswith('//'): volver = f'/sites/{sid}/fotos'
         if cat not in cats_permitidas(s): return redirect(volver + ('&' if '?' in volver else '?') + 'msg=Categoría no permitida para este tipo de site')
+        ups_id = request.form.get('ups_id')
+        if ups_id:
+            if cat != CAT_UPS or not ups_id.isdigit() or not q('SELECT 1 FROM sitio_ups WHERE id=? AND sitio_id=?', (int(ups_id), sid), one=True): abort(400)
+            ups_id = int(ups_id)
+        else: ups_id = None
         com = (request.form.get('comentario') or '').strip() or None; n = err = 0
         for fs in request.files.getlist('fotos'):
             if not fs or not fs.filename: continue
             try: arch = guardar_imagen(fs, carpeta)
             except Exception: err += 1; continue
-            db().execute('INSERT INTO sitio_fotos(sitio_id,categoria,archivo,comentario) VALUES(?,?,?,?)', (sid, cat, arch, com)); n += 1
+            db().execute('INSERT INTO sitio_fotos(sitio_id,categoria,archivo,comentario,ups_id) VALUES(?,?,?,?,?)', (sid, cat, arch, com, ups_id)); n += 1
         db().commit()
         m = f'{n} foto(s) agregada(s)' + (f', {err} archivo(s) no son imagen' if err else '')
         return redirect(volver + ('&' if '?' in volver else '?') + 'msg=' + m + '#fotos')

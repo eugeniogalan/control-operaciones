@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS herramientas(id INTEGER PRIMARY KEY, codigo TEXT, num
  almacen_id INTEGER REFERENCES almacenes(id) ON DELETE SET NULL, fecha_calibracion TEXT, notas TEXT, activo INTEGER DEFAULT 1, ejemplo INTEGER DEFAULT 0);
 '''
 TIPOS_SITIO = ['Site','Site + Torre','Gabinete para exteriores','Gabinete para exteriores + Torre','Torre']  # solo sitios propios de Spectro Networks
-ENERGIAS = ['CFE','Solar','Generador']
+ENERGIAS = ['CFE','Solar','Generador','UPS']
 ACCESOS = ['Libre 24 hrs','Requiere permiso']
 UNIDADES_ANT = ['horas','días']
 ACC_SPN = {'SPN-POP-01':(48,'horas','Administración Plaza Juárez · 33 1234 5678'),'SPN-CS-003':(2,'días','Vigilancia Av. Patria'),'SPN-RP-004':(24,'horas','Ejido La Cruz · Comisariado')}
@@ -28,7 +28,8 @@ COMBUSTIBLES = ['Gas LP','Gasolina','Diesel']
 ARRANQUES = ['Automático','Manual','Remoto']
 BLOQUES_ENERGIA = {'CFE': ['voltaje_cfe','cfe_servicio','cfe_tipo_servicio','cfe_interruptor_a'],
     'Solar': ['voltaje_solar','solar_paneles_w','solar_num_paneles','solar_baterias_ah','solar_tipo_bateria','solar_num_baterias','solar_bat_marca','solar_bat_modelo','solar_bat_instalacion','solar_bat_cambio'],
-    'Generador': ['gen_tipo','gen_marca','gen_modelo','gen_kw','gen_combustible','gen_arranque']}
+    'Generador': ['gen_tipo','gen_marca','gen_modelo','gen_kw','gen_combustible','gen_arranque'],
+    'UPS': []}  # UPS: unidades en tabla sitio_ups (sitio_ups.py)
 COLS_ENERGIA = [('cfe_servicio','TEXT'),('cfe_tipo_servicio','TEXT'),('cfe_interruptor_a','REAL'),('solar_paneles_w','REAL'),('solar_num_paneles','INTEGER'),
     ('solar_baterias_ah','REAL'),('solar_tipo_bateria','TEXT'),('gen_tipo','TEXT'),('gen_marca','TEXT'),('gen_modelo','TEXT'),('gen_kw','REAL'),('gen_combustible','TEXT'),('gen_arranque','TEXT')]
 SEED_ENERGIA = {
@@ -54,6 +55,9 @@ TIPOS_TORRE = ['TZ30','TZ45','T60','Autosoportada']
 ENERGIA_SPN = [('SPN-TR-001',30,'CFE,Generador','TZ30'),('SPN-POP-01',None,'CFE,Generador',None),('SPN-CS-003',None,'CFE',None),
     ('SPN-RP-004',18,'Solar,Generador','Autosoportada'),('SPN-TR-005',42,'CFE,Solar','TZ45')]
 def sitio_valid(d, rid):
+    if d.get('cp') and not (len(d['cp']) == 5 and d['cp'].isdigit()): return 'Código postal debe tener 5 dígitos'
+    if d.get('estado') is not None and d['estado'] not in ESTADOS_MX: return 'Estado inválido'
+    if 'calle' in d: d['direccion'] = (' '.join(x for x in (d.get('calle'), d.get('num_ext')) if x) or None); d['ciudad'] = d.get('municipio')  # compatibilidad
     if d.get('acceso') not in ACCESOS: return 'Acceso inválido (Libre 24 hrs o Requiere permiso)'
     if d['acceso'] == 'Requiere permiso':
         if not d.get('anticipacion_valor') or d['anticipacion_valor'] <= 0: return 'Anticipación para solicitar permiso debe ser mayor a 0'
@@ -87,6 +91,19 @@ def sitio_valid(d, rid):
         if d.get('altura_torre') is None: return 'Altura de torre (m) es obligatoria cuando el tipo incluye Torre'
         if d['altura_torre'] <= 0: return 'Altura de torre debe ser mayor a 0'
     else: d['altura_torre'] = None; d['tipo_torre'] = None
+ESTADOS_MX = ['Aguascalientes','Baja California','Baja California Sur','Campeche','Chiapas','Chihuahua','Ciudad de México','Coahuila','Colima','Durango',
+    'Estado de México','Guanajuato','Guerrero','Hidalgo','Jalisco','Michoacán','Morelos','Nayarit','Nuevo León','Oaxaca','Puebla','Querétaro','Quintana Roo',
+    'San Luis Potosí','Sinaloa','Sonora','Tabasco','Tamaulipas','Tlaxcala','Veracruz','Yucatán','Zacatecas']
+COLS_DOM = [('calle','TEXT'),('num_ext','TEXT'),('num_int','TEXT'),('entre_calle','TEXT'),('y_calle','TEXT'),('colonia','TEXT'),('cp','TEXT'),('municipio','TEXT'),('referencias','TEXT')]
+DOMICILIO = ['calle','num_ext','num_int','entre_calle','y_calle','colonia','cp','municipio','estado','referencias','lat','lng']
+SEED_DOM = {
+    'SPN-TR-001': ('Camino al Cerro del Cuatro','s/n',None,'Calle Cerro Gordo','Calle Volcán','Lomas del Cuatro','45589','San Pedro Tlaquepaque','Junto a la antena de radio; acceso por terracería'),
+    'SPN-POP-01': ('Av. Juárez','120','Piso 3','Calle Colón','Calle Galeana','Centro','44100','Guadalajara','Edificio Plaza Juárez, cuarto de telecom en azotea'),
+    'SPN-CS-003': ('Av. Patria','2000',None,'Av. Acueducto','Calle Santa Margarita','Jacarandas','45160','Zapopan','Gabinete en camellón frente a gasolinera'),
+    'SPN-RP-004': ('Camino a Cerro La Cruz','km 3',None,None,None,'La Cruz','49340','Tapalpa','Subir por brecha desde la presa; requiere 4x4'),
+    'SPN-TR-005': ('Camino al Cerro de la Reina','s/n',None,'Calle Hidalgo','Calle Morelos','Cerro de la Reina','45400','Tonalá','Portón verde al final del camino')}
+_DOM_SQL = """TRIM(COALESCE(NULLIF(TRIM(COALESCE(calle,'')||COALESCE(' '||num_ext,'')||COALESCE(' int. '||num_int,'')),''),direccion,'')
+    ||COALESCE(', Col. '||colonia,'')||COALESCE(', C.P. '||cp,'')||COALESCE(', '||COALESCE(municipio,ciudad),'')||COALESCE(', '||estado,''), ', ')"""
 TIPOS_HERR = ['Herramienta','Equipo de medición','EPP','Equipo de fusión','Escalera / altura','Vehículo / remolque','Otro']
 ESTADOS_HERR = ['disponible','asignado','en reparación','baja']
 PUESTOS = ['Director','Gerente','Supervisor','Técnico Instalador','Vendedor','Almacenista','Proveedor Externo']
@@ -107,6 +124,14 @@ def migrar(c, N_VEH=18):
     for col, typ in (('altura_torre','REAL'), ('energia','TEXT'), ('tipo_torre','TEXT'), ('voltaje_cfe','TEXT'), ('voltaje_solar','TEXT')):
         if col not in sc: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
     _sembrar_sitios(c)
+    if 'calle' not in sc:
+        for col, typ in COLS_DOM:
+            if col not in sc: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
+        c.execute("UPDATE sitios SET calle=direccion WHERE calle IS NULL AND TRIM(COALESCE(direccion,''))<>''")   # copia best-effort
+        c.execute("UPDATE sitios SET municipio=ciudad WHERE municipio IS NULL AND TRIM(COALESCE(ciudad,''))<>''")
+        for cod, (ca, ne, ni, e1, e2, col, cp, mun, ref) in SEED_DOM.items():
+            c.execute('UPDATE sitios SET calle=?, num_ext=?, num_int=?, entre_calle=?, y_calle=?, colonia=?, cp=?, municipio=?, referencias=? WHERE codigo=? AND ejemplo=1',
+                      (ca, ne, ni, e1, e2, col, cp, mun, ref, cod))
     if 'tenencia' not in sc:
         c.execute("ALTER TABLE sitios ADD COLUMN tenencia TEXT DEFAULT 'Propio'")
         for cod, tn in TEN_SPN.items(): c.execute('UPDATE sitios SET tenencia=? WHERE codigo=? AND ejemplo=1', (tn, cod))
@@ -318,20 +343,26 @@ def registrar(app, q, db):
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE cliente_id=? LIMIT 1', (i,)),
         unico=[('nombre','Ese cliente ya existe')]),
      'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
-        buscar=['codigo','nombre','ciudad','tipo'],
+        buscar=['codigo','nombre','tipo','calle','colonia','cp','municipio','estado'],
         sql="""SELECT *, CASE WHEN acceso='Requiere permiso' THEN 'Requiere permiso ('||COALESCE(anticipacion_valor,'?')||' '||COALESCE(anticipacion_unidad,'')||')'
                ||CASE WHEN COALESCE(contacto_permiso,'')<>'' THEN ' · '||contacto_permiso ELSE '' END ELSE COALESCE(acceso,'Libre 24 hrs') END acceso_txt, (SELECT COUNT(*) FROM sitio_fotos f WHERE f.sitio_id=sitios.id) nfotos,
                SUBSTR(COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,CFE,%' THEN 'CFE'||COALESCE(' '||REPLACE(voltaje_cfe,',','/'),'')||COALESCE(' '||LOWER(cfe_tipo_servicio),'') END,'')
                ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Solar,%' THEN 'Solar'||COALESCE(' '||voltaje_solar,'')||CASE WHEN solar_num_paneles>0 AND solar_paneles_w>0 THEN ' '||solar_num_paneles||'×'||CAST(solar_paneles_w AS INT)||'W' ELSE '' END||CASE WHEN solar_num_baterias>0 THEN ' · '||solar_num_baterias||' bat.'||COALESCE(' '||solar_bat_marca,'') ELSE '' END END,'')
-               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Generador,%' THEN 'Gen'||COALESCE(' '||(CASE WHEN gen_kw=CAST(gen_kw AS INT) THEN CAST(gen_kw AS INT) ELSE gen_kw END)||'kW','')||COALESCE(' '||gen_combustible,'') END,''),4) energia_txt, """+BAT_ALERTA_SQL+""" bat_alerta
+               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Generador,%' THEN 'Gen'||COALESCE(' '||(CASE WHEN gen_kw=CAST(gen_kw AS INT) THEN CAST(gen_kw AS INT) ELSE gen_kw END)||'kW','')||COALESCE(' '||gen_combustible,'') END,''),4) energia_txt_base, """+BAT_ALERTA_SQL+""" bat_alerta,
+               CASE WHEN ','||COALESCE(energia,'')||',' LIKE '%,UPS,%' THEN """+__import__('sitio_ups').RESUMEN_SQL+""" END ups_txt,
+               """+__import__('sitio_ups').ALERTA_SITIO_SQL+""" ups_alerta, """+__import__('sitio_ups').CAMBIO_MIN_SQL+""" ups_cambio,
+               """+_DOM_SQL+""" domicilio_txt
                FROM sitios""",
-        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
+        post_sql=lambda rows: [dict(r, energia_txt=' · '.join(x for x in (r['energia_txt_base'], r['ups_txt']) if x)) for r in rows],
+        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('domicilio_txt','Domicilio')],
         campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje disponible','checks',VOLTAJES),('cfe_servicio','No. de servicio / medidor CFE','text'),('cfe_tipo_servicio','Tipo de servicio','select',SERVICIOS_CFE),('cfe_interruptor_a','Interruptor principal (A)','decimal'),
                 ('voltaje_solar','Voltaje CD','select',VOLT_SOLAR),('solar_paneles_w','Capacidad por panel (W)','decimal'),('solar_num_paneles','Número de paneles','number'),('solar_baterias_ah','Banco de baterías (Ah)','decimal'),('solar_tipo_bateria','Tipo de batería','select',TIPOS_BATERIA),('solar_num_baterias','Número de baterías','number'),('solar_bat_marca','Marca batería','text'),('solar_bat_modelo','Modelo batería','text'),
                 ('solar_bat_instalacion','Fecha de instalación inicial (baterías)','date'),('solar_bat_cambio','Fecha de cambio requerida (+3 años)','readonly*'),
-                ('gen_tipo','Tipo de generador','select',TIPOS_GEN),('gen_marca','Marca','text'),('gen_modelo','Modelo','text'),('gen_kw','Capacidad (kW) *','decimal'),('gen_combustible','Combustible','select',COMBUSTIBLES),('gen_arranque','Arranque','checks',ARRANQUES),('direccion','Dirección','text'),
-                ('ciudad','Ciudad','text'),('estado','Estado','text'),('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
-        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA,
+                ('gen_tipo','Tipo de generador','select',TIPOS_GEN),('gen_marca','Marca','text'),('gen_modelo','Modelo','text'),('gen_kw','Capacidad (kW) *','decimal'),('gen_combustible','Combustible','select',COMBUSTIBLES),('gen_arranque','Arranque','checks',ARRANQUES),
+                ('calle','Calle','text',True),('num_ext','Número exterior','text'),('num_int','Número interior','text'),('entre_calle','Entre calle','text'),('y_calle','Y calle','text'),
+                ('colonia','Colonia','text',True),('cp','Código postal','cp'),('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('referencias','Referencias','textarea'),
+                ('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
+        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA, domicilio=DOMICILIO,
         pre_del=sitio_del, ver_url='/sites/{id}/fotos'),
      'almacenes': dict(titulo='Almacenes', icono='🏬', tabla='almacenes', act='activo', orden="tipo, nombre", desc='Bodegas (Torrelit, Autosound) y vehículos 01–18.',
         buscar=['nombre','tipo'],
@@ -369,6 +400,7 @@ def registrar(app, q, db):
         elif ver == 'inactivos': w.append(f"COALESCE({pre}{e['act']},1)=0")
         orden = ', '.join(pre + o.strip() for o in e['orden'].split(','))
         rows = q(f"{sql} {'WHERE '+' AND '.join(w) if w else ''} ORDER BY {orden} LIMIT 500", a)
+        if e.get('post_sql'): rows = e['post_sql'](rows)
         return render_template('config_lista.html', k=k, e=e, rows=rows, s=s, ver=ver, msg=request.args.get('msg'))
 
     @app.route('/configuracion/<k>/nuevo', methods=['GET','POST'])
