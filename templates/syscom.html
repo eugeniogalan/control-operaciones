@@ -1,9 +1,9 @@
 {% extends 'base.html' %}{% block body %}<style>.btn[disabled]{opacity:.45;cursor:not-allowed}</style>
 <h1>Proveedor: SYSCOM <span class="muted">catálogo, números de parte y fotos</span></h1>
-{% if msg %}<div class="ej" style="background:#0f2e1c;border-color:#1f5c36;color:#4ade80">✔ {{msg}}</div>{% endif %}
-{% if err %}<div class="ej" style="background:#3a1517;border-color:#6b2224;color:#ff8a85">⚠ {{err}}</div>{% endif %}
+{% if msg %}<div class="ej" style="background:#e7f6ec;border-color:#b9e3c6;color:#15803d">✔ {{msg}}</div>{% endif %}
+{% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ {{err}}</div>{% endif %}
 <div class="grid g5">
-<div class="kpi" style="background:{{'#0f2e1c' if st=='conectado' else ('#33270f' if st!='sin credenciales' else '#1c1c1f')}}"><div class="n" style="font-size:20px">{{ {'conectado':'🟢 Conectado','sin credenciales':'⚪ Sin credenciales'}.get(st, '🟡 Sin probar') }}</div><div class="l">Estado{% if origen %} · desde {{origen}}{% endif %}{% if cid_mask %} · client_id {{cid_mask}}{% endif %}</div></div>
+<div class="kpi" style="background:{{'#e7f6ec' if st=='conectado' else ('#fdf6e3' if st!='sin credenciales' else '#f5f5f7')}}"><div class="n" style="font-size:20px">{{ {'conectado':'🟢 Conectado','sin credenciales':'⚪ Sin credenciales'}.get(st, '🟡 Sin probar') }}</div><div class="l">Estado{% if origen %} · desde {{origen}}{% endif %}{% if cid_mask %} · client_id {{cid_mask}}{% endif %}</div></div>
 <div class="kpi"><div class="n" style="font-size:20px">{{est.ultima_sync or '—'}}</div><div class="l">Última sincronización</div></div>
 <div class="kpi"><div class="n">{{stats.con_sys or 0}}/{{stats.n}}</div><div class="l">Materiales ligados a Syscom</div></div>
 <div class="kpi"><div class="n">{{stats.con_img or 0}}</div><div class="l">Con foto ({{stats.ej or 0}} de ejemplo)</div></div></div>

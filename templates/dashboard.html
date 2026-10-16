@@ -4,7 +4,7 @@
 <div class="grid g5">
 <a class="kpi" href="/ordenes"><div class="n">{{total}}</div><div class="l">Órdenes totales</div></a>
 {% for e in ESTADOS %}<a class="kpi" href="/ordenes?estado={{e}}"><div class="n">{{por_estado[e]}}</div><div class="l">{{est(e)}}</div></a>{% endfor %}
-<a class="kpi" href="/ordenes?vencidas=1" style="border-color:#6b2224"><div class="n venc">{{vencidas|length}}</div><div class="l">Vencidas (abiertas y fuera de fecha)</div></a>
+<a class="kpi" href="/ordenes?vencidas=1" style="border-color:#f3c4c4"><div class="n venc">{{vencidas|length}}</div><div class="l">Vencidas (abiertas y fuera de fecha)</div></a>
 <a class="kpi" href="/ordenes?desde={{hoy}}&hasta={{hoy}}"><div class="n">{{hoy_n}}</div><div class="l">Programadas hoy</div></a>
 <a class="kpi" href="/ordenes?estado=completada"><div class="n">{{pend_aud}}</div><div class="l">Completadas sin auditar</div></a>
 </div>

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}{% block body %}{% from 'sitio_fotos_macro.html' import seccion %}
 <div class="muted"><a href="/configuracion">Configuración</a> › <a href="/configuracion/sites">Sites</a> › {{sitio.codigo}}</div>
 <h1>📷 {{sitio.codigo}} · {{sitio.nombre}}</h1><p class="muted">{{sitio.tipo}}{% if sitio.ciudad %} · {{sitio.ciudad}}{% endif %} · <a href="/configuracion/sites/{{sitio.id}}/editar">Editar site</a></p>
-{% if msg %}<div class="ej" style="background:#0f2e1c;border-color:#1f5c36;color:#4ade80">{{msg}}</div>{% endif %}
+{% if msg %}<div class="ej" style="background:#e7f6ec;border-color:#b9e3c6;color:#15803d">{{msg}}</div>{% endif %}
 {{ seccion(sitio_fotos_ctx(sitio.id), '/sites/' ~ sitio.id ~ '/fotos', extra=['Recibo CFE']) }}{% endblock %}

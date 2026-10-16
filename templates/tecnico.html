@@ -1,9 +1,9 @@
 {% extends 'base.html' %}{% from 'macros.html' import est, pri, fh %}{% block head %}<style>
-.oc{background:#161618;border:1px solid var(--b);border-left:6px solid #3f3f46;border-radius:12px;padding:14px;margin-bottom:14px}
+.oc{background:#ffffff;border:1px solid var(--b);border-left:6px solid #d1d1d6;border-radius:12px;padding:14px;margin-bottom:14px}
 .oc.s-en{border-left-color:#d48a00}.oc.s-completada{border-left-color:#16803c;opacity:.8}.oc.s-asignada{border-left-color:#1d4fb8}
 .big{display:block;width:100%;padding:16px;font-size:18px;font-weight:700;border-radius:10px;margin-top:8px}
-.oc textarea,.oc input{width:100%;padding:10px;font-size:16px;border:1px solid #2e2e33;border-radius:8px;margin-top:6px}
-.sel{width:100%;padding:12px;font-size:17px;border-radius:10px;border:1px solid #2e2e33}
+.oc textarea,.oc input{width:100%;padding:10px;font-size:16px;border:1px solid #d9d9de;border-radius:8px;margin-top:6px}
+.sel{width:100%;padding:12px;font-size:17px;border-radius:10px;border:1px solid #d9d9de}
 </style>{% endblock %}{% block body %}
 <select class="sel" onchange="location='/tecnico?cuadrilla='+this.value">{% for x in cs %}<option value="{{x.id}}" {{'selected' if x.id==c.id}}>{{x.nombre}} · {{x.especialidad}}</option>{% endfor %}</select>
 <p class="muted">{% for t in equipo %}{{'👷' if t.rol=='líder' else '🔧'}} {{t.nombre}}{{' · ' if not loop.last}}{% endfor %}</p>

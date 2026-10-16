@@ -1,5 +1,5 @@
 {% extends 'base.html' %}{% block body %}<h1>Vehículos (almacenes móviles)</h1>
-{% if ok %}<div class="ej" style="background:#0f2e1c;border-color:#1f5c36;color:#4ade80">Asignaciones guardadas.</div>{% endif %}
+{% if ok %}<div class="ej" style="background:#e7f6ec;border-color:#b9e3c6;color:#15803d">Asignaciones guardadas.</div>{% endif %}
 <p class="muted">Cada vehículo pertenece a una cuadrilla (se puede reasignar). Su inventario se mantiene aunque cambie de cuadrilla. Al capturar materiales de una orden se sugieren primero los vehículos de su cuadrilla.</p>
 <form method="post" class="f"><div class="tw"><table><tr><th>Vehículo</th><th>Cuadrilla asignada</th><th>Materiales con stock</th><th></th></tr>
 {% for v in vs %}<tr><td><b>{{v.nombre}}</b></td><td><select name="v{{v.id}}"><option value="">— sin asignar —</option>{% for c in cu %}<option value="{{c.id}}" {{'selected' if v.cuadrilla_id==c.id}}>{{c.nombre}}</option>{% endfor %}</select></td>

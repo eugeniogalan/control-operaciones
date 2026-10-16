@@ -1,12 +1,12 @@
 <!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Iniciar sesión</title>
-<meta name="theme-color" content="#000000"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style>*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 600px at 50% -10%,#1a1d24 0%,#000 60%);color:#f4f4f5;display:flex;min-height:100vh;align-items:center;justify-content:center;color-scheme:dark}
-form{background:rgba(18,18,20,.9);border:1px solid #26262a;border-radius:22px;padding:34px 26px;width:92%;max-width:380px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
-.brand{font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:13px;color:#a1a1aa;display:flex;align-items:center;gap:8px;margin-bottom:22px}.brand i{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 10px #22c55e}
-h1{font-size:26px;font-weight:600;letter-spacing:-.02em;margin:0 0 24px}label{display:block;font-size:12.5px;color:#a1a1aa;margin-bottom:14px;font-weight:500}
-input{width:100%;padding:13px 14px;font-size:16px;border:1px solid #33333a;border-radius:12px;margin-top:6px;background:#0b0b0c;color:#f4f4f5;font-family:inherit;outline:none}input:focus{border-color:#71717a}
-button{width:100%;margin-top:8px;padding:14px;font-size:16px;font-weight:600;background:#f4f4f5;color:#000;border:0;border-radius:999px;cursor:pointer;font-family:inherit}button:hover{background:#fff}
-.e{color:#f87171;background:#2a1011;border:1px solid #5c2222;border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:14px}</style></head>
+<meta name="theme-color" content="#f5f5f7"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>*{box-sizing:border-box}body{margin:0;font-family:Inter,system-ui,sans-serif;background:radial-gradient(1200px 600px at 50% -10%,#ffffff 0%,#f5f5f7 60%);color:#111;display:flex;min-height:100vh;align-items:center;justify-content:center;color-scheme:light}
+form{background:#fff;border:1px solid #e5e5ea;border-radius:22px;padding:34px 26px;width:92%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.08)}
+.brand{font-weight:700;letter-spacing:.18em;text-transform:uppercase;font-size:13px;color:#6b6b70;display:flex;align-items:center;gap:8px;margin-bottom:22px}.brand i{width:8px;height:8px;border-radius:50%;background:#22c55e;box-shadow:0 0 6px rgba(22,163,74,.5)}
+h1{font-size:26px;font-weight:600;letter-spacing:-.02em;margin:0 0 24px}label{display:block;font-size:12.5px;color:#6b6b70;margin-bottom:14px;font-weight:500}
+input{width:100%;padding:13px 14px;font-size:16px;border:1px solid #d6d6dc;border-radius:12px;margin-top:6px;background:#fff;color:#111;font-family:inherit;outline:none}input:focus{border-color:#111}
+button{width:100%;margin-top:8px;padding:14px;font-size:16px;font-weight:600;background:#111;color:#fff;border:0;border-radius:999px;cursor:pointer;font-family:inherit}button:hover{background:#2c2c2e}
+.e{color:#c62828;background:#fdecec;border:1px solid #f3c4c4;border-radius:12px;padding:10px 12px;margin-bottom:14px;font-size:14px}</style></head>
 <body><form method="post"><div class="brand"><i></i>Spectro Networks</div><h1>Control de Operaciones</h1>{% if err %}<div class="e">{{err}}</div>{% endif %}
 <label>Usuario<input name="usuario" autocomplete="username" autocapitalize="none" required></label>
 <label>Contraseña<input name="clave" type="password" autocomplete="current-password" required></label><button>Iniciar sesión</button></form></body></html>
