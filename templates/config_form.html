@@ -18,6 +18,13 @@
 {% for c2 in campos %}{% if c2[0] in e.torre %}{{ campo(c2, r) }}{% endif %}{% endfor %}
 {% if rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fct=sitio_fotos_ctx(rid) %}{% if 'Torre / Mástil' in fct.permitidas %}{{ cat_incrustada(fct, 'Torre / Mástil', '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}
 </div></details></fieldset>{% elif c[0] not in encols %}{{ campo(c, r) }}{% endif %}
+{% if c[0]=='nombre' and e.domicilio %}<fieldset style="grid-column:1/-1;margin:4px 0" id="blk_domicilio"><legend>📍 Domicilio y ubicación</legend><div class="grid g2">
+{% for c in campos %}{% if c[0] in (e.domicilio or []) and c[0] not in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
+<h3 style="margin:10px 0 4px">Ubicación en mapa</h3><div class="grid g2">{% for c in campos %}{% if c[0] in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
+<p class="muted" style="margin:0 0 6px">Toca el mapa para colocar el pin; arrástralo para ajustar. Llena Latitud/Longitud.</p>
+<div id="mapa" style="height:300px;width:100%;border-radius:8px;border:1px solid #ccc"></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn sec" id="btnGeo">📡 Usar mi ubicación</button>
+<a class="btn sec" id="lnkGM" target="_blank" rel="noopener" href="#">🗺 Abrir en Google Maps</a></div></fieldset>{% endif %}
 {% if c[0]=='energia' and enb %}{% for b,cs in enb.items() %}<details class="blk-en" id="blk_{{b}}" data-en="{{b}}" open style="grid-column:1/-1;border:1px solid #cfd8e3;border-radius:8px;padding:6px 10px;background:#f7f9fc">
 <summary style="font-weight:600;cursor:pointer">{{ {'CFE':'⚡ CFE','Solar':'☀️ Solar','Generador':'⛽ Generador','UPS':'🔌 UPS'}[b] }}</summary><div class="grid g2" style="margin-top:6px">
 {% for c2 in campos %}{% if c2[0] in cs %}{{ campo(c2, r) }}{% endif %}{% endfor %}
@@ -35,13 +42,7 @@
 {% if k=='sites' %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<fieldset style="margin:10px 0" id="blk_domicilio"><legend>📍 Domicilio y ubicación</legend><div class="grid g2">
-{% for c in campos %}{% if c[0] in (e.domicilio or []) and c[0] not in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
-<h3 style="margin:10px 0 4px">Ubicación en mapa</h3><div class="grid g2">{% for c in campos %}{% if c[0] in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
-<p class="muted" style="margin:0 0 6px">Toca el mapa para colocar el pin; arrástralo para ajustar. Llena Latitud/Longitud.</p>
-<div id="mapa" style="height:300px;width:100%;border-radius:8px;border:1px solid #ccc"></div>
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn sec" id="btnGeo">📡 Usar mi ubicación</button>
-<a class="btn sec" id="lnkGM" target="_blank" rel="noopener" href="#">🗺 Abrir en Google Maps</a></div></fieldset>
+
 <script>(function(){if(!window.L)return;var la=document.querySelector('[name=lat]'),ln=document.querySelector('[name=lng]'),gm=document.getElementById('lnkGM');
 var lat=parseFloat(la.value),lng=parseFloat(ln.value),has=!isNaN(lat)&&!isNaN(lng);
 var m=L.map('mapa',{tap:true}).setView(has?[lat,lng]:[23.6,-102.5],has?15:5);
