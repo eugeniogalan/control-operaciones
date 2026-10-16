@@ -5,8 +5,29 @@
 {% for c in campos %}{{ campo(c, r) }}{% endfor %}
 <label><input type="checkbox" name="activo" style="width:auto" {{'checked' if r.get(e.act)!=0}}> Activo</label></div></fieldset>
 {% if k=='vehiculos' %}<p class="muted">Al guardar se crea o renombra automáticamente su almacén “Vehículo NN” y se sincroniza la cuadrilla.</p>{% endif %}
-{% if k=='sites' %}<script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('w_altura_torre'),i=w.querySelector('input'),w2=document.getElementById('w_tipo_torre');
+{% if k=='sites' %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<fieldset style="margin:10px 0"><legend>📍 Ubicación</legend>
+<p class="muted" style="margin:0 0 6px">Toca el mapa para colocar el pin; arrástralo para ajustar. Llena Latitud/Longitud.</p>
+<div id="mapa" style="height:300px;width:100%;border-radius:8px;border:1px solid #ccc"></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button type="button" class="btn sec" id="btnGeo">📡 Usar mi ubicación</button>
+<a class="btn sec" id="lnkGM" target="_blank" rel="noopener" href="#">🗺 Abrir en Google Maps</a></div></fieldset>
+<script>(function(){if(!window.L)return;var la=document.querySelector('[name=lat]'),ln=document.querySelector('[name=lng]'),gm=document.getElementById('lnkGM');
+var lat=parseFloat(la.value),lng=parseFloat(ln.value),has=!isNaN(lat)&&!isNaN(lng);
+var m=L.map('mapa',{tap:true}).setView(has?[lat,lng]:[23.6,-102.5],has?15:5);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(m);
+var pin=null;function gml(){var a=parseFloat(la.value),b=parseFloat(ln.value);var ok=!isNaN(a)&&!isNaN(b);gm.style.display=ok?'':'none';if(ok)gm.href='https://www.google.com/maps?q='+a+','+b;}
+function poner(a,b,z){a=+a.toFixed(6);b=+b.toFixed(6);la.value=a;ln.value=b;if(pin)pin.setLatLng([a,b]);else{pin=L.marker([a,b],{draggable:true}).addTo(m);pin.on('dragend',function(){var p=pin.getLatLng();poner(p.lat,p.lng);});}if(z)m.setView([a,b],z);gml();}
+if(has)poner(lat,lng);m.on('click',function(e){poner(e.latlng.lat,e.latlng.lng);});
+function sync(){var a=parseFloat(la.value),b=parseFloat(ln.value);if(!isNaN(a)&&!isNaN(b))poner(a,b,Math.max(m.getZoom(),13));else gml();}la.addEventListener('change',sync);ln.addEventListener('change',sync);
+document.getElementById('btnGeo').onclick=function(){if(!navigator.geolocation){alert('Tu navegador no soporta geolocalización');return;}
+navigator.geolocation.getCurrentPosition(function(p){poner(p.coords.latitude,p.coords.longitude,17);},function(e){alert('No se pudo obtener la ubicación: '+e.message);},{enableHighAccuracy:true,timeout:15000});};
+gml();setTimeout(function(){m.invalidateSize();},200);})();</script>
+<script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('w_altura_torre'),i=w.querySelector('input'),w2=document.getElementById('w_tipo_torre');
 function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=w2.style.display=on?'':'none';i.required=on;if(!on){i.value='';w2.querySelector('input').value='';}}t.addEventListener('change',f);f();
 var wv=document.getElementById('w_voltaje_cfe'),cfe=document.querySelector('[name=energia][value=CFE]');
-function g(){wv.style.display=cfe.checked?'':'none';if(!cfe.checked)wv.querySelectorAll('input').forEach(function(x){x.checked=false});}cfe.addEventListener('change',g);g();})();</script>{% endif %}
+function g(){wv.style.display=cfe.checked?'':'none';if(!cfe.checked)wv.querySelectorAll('input').forEach(function(x){x.checked=false});}cfe.addEventListener('change',g);g();
+var ws=document.getElementById('w_voltaje_solar'),sol=document.querySelector('[name=energia][value=Solar]');
+function h(){ws.style.display=sol.checked?'':'none';if(!sol.checked)ws.querySelector('select').value='';}sol.addEventListener('change',h);h();})();</script>{% endif %}
 <button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% endblock %}
