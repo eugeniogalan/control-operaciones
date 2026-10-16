@@ -133,8 +133,9 @@ def dashboard():
     bajo_min = q(f'''SELECT m.id, m.sku, m.nombre, m.unidad, a.nombre alm, e.stock, e.minimo FROM existencias e JOIN materiales m ON m.id=e.material_id JOIN almacenes a ON a.id=e.almacen_id
         WHERE m.activo=1 AND {BAJO_ALM} ORDER BY (e.stock - e.minimo) / e.minimo LIMIT 10''')
     nbajo = q(f'SELECT COUNT(*) n FROM materiales m WHERE {BAJO_ALGUNO}', one=True)['n']
+    bat_cambio = q(f"SELECT id, codigo, nombre, solar_num_baterias, solar_bat_marca, solar_bat_cambio, alerta FROM (SELECT *, {CM.BAT_ALERTA_SQL} alerta FROM sitios WHERE activo=1) WHERE alerta IS NOT NULL ORDER BY solar_bat_cambio")
     total = sum(por_estado.values()); maxc = max([r['total'] for r in por_cuad] + [1])
-    return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm)
+    return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, hoy=dt.date.today())
 
 # ---------- Órdenes ----------
 @app.route('/ordenes')
@@ -655,6 +656,7 @@ def init_db():
 import syscom_client as SC
 import config_mod as CM
 import sitio_fotos as SF
+app.jinja_env.filters['todate'] = lambda v: dt.date.fromisoformat(v)
 CONFIG = CM.registrar(app, q, db)
 SF.registrar(app, q, db, UP)
 

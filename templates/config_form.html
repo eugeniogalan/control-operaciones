@@ -31,6 +31,9 @@ navigator.geolocation.getCurrentPosition(function(p){poner(p.coords.latitude,p.c
 gml();setTimeout(function(){m.invalidateSize();},200);})();</script>
 <script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('w_altura_torre'),i=w.querySelector('input'),w2=document.getElementById('w_tipo_torre');
 function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=w2.style.display=on?'':'none';i.required=on;if(!on){i.value='';w2.querySelector('input').value='';}}t.addEventListener('change',f);f();
+(function(){var fi=document.querySelector('[name=solar_bat_instalacion]'),fc=document.getElementById('ro_solar_bat_cambio');if(!fi||!fc)return;
+function cal(){var m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(fi.value);if(!m){fc.value='';return;}var y=+m[1]+3,mo=m[2],d=m[3];if(mo==='02'&&d==='29')d='28';fc.value=y+'-'+mo+'-'+d;}
+fi.addEventListener('input',cal);fi.addEventListener('change',cal);cal();})();
 document.querySelectorAll('.blk-en').forEach(function(bk){var cb=document.querySelector('[name=energia][value="'+bk.dataset.en+'"]');
 function u(){var on=cb.checked;bk.style.display=on?'':'none';if(!on)bk.querySelectorAll('input,select').forEach(function(x){if(x.type==='checkbox')x.checked=false;else x.value='';});
 if(bk.dataset.en==='Generador')['gen_tipo','gen_kw','gen_combustible'].forEach(function(n){bk.querySelector('[name='+n+']').required=on;});}cb.addEventListener('change',u);u();});

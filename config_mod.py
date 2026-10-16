@@ -27,7 +27,7 @@ TIPOS_GEN = ['Estacionario','Portátil']
 COMBUSTIBLES = ['Gas LP','Gasolina','Diesel']
 ARRANQUES = ['Automático','Manual','Remoto']
 BLOQUES_ENERGIA = {'CFE': ['voltaje_cfe','cfe_servicio','cfe_tipo_servicio','cfe_interruptor_a'],
-    'Solar': ['voltaje_solar','solar_paneles_w','solar_num_paneles','solar_baterias_ah','solar_tipo_bateria'],
+    'Solar': ['voltaje_solar','solar_paneles_w','solar_num_paneles','solar_baterias_ah','solar_tipo_bateria','solar_num_baterias','solar_bat_marca','solar_bat_modelo','solar_bat_instalacion','solar_bat_cambio'],
     'Generador': ['gen_tipo','gen_marca','gen_modelo','gen_kw','gen_combustible','gen_arranque']}
 COLS_ENERGIA = [('cfe_servicio','TEXT'),('cfe_tipo_servicio','TEXT'),('cfe_interruptor_a','REAL'),('solar_paneles_w','REAL'),('solar_num_paneles','INTEGER'),
     ('solar_baterias_ah','REAL'),('solar_tipo_bateria','TEXT'),('gen_tipo','TEXT'),('gen_marca','TEXT'),('gen_modelo','TEXT'),('gen_kw','REAL'),('gen_combustible','TEXT'),('gen_arranque','TEXT')]
@@ -37,6 +37,15 @@ SEED_ENERGIA = {
     'SPN-CS-003': dict(cfe_servicio='RPU 555111222333', cfe_tipo_servicio='Monofásico', cfe_interruptor_a=30),
     'SPN-RP-004': dict(solar_paneles_w=550, solar_num_paneles=8, solar_baterias_ah=400, solar_tipo_bateria='Litio', gen_tipo='Portátil', gen_marca='Honda', gen_modelo='EU7000iS', gen_kw=5.5, gen_combustible='Gasolina', gen_arranque='Manual,Remoto'),
     'SPN-TR-005': dict(cfe_servicio='RPU 444333222111', cfe_tipo_servicio='Monofásico', cfe_interruptor_a=40, solar_paneles_w=450, solar_num_paneles=4, solar_baterias_ah=200, solar_tipo_bateria='AGM')}
+COLS_BAT = [('solar_num_baterias','INTEGER'),('solar_bat_marca','TEXT'),('solar_bat_modelo','TEXT'),('solar_bat_instalacion','TEXT'),('solar_bat_cambio','TEXT')]
+ANIOS_CAMBIO_BAT = 3
+def fecha_cambio_bat(iso):
+    import datetime as _dt
+    f = _dt.date.fromisoformat(iso)
+    try: return f.replace(year=f.year + ANIOS_CAMBIO_BAT).isoformat()
+    except ValueError: return f.replace(year=f.year + ANIOS_CAMBIO_BAT, day=28).isoformat()  # 29-feb
+BAT_ALERTA_SQL = """CASE WHEN ','||COALESCE(energia,'')||',' LIKE '%,Solar,%' AND solar_bat_cambio IS NOT NULL THEN
+    CASE WHEN solar_bat_cambio <= date('now','localtime') THEN 'vencido' WHEN solar_bat_cambio <= date('now','localtime','+90 days') THEN 'pronto' END END"""
 VOLT_SOLAR = ['12V','24V','48V']
 VSOL_SPN = {'SPN-RP-004':'48V','SPN-TR-005':'24V'}
 VOLTAJES = ['110V','220V','440V']
@@ -63,6 +72,11 @@ def sitio_valid(d, rid):
         if m: return m
     for col, lab in (('cfe_interruptor_a','Interruptor principal'),('solar_paneles_w','Capacidad de paneles'),('solar_baterias_ah','Banco de baterías')):
         if d.get(col) is not None and d[col] <= 0: return f'{lab} debe ser mayor a 0'
+    if d.get('solar_num_baterias') is not None and d['solar_num_baterias'] <= 0: return 'Número de baterías debe ser mayor a 0'
+    d['solar_bat_cambio'] = None
+    if d.get('solar_bat_instalacion'):
+        try: d['solar_bat_cambio'] = fecha_cambio_bat(d['solar_bat_instalacion'])
+        except ValueError: return 'Fecha de instalación de baterías inválida'
     if d.get('solar_num_paneles') is not None and d['solar_num_paneles'] < 0: return 'Número de paneles no puede ser negativo'
     if 'Generador' in en:
         if not d.get('gen_tipo'): return 'Tipo de generador es obligatorio'
@@ -110,6 +124,19 @@ def migrar(c, N_VEH=18):
             if col not in sc2: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
         for cod, vals in SEED_ENERGIA.items():
             ks = list(vals); c.execute(f"UPDATE sitios SET {', '.join(k+'=?' for k in ks)} WHERE codigo=? AND ejemplo=1", [vals[k] for k in ks] + [cod])
+    if 'solar_bat_cambio' not in sc2:
+        import datetime as _dt
+        for col, typ in COLS_BAT:
+            if col not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
+        hoy = _dt.date.today(); hace = lambda dias: (hoy.replace(year=hoy.year - ANIOS_CAMBIO_BAT) + _dt.timedelta(days=dias)).isoformat()
+        seed = {'SPN-RP-004': (8, 'Trojan', 'SAGM 12 205', hace(-40)),       # vencido hace ~40 días
+                'SPN-TR-005': (4, 'Victron', 'GEL 12V 220Ah', hace(45)),     # vence en ~45 días
+                'SPN-CS-003': (2, 'Pylontech', 'US3000C', (hoy - _dt.timedelta(days=365)).isoformat())}  # bien (~2 años)
+        for cod, (n, ma, mo, ins) in seed.items():
+            if cod == 'SPN-CS-003':  # gabinete con respaldo solar pequeño
+                c.execute("UPDATE sitios SET energia='CFE,Solar', voltaje_solar='12V', solar_paneles_w=400, solar_num_paneles=2, solar_baterias_ah=100, solar_tipo_bateria='Litio' WHERE codigo=? AND ejemplo=1 AND energia='CFE'", (cod,))
+            c.execute("UPDATE sitios SET solar_num_baterias=?, solar_bat_marca=?, solar_bat_modelo=?, solar_bat_instalacion=?, solar_bat_cambio=? WHERE codigo=? AND ejemplo=1 AND ','||energia||',' LIKE '%,Solar,%'",
+                      (n, ma, mo, ins, fecha_cambio_bat(ins), cod))
     for cod, vv in VSOL_SPN.items():
         c.execute("UPDATE sitios SET voltaje_solar=? WHERE codigo=? AND ejemplo=1 AND voltaje_solar IS NULL AND ','||COALESCE(energia,'Solar')||',' LIKE '%,Solar,%'", (vv, cod))
     for cod, vv in VOLT_SPN.items():
@@ -295,12 +322,13 @@ def registrar(app, q, db):
         sql="""SELECT *, CASE WHEN acceso='Requiere permiso' THEN 'Requiere permiso ('||COALESCE(anticipacion_valor,'?')||' '||COALESCE(anticipacion_unidad,'')||')'
                ||CASE WHEN COALESCE(contacto_permiso,'')<>'' THEN ' · '||contacto_permiso ELSE '' END ELSE COALESCE(acceso,'Libre 24 hrs') END acceso_txt, (SELECT COUNT(*) FROM sitio_fotos f WHERE f.sitio_id=sitios.id) nfotos,
                SUBSTR(COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,CFE,%' THEN 'CFE'||COALESCE(' '||REPLACE(voltaje_cfe,',','/'),'')||COALESCE(' '||LOWER(cfe_tipo_servicio),'') END,'')
-               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Solar,%' THEN 'Solar'||COALESCE(' '||voltaje_solar,'')||CASE WHEN solar_num_paneles>0 AND solar_paneles_w>0 THEN ' '||solar_num_paneles||'×'||CAST(solar_paneles_w AS INT)||'W' ELSE '' END END,'')
-               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Generador,%' THEN 'Gen'||COALESCE(' '||(CASE WHEN gen_kw=CAST(gen_kw AS INT) THEN CAST(gen_kw AS INT) ELSE gen_kw END)||'kW','')||COALESCE(' '||gen_combustible,'') END,''),4) energia_txt
+               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Solar,%' THEN 'Solar'||COALESCE(' '||voltaje_solar,'')||CASE WHEN solar_num_paneles>0 AND solar_paneles_w>0 THEN ' '||solar_num_paneles||'×'||CAST(solar_paneles_w AS INT)||'W' ELSE '' END||CASE WHEN solar_num_baterias>0 THEN ' · '||solar_num_baterias||' bat.'||COALESCE(' '||solar_bat_marca,'') ELSE '' END END,'')
+               ||COALESCE(' · '||CASE WHEN ','||energia||',' LIKE '%,Generador,%' THEN 'Gen'||COALESCE(' '||(CASE WHEN gen_kw=CAST(gen_kw AS INT) THEN CAST(gen_kw AS INT) ELSE gen_kw END)||'kW','')||COALESCE(' '||gen_combustible,'') END,''),4) energia_txt, """+BAT_ALERTA_SQL+""" bat_alerta
                FROM sitios""",
         cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia_txt','Energía'),('nfotos','📷 Fotos'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
         campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje disponible','checks',VOLTAJES),('cfe_servicio','No. de servicio / medidor CFE','text'),('cfe_tipo_servicio','Tipo de servicio','select',SERVICIOS_CFE),('cfe_interruptor_a','Interruptor principal (A)','decimal'),
-                ('voltaje_solar','Voltaje CD','select',VOLT_SOLAR),('solar_paneles_w','Capacidad por panel (W)','decimal'),('solar_num_paneles','Número de paneles','number'),('solar_baterias_ah','Banco de baterías (Ah)','decimal'),('solar_tipo_bateria','Tipo de batería','select',TIPOS_BATERIA),
+                ('voltaje_solar','Voltaje CD','select',VOLT_SOLAR),('solar_paneles_w','Capacidad por panel (W)','decimal'),('solar_num_paneles','Número de paneles','number'),('solar_baterias_ah','Banco de baterías (Ah)','decimal'),('solar_tipo_bateria','Tipo de batería','select',TIPOS_BATERIA),('solar_num_baterias','Número de baterías','number'),('solar_bat_marca','Marca batería','text'),('solar_bat_modelo','Modelo batería','text'),
+                ('solar_bat_instalacion','Fecha de instalación inicial (baterías)','date'),('solar_bat_cambio','Fecha de cambio requerida (+3 años)','readonly*'),
                 ('gen_tipo','Tipo de generador','select',TIPOS_GEN),('gen_marca','Marca','text'),('gen_modelo','Modelo','text'),('gen_kw','Capacidad (kW) *','decimal'),('gen_combustible','Combustible','select',COMBUSTIBLES),('gen_arranque','Arranque','checks',ARRANQUES),('direccion','Dirección','text'),
                 ('ciudad','Ciudad','text'),('estado','Estado','text'),('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA,
