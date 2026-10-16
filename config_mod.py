@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS herramientas(id INTEGER PRIMARY KEY, codigo TEXT, num
  estado TEXT DEFAULT 'disponible', cuadrilla_id INTEGER REFERENCES cuadrillas(id) ON DELETE SET NULL, personal_id INTEGER REFERENCES tecnicos(id) ON DELETE SET NULL,
  almacen_id INTEGER REFERENCES almacenes(id) ON DELETE SET NULL, fecha_calibracion TEXT, notas TEXT, activo INTEGER DEFAULT 1, ejemplo INTEGER DEFAULT 0);
 '''
-TIPOS_SITIO = ['Torre','Caseta','POP','Repetidor','Data center','Oficina','Otro']  # solo sitios propios de Spectro Networks
+TIPOS_SITIO = ['Site','Site + Torre','Gabinete para exteriores','Gabinete para exteriores + Torre','Torre']  # solo sitios propios de Spectro Networks
 TIPOS_HERR = ['Herramienta','Equipo de medición','EPP','Equipo de fusión','Escalera / altura','Vehículo / remolque','Otro']
 ESTADOS_HERR = ['disponible','asignado','en reparación','baja']
 PUESTOS = ['Director','Gerente','Supervisor','Técnico Instalador','Vendedor','Almacenista','Proveedor Externo']
@@ -58,16 +58,18 @@ def migrar(c, N_VEH=18):
             c.execute('INSERT OR IGNORE INTO clientes(nombre,tipo_cliente,calle,ciudad,estado,contacto,telefono) VALUES(?,?,?,?,?,?,?)', (n, tc, ca, ci, es, co, te))
     c.execute("UPDATE ordenes SET cliente_id=(SELECT id FROM clientes WHERE nombre=TRIM(ordenes.cliente)) WHERE cliente_id IS NULL AND TRIM(COALESCE(cliente,''))<>''")
     _limpiar_sitios_cliente(c)
+    c.execute("""UPDATE sitios SET tipo=CASE WHEN LOWER(tipo) IN ('torre','repetidor') THEN 'Torre' ELSE 'Site' END
+        WHERE tipo IS NULL OR tipo NOT IN ('Site','Site + Torre','Gabinete para exteriores','Gabinete para exteriores + Torre','Torre')""")
     # vehículos: uno por cada almacén "Vehículo NN" existente
     if not c.execute('SELECT 1 FROM vehiculos LIMIT 1').fetchone():
         for aid, nom, cid, act in c.execute("SELECT id,nombre,cuadrilla_id,activo FROM almacenes WHERE tipo='vehiculo' ORDER BY nombre").fetchall():
             num = nom.replace('Vehículo','').strip() or str(aid)
             c.execute('INSERT OR IGNORE INTO vehiculos(numero,cuadrilla_id,almacen_id,activo) VALUES(?,?,?,?)', (num, cid, aid, act))
 
-SITIOS_SPN = [('SPN-TR-001','Torre Cerro del Cuatro','Cerro del Cuatro s/n','Tlaquepaque','Jalisco',20.5952,-103.3640,'Torre','NOC Spectro'),
-    ('SPN-POP-01','POP Guadalajara Centro','Av. Juárez 120','Guadalajara','Jalisco',20.6748,-103.3470,'POP','NOC Spectro'),
-    ('SPN-CS-003','Caseta Zapopan Norte','Av. Patria 2000','Zapopan','Jalisco',20.7270,-103.4060,'Caseta',''),
-    ('SPN-RP-004','Repetidor Tapalpa','Cerro La Cruz','Tapalpa','Jalisco',19.9440,-103.7590,'Repetidor',''),
+SITIOS_SPN = [('SPN-TR-001','Torre Cerro del Cuatro','Cerro del Cuatro s/n','Tlaquepaque','Jalisco',20.5952,-103.3640,'Site + Torre','NOC Spectro'),
+    ('SPN-POP-01','POP Guadalajara Centro','Av. Juárez 120','Guadalajara','Jalisco',20.6748,-103.3470,'Site','NOC Spectro'),
+    ('SPN-CS-003','Caseta Zapopan Norte','Av. Patria 2000','Zapopan','Jalisco',20.7270,-103.4060,'Gabinete para exteriores',''),
+    ('SPN-RP-004','Repetidor Tapalpa','Cerro La Cruz','Tapalpa','Jalisco',19.9440,-103.7590,'Gabinete para exteriores + Torre',''),
     ('SPN-TR-005','Torre Cerro de la Reina','Cerro de la Reina','Tonalá','Jalisco',20.6170,-103.2330,'Torre','')]
 def _sembrar_sitios(c):
     if not c.execute("SELECT 1 FROM sitios WHERE codigo LIKE 'SPN-%' LIMIT 1").fetchone():
