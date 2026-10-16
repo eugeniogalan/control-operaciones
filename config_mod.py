@@ -166,8 +166,42 @@ SEED_DOM = {
     'SPN-CS-003': ('Av. Patria','2000',None,'Av. Acueducto','Calle Santa Margarita','Jacarandas','45160','Zapopan','Gabinete en camellón frente a gasolinera'),
     'SPN-RP-004': ('Camino a Cerro La Cruz','km 3',None,None,None,'La Cruz','49340','Tapalpa','Subir por brecha desde la presa; requiere 4x4'),
     'SPN-TR-005': ('Camino al Cerro de la Reina','s/n',None,'Calle Hidalgo','Calle Morelos','Cerro de la Reina','45400','Tonalá','Portón verde al final del camino')}
+def cli_valid(d, rid):
+    if d.get('cp') and not (len(d['cp']) == 5 and d['cp'].isdigit()): return 'Código postal debe tener 5 dígitos'
+    if 'municipio' in d: d['ciudad'] = d.get('municipio')  # las órdenes siguen usando clientes.ciudad
+
+def _migrar_cli_dom(c):
+    cc = [r[1] for r in c.execute('PRAGMA table_info(clientes)')]
+    for col in ('cp', 'colonia', 'municipio'):
+        if col not in cc: c.execute(f'ALTER TABLE clientes ADD COLUMN {col} TEXT')
+    if 'municipio' not in cc: c.execute("UPDATE clientes SET municipio=ciudad WHERE municipio IS NULL AND TRIM(COALESCE(ciudad,''))<>''")
+
+def alm_valid(d, rid):
+    if d.get('tipo') == 'vehiculo':
+        for col in DOMICILIO: d[col] = None
+        return None
+    d['cuadrilla_id'] = None
+    if not d.get('calle'): return 'Calle es obligatoria para almacenes fijos'
+    if not d.get('colonia'): return 'Colonia es obligatoria para almacenes fijos'
+    if d.get('cp') and not (len(d['cp']) == 5 and d['cp'].isdigit()): return 'Código postal debe tener 5 dígitos'
+    if (d.get('lat') is None) != (d.get('lng') is None): return 'Captura latitud y longitud (o ninguna)'
+
+SEED_ALM_DOM = {'Torrelit': ('Av. Vallarta','5145',None,'Av. Patria','Calle Cumbres','Jardines Vallarta','45027','Zapopan','Jalisco','Bodega con portón negro, junto a Torrelit',20.6767,-103.4310),
+                'Autosound': ('Av. López Mateos Sur','2375',None,'Av. Mariano Otero','Calle Ixtlán','Ciudad del Sol','45050','Zapopan','Jalisco','Entrada por estacionamiento lateral',20.6503,-103.4012)}
+
 _DOM_SQL = """TRIM(COALESCE(NULLIF(TRIM(COALESCE(calle,'')||COALESCE(' '||num_ext,'')||COALESCE(' int. '||num_int,'')),''),direccion,'')
     ||COALESCE(', Col. '||colonia,'')||COALESCE(', C.P. '||cp,'')||COALESCE(', '||COALESCE(municipio,ciudad),'')||COALESCE(', '||estado,''), ', ')"""
+_DOM_ALM_SQL = """NULLIF(TRIM(COALESCE(a.calle,'')||COALESCE(' '||a.num_ext,'')||COALESCE(' int. '||a.num_int,'')
+    ||COALESCE(', Col. '||a.colonia,'')||COALESCE(', C.P. '||a.cp,'')||COALESCE(', '||a.municipio,'')||COALESCE(', '||a.estado,''), ', '),'')"""
+
+def _migrar_alm_dom(c):
+    """Domicilio y ubicación para almacenes fijos (bodegas). Corre al final de migrar: la tabla y las bodegas ya existen."""
+    ac = [r[1] for r in c.execute('PRAGMA table_info(almacenes)')]
+    if 'calle' in ac: return
+    for col, typ in COLS_DOM + [('estado','TEXT'), ('lat','REAL'), ('lng','REAL')]:
+        if col not in ac: c.execute(f'ALTER TABLE almacenes ADD COLUMN {col} {typ}')
+    for nom, v in SEED_ALM_DOM.items():
+        c.execute("UPDATE almacenes SET calle=?,num_ext=?,num_int=?,entre_calle=?,y_calle=?,colonia=?,cp=?,municipio=?,estado=?,referencias=?,lat=?,lng=? WHERE nombre=? AND tipo='bodega' AND calle IS NULL", v + (nom,))
 SI_NO = ['Sí','No']
 COLS_TORRE = [('torre_secciones','INTEGER'),('torre_balizamiento','TEXT'),('torre_pararrayos','TEXT'),('torre_tierras','TEXT'),('torre_capacidad','TEXT'),('torre_anio','INTEGER'),('torre_obs','TEXT')]
 CATS_TORRE = ['Torre arriostrada','Torre autosoportada','Mástil']
@@ -364,6 +398,8 @@ def migrar(c, N_VEH=18):
             num = nom.replace('Vehículo','').strip() or str(aid)
             c.execute('INSERT OR IGNORE INTO vehiculos(numero,cuadrilla_id,almacen_id,activo) VALUES(?,?,?,?)', (num, cid, aid, act))
     _mapear_torre(c)
+    _migrar_alm_dom(c)
+    _migrar_cli_dom(c)
 
 def _mapear_torre(c):
     # tipo_torre libre -> categoría/modelo (solo filas aún sin categoría)
@@ -514,11 +550,11 @@ def registrar(app, q, db):
         hist=lambda i: existe('SELECT 1 FROM materiales WHERE proveedor_id=?', (i,)) or existe('SELECT 1 FROM herramientas WHERE proveedor_id=?', (i,)),
         unico=[('razon_social','Ese proveedor ya existe')]),
      'clientes': dict(titulo='Clientes', icono='🏢', tabla='clientes', act='activo', orden='nombre', desc='Catálogo de clientes; se eligen en las órdenes de trabajo.',
-        buscar=['nombre','rfc','contacto','ciudad','tipo_cliente'],
-        cols=[('nombre','Nombre'),('tipo_cliente','Tipo'),('rfc','RFC'),('contacto','Contacto'),('telefono','Teléfono'),('ciudad','Ciudad')],
+        buscar=['nombre','rfc','contacto','ciudad','municipio','colonia','cp','tipo_cliente'],
+        cols=[('nombre','Nombre'),('tipo_cliente','Tipo'),('rfc','RFC'),('contacto','Contacto'),('telefono','Teléfono'),('ciudad','Municipio'),('estado','Estado')],
         campos=[('nombre','Nombre / razón social','text',True),('tipo_cliente','Tipo de cliente','select',['Empresa','PYME','Residencial','Gobierno']),('rfc','RFC','text'),
-                ('contacto','Persona de contacto','text'),('telefono','Teléfono','tel'),('email','Email','email'),('calle','Calle y No.','text'),('ciudad','Ciudad','text'),
-                ('estado','Estado','text'),('notas','Notas','textarea')],
+                ('contacto','Persona de contacto','text'),('telefono','Teléfono','tel'),('email','Email','email'),('calle','Calle y No.','text'),('cp','Código postal','cp'),('colonia','Colonia','text'),
+                ('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('notas','Notas','textarea')], valid=cli_valid,
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE cliente_id=? LIMIT 1', (i,)),
         unico=[('nombre','Ese cliente ya existe')]),
      'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
@@ -545,15 +581,19 @@ def registrar(app, q, db):
                 ('solar_bat_instalacion','Fecha de instalación inicial (baterías)','date'),('solar_bat_cambio','Fecha de cambio requerida (+3 años)','readonly*'),
                 ('gen_tipo','Tipo de generador','select',TIPOS_GEN),('gen_marca','Marca','text'),('gen_modelo','Modelo','text'),('gen_kw','Capacidad (kW) *','decimal'),('gen_combustible','Combustible','select',COMBUSTIBLES),('gen_arranque','Arranque','checks',ARRANQUES),
                 ('calle','Calle','text',True),('num_ext','Número exterior','text'),('num_int','Número interior','text'),('entre_calle','Entre calle','text'),('y_calle','Y calle','text'),
-                ('colonia','Colonia','text',True),('cp','Código postal','cp'),('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('referencias','Referencias','textarea'),
+                ('cp','Código postal','cp'),('colonia','Colonia','text',True),('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('referencias','Referencias','textarea'),
                 ('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid, bloques=BLOQUES_ENERGIA, domicilio=DOMICILIO, tenencia_blk=TENENCIA_BLK, acceso_blk=ACCESO_BLK, torre=TORRE, modelos_torre=MODELOS_TORRE,
         pre_del=sitio_del, ver_url='/sites/{id}/fotos'),
      'almacenes': dict(titulo='Almacenes', icono='🏬', tabla='almacenes', act='activo', orden="tipo, nombre", desc='Bodegas (Torrelit, Autosound) y vehículos 01–18.',
-        buscar=['nombre','tipo'],
-        sql="SELECT a.*, c.nombre cuadrilla, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat FROM almacenes a LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id",
-        cols=[('nombre','Nombre'),('tipo','Tipo'),('cuadrilla','Cuadrilla'),('nmat','Materiales con stock')],
-        campos=[('nombre','Nombre','text',True),('tipo','Tipo','select',['bodega','vehiculo'],True),('cuadrilla_id','Cuadrilla (vehículos)','fk',CUAD)],
+        buscar=['nombre','tipo','calle','colonia','cp','municipio','estado'],
+        sql="SELECT a.*, c.nombre cuadrilla, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat, CASE WHEN a.tipo<>'vehiculo' THEN "+_DOM_ALM_SQL+" END domicilio_txt FROM almacenes a LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id",
+        cols=[('nombre','Nombre'),('tipo','Tipo'),('cuadrilla','Cuadrilla'),('nmat','Materiales con stock'),('domicilio_txt','Domicilio')],
+        campos=[('nombre','Nombre','text',True),('tipo','Tipo','select',['bodega','vehiculo'],True),('cuadrilla_id','Cuadrilla (vehículos)','fk',CUAD),
+                ('calle','Calle','text'),('num_ext','Número exterior','text'),('num_int','Número interior','text'),('entre_calle','Entre calle','text'),('y_calle','Y calle','text'),
+                ('cp','Código postal','cp'),('colonia','Colonia','text'),('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('referencias','Referencias','textarea'),
+                ('lat','Latitud','coord'),('lng','Longitud','coord')],
+        domicilio=DOMICILIO, dom_after='cuadrilla_id', valid=alm_valid,
         post=alm_post, hist=alm_hist, pre_del=alm_del, unico=[('nombre','Ya existe un almacén con ese nombre')], ver_url='/inventario?almacen={id}'),
      'herramientas': dict(titulo='Herramientas y Equipo', icono='🛠', tabla='herramientas', act='activo', orden='codigo', desc='Herramienta, equipo de medición y EPP; asignación y calibración.',
         buscar=['codigo','numero_serie','nombre','tipo','marca','modelo','estado'],

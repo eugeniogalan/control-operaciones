@@ -4,7 +4,7 @@
 <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">{% for cat in fct0.CATEGORIAS %}<a href="#fcat_{{loop.index}}" style="font-size:12px;padding:3px 8px;border-radius:12px;border:1px solid #e5e5ea;text-decoration:none;{{'background:#e8f1fd' if fct0.fotos[cat] else 'background:#ffffff;color:#8e8e93'}}">{{cat}} <b>{{fct0.fotos[cat]|length}}</b></a>{% endfor %}<a href="/sites/{{rid}}/fotos" style="font-size:12px;padding:3px 8px">Ver galería →</a></div></details>
 {% else %}<p style="margin:0 0 8px"><a class="btn sec" href="#fotos">📷 Fotografías</a></p>{% endif %}{% if request.method=='POST' and request.files and (request.files.values()|selectattr('filename')|list) %}<div class="ej" style="background:#fdf6e3;border-color:#ecd59a;color:#a16207">⚠ El formulario tenía errores: vuelve a seleccionar las fotos/documentos antes de guardar.</div>{% endif %}{% endif %}
 {% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ {{err}}</div>{% endif %}
-<form class="f" method="post"{% if k=="sites" %} enctype="multipart/form-data"{% endif %}><fieldset><legend>{{e.titulo}}</legend><div class="grid g2">
+<form class="f" method="post"{% if k=="sites" %} enctype="multipart/form-data"{% endif %}{% if k in ("sites","almacenes","clientes") %} data-cpmx data-cp="cp" data-estado="estado" data-municipio="municipio" data-colonia="colonia"{% endif %}><fieldset><legend>{{e.titulo}}</legend><div class="grid g2">
 {% set enb = e.bloques or {} %}{% set encols = (e.tenencia_blk or [])|list + (e.domicilio or [])|list + (e.torre or [])|list + (e.acceso_blk or [])|list %}{% for b,cs in enb.items() %}{% for x in cs %}{% set _ = encols.append(x) %}{% endfor %}{% endfor %}
 {% macro docs_box(rid, cat, slug, puede, titulo) %}<div id="docs_{{slug}}" style="grid-column:1/-1;border-top:1px dashed #e5e5ea;padding-top:6px">{% if rid %}{% set dcs = sitio_docs(rid, cat) %}<b>📎 {{titulo}}</b> <span class="muted">({{dcs|length}})</span>
 <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">{% for dd in dcs %}<div style="display:flex;align-items:center;gap:8px;border:1px solid #ececf0;border-radius:6px;padding:4px 6px;background:#ffffff">
@@ -44,7 +44,7 @@
 {% for c2 in campos %}{% if c2[0] in e.torre %}{{ campo(c2, r) }}{% endif %}{% endfor %}
 {% if rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fct=sitio_fotos_ctx(rid) %}{% if 'Torre / Mástil' in fct.permitidas %}{{ cat_incrustada(fct, 'Torre / Mástil', '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}
 </div></details></fieldset>{% elif c[0] not in encols %}{{ campo(c, r) }}{% endif %}
-{% if c[0]=='nombre' and e.domicilio %}<fieldset style="grid-column:1/-1;margin:4px 0" id="blk_domicilio"><legend>📍 Domicilio y ubicación</legend><div class="grid g2">
+{% if c[0]==(e.dom_after or 'nombre') and e.domicilio %}<fieldset style="grid-column:1/-1;margin:4px 0" id="blk_domicilio"><legend>📍 Domicilio y ubicación</legend><div class="grid g2">
 {% for c in campos %}{% if c[0] in (e.domicilio or []) and c[0] not in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
 <h3 style="margin:10px 0 4px">Ubicación en mapa</h3><div class="grid g2">{% for c in campos %}{% if c[0] in ('lat','lng') %}{{ campo(c, r) }}{% endif %}{% endfor %}</div>
 <p class="muted" style="margin:0 0 6px">Toca el mapa para colocar el pin; arrástralo para ajustar. Llena Latitud/Longitud.</p>
@@ -65,13 +65,13 @@
 {% if k=='sites' and rid %}{% from 'sitio_fotos_macro.html' import cat_incrustada %}{% set fc=sitio_fotos_ctx(rid) %}{% set catb=fc.CAT_POR_ENERGIA.get(b) if b!='UPS' %}{% if catb and catb in fc.permitidas %}{{ cat_incrustada(fc, catb, '/configuracion/sites/' ~ rid ~ '/editar') }}{% endif %}{% endif %}</div></details>{% endfor %}{% endif %}{% endfor %}
 <label><input type="checkbox" name="activo" style="width:auto" {{'checked' if r.get(e.act)!=0}}> Activo</label></div></fieldset>
 {% if k=='vehiculos' %}<p class="muted">Al guardar se crea o renombra automáticamente su almacén “Vehículo NN” y se sincroniza la cuadrilla.</p>{% endif %}
-{% if k=='sites' %}
+{% if k in ('sites','almacenes','clientes') %}<script src="/static/cp.js?v=1" defer></script>{% endif %}{% if e.domicilio %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>(function(){if(!window.L)return;var la=document.querySelector('[name=lat]'),ln=document.querySelector('[name=lng]'),gm=document.getElementById('lnkGM');
 var lat=parseFloat(la.value),lng=parseFloat(ln.value),has=!isNaN(lat)&&!isNaN(lng);
-var m=L.map('mapa',{tap:true}).setView(has?[lat,lng]:[23.6,-102.5],has?15:5);
+var m=window._mapa=L.map('mapa',{tap:true}).setView(has?[lat,lng]:[23.6,-102.5],has?15:5);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(m);
 var pin=null;function gml(){var a=parseFloat(la.value),b=parseFloat(ln.value);var ok=!isNaN(a)&&!isNaN(b);gm.style.display=ok?'':'none';if(ok)gm.href='https://www.google.com/maps?q='+a+','+b;}
 function poner(a,b,z){a=+a.toFixed(6);b=+b.toFixed(6);la.value=a;ln.value=b;if(pin)pin.setLatLng([a,b]);else{pin=L.marker([a,b],{draggable:true}).addTo(m);pin.on('dragend',function(){var p=pin.getLatLng();poner(p.lat,p.lng);});}if(z)m.setView([a,b],z);gml();}
@@ -80,6 +80,9 @@ function sync(){var a=parseFloat(la.value),b=parseFloat(ln.value);if(!isNaN(a)&&
 document.getElementById('btnGeo').onclick=function(){if(!navigator.geolocation){alert('Tu navegador no soporta geolocalización');return;}
 navigator.geolocation.getCurrentPosition(function(p){poner(p.coords.latitude,p.coords.longitude,17);},function(e){alert('No se pudo obtener la ubicación: '+e.message);},{enableHighAccuracy:true,timeout:15000});};
 gml();setTimeout(function(){m.invalidateSize();},200);})();</script>
+{% endif %}{% if k=='almacenes' %}<script>(function(){var t=document.querySelector('[name=tipo]'),d=document.getElementById('blk_domicilio'),cu=document.getElementById('w_cuadrilla_id');if(!t||!d)return;
+function f(){var fija=t.value!=='vehiculo';d.style.display=fija?'':'none';if(cu)cu.style.display=fija?'none':'';['calle','colonia'].forEach(function(n){var x=d.querySelector('[name='+n+']');if(x)x.required=fija;});if(fija&&window._mapa)setTimeout(function(){window._mapa.invalidateSize();},50);}
+t.addEventListener('change',f);f();})();</script>{% endif %}{% if k=='sites' %}
 <script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('blk_torre'),i=document.querySelector('[name=altura_torre]');
 function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=on?'':'none';i.required=on;if(!on)w.querySelectorAll('input[name],select[name],textarea[name]').forEach(function(x){if(!x.getAttribute('form'))x.value='';});}t.addEventListener('change',f);f();
 var tc=document.querySelector('[name=torre_categoria]'),tm=document.querySelector('[name=torre_modelo]');if(tc&&tm){var MOD={{ e.modelos_torre|tojson if e.modelos_torre else '{}' }},cur=tm.value,wm=document.getElementById('w_torre_modelo');

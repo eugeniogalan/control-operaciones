@@ -665,10 +665,12 @@ import config_mod as CM
 import sitio_fotos as SF
 import sitio_ups as UPS
 import sitio_docs as SD
+import sepomex
 app.jinja_env.filters['todate'] = lambda v: dt.date.fromisoformat(v)
 CONFIG = CM.registrar(app, q, db)
 SF.registrar(app, q, db, UP)
 UPS.registrar(app, q, db)
+sepomex.registrar(app)
 SD.registrar(app, q, db)
 app.config.setdefault('MAX_CONTENT_LENGTH', 80 * 1024 * 1024)
 

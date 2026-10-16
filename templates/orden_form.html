@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% block body %}
 <h1>{{ 'Editar orden '+o.folio if o else 'Nueva orden de trabajo' }}</h1>
 {% set v = o or {} %}
-<form class="f" method="post">
+<form class="f" method="post" data-cpmx data-estado="estado_geo" data-municipio="ciudad">
 <fieldset><legend>Datos generales</legend><div class="grid g2">
 <label>Formato<select name="categoria" id="cat" required>{% for k,t in CATEGORIAS.items() %}<option value="{{k}}" {{'selected' if v.categoria==k}}>{{t}}</option>{% endfor %}</select></label>
 <label>Folio <span class="muted">(vacío = automático)</span><input name="folio" value="{{v.folio or ''}}"></label>
@@ -27,7 +27,7 @@
 <select name="site_id" id="site"><option value="">— Selecciona site —</option>{% for st in sitios %}<option value="{{st.id}}" {{'selected' if v.site_id==st.id}}>{{st.codigo}} · {{st.nombre}}</option>{% endfor %}</select></label>
 {% if v.sitio and not v.site_id %}<details open><summary class="muted">Sitio en texto libre (orden antigua)</summary><input name="sitio" value="{{v.sitio}}"></details>{% else %}<details><summary class="muted">¿No está en el catálogo? Texto libre</summary><input name="sitio" value="{{'' if v.site_id else (v.sitio or '')}}"></details>{% endif %}</div>
 <label>Calle y No.<input name="calle" value="{{v.calle or ''}}"></label>
-<label>Ciudad<input name="ciudad" value="{{v.ciudad or ''}}"></label><label>Estado (entidad)<input name="estado_geo" value="{{v.estado_geo or ''}}"></label>
+<label>Municipio / Ciudad<input name="ciudad" value="{{v.ciudad or ''}}"></label><label>Estado (entidad)<input name="estado_geo" value="{{v.estado_geo or ''}}"></label>
 <label>Persona de contacto<input name="contacto" value="{{v.contacto or ''}}"></label><label>Teléfono<input name="telefono" value="{{v.telefono or ''}}"></label>
 <label>Coordenadas GPS (punto A)<input name="coordenadas" value="{{v.coordenadas or ''}}" placeholder="19.4326,-99.1332"></label>
 <label>Coordenadas GPS punto B (enlaces P-P)<input name="coordenadas_b" value="{{v.coordenadas_b or ''}}"></label></div>
@@ -60,4 +60,4 @@ function filt(k){const q=document.getElementById(k+'_q').value.toLowerCase(),s=d
 function fillIf(n,v){const e=document.querySelector('[name='+n+']');if(e&&v&&!e.value)e.value=v;}
 function cliSel(){const o=document.getElementById('cli').selectedOptions[0];
  if(o.value){fillIf('tipo_cliente',o.dataset.tipo);fillIf('calle',o.dataset.calle);fillIf('ciudad',o.dataset.ciudad);fillIf('estado_geo',o.dataset.estado);fillIf('contacto',o.dataset.contacto);fillIf('telefono',o.dataset.tel);}}
-</script>{% endblock %}
+</script><script src="/static/cp.js?v=1" defer></script>{% endblock %}

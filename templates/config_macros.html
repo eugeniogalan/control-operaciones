@@ -1,7 +1,7 @@
 {% macro campo(c, r) %}{% set col,lab,typ,op,req = c %}{% set v = r.get(col) %}
 {% if typ=='textarea' %}<label style="grid-column:1/-1">{{lab}}<textarea name="{{col}}" rows="3">{{v or ''}}</textarea></label>
 {% elif typ=='select' %}<label id="w_{{col}}">{{lab}}<select name="{{col}}" {{'required' if req}}>{% if not req %}<option value="">—</option>{% endif %}{% for o in op %}<option {{'selected' if v==o}}>{{o}}</option>{% endfor %}</select></label>
-{% elif typ=='fk' %}<label>{{lab}}<select name="{{col}}"><option value="">— ninguno —</option>{% for i,n in op %}<option value="{{i}}" {{'selected' if v==i}}>{{n}}</option>{% endfor %}</select></label>
+{% elif typ=='fk' %}<label id="w_{{col}}">{{lab}}<select name="{{col}}"><option value="">— ninguno —</option>{% for i,n in op %}<option value="{{i}}" {{'selected' if v==i}}>{{n}}</option>{% endfor %}</select></label>
 {% elif typ=='multi' %}<fieldset style="grid-column:1/-1"><legend>{{lab}}</legend><div class="grid g5">{% for i,n in op %}<label style="font-weight:400"><input type="checkbox" style="width:auto" name="{{col}}" value="{{i}}" {{'checked' if v and i in v}}> {{n}}</label>{% endfor %}</div></fieldset>
 {% elif typ=='checks' %}{% set sel=(v or '').split(',') %}<fieldset style="grid-column:1/-1" id="w_{{col}}"><legend>{{lab}}</legend><div class="grid g5">{% for o in op %}<label style="font-weight:400"><input type="checkbox" style="width:auto" name="{{col}}" value="{{o}}" {{'checked' if o in sel}}> {{o}}</label>{% endfor %}</div></fieldset>
 {% elif typ=='datalist' %}<label id="w_{{col}}">{{lab}}<input name="{{col}}" list="dl_{{col}}" value="{{v or ''}}" placeholder="Elige o escribe otro"><datalist id="dl_{{col}}">{% for o in op %}<option value="{{o}}">{% endfor %}</datalist></label>
