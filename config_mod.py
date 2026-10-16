@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS herramientas(id INTEGER PRIMARY KEY, codigo TEXT, num
 '''
 TIPOS_SITIO = ['Site','Site + Torre','Gabinete para exteriores','Gabinete para exteriores + Torre','Torre']  # solo sitios propios de Spectro Networks
 ENERGIAS = ['CFE','Solar','Generador']
+ACCESOS = ['Libre 24 hrs','Requiere permiso']
+UNIDADES_ANT = ['horas','días']
+ACC_SPN = {'SPN-POP-01':(48,'horas','Administración Plaza Juárez · 33 1234 5678'),'SPN-CS-003':(2,'días','Vigilancia Av. Patria'),'SPN-RP-004':(24,'horas','Ejido La Cruz · Comisariado')}
 TENENCIAS = ['Rentado','Propio','Intercambio']
 TEN_SPN = {'SPN-TR-001':'Propio','SPN-POP-01':'Rentado','SPN-CS-003':'Rentado','SPN-RP-004':'Intercambio','SPN-TR-005':'Propio'}
 VOLT_SOLAR = ['12V','24V','48V']
@@ -26,6 +29,11 @@ TIPOS_TORRE = ['TZ30','TZ45','T60','Autosoportada']
 ENERGIA_SPN = [('SPN-TR-001',30,'CFE,Generador','TZ30'),('SPN-POP-01',None,'CFE,Generador',None),('SPN-CS-003',None,'CFE',None),
     ('SPN-RP-004',18,'Solar,Generador','Autosoportada'),('SPN-TR-005',42,'CFE,Solar','TZ45')]
 def sitio_valid(d, rid):
+    if d.get('acceso') not in ACCESOS: return 'Acceso inválido (Libre 24 hrs o Requiere permiso)'
+    if d['acceso'] == 'Requiere permiso':
+        if not d.get('anticipacion_valor') or d['anticipacion_valor'] <= 0: return 'Anticipación para solicitar permiso debe ser mayor a 0'
+        if d.get('anticipacion_unidad') not in UNIDADES_ANT: return 'Unidad de anticipación inválida (horas o días)'
+    else: d['anticipacion_valor'] = d['anticipacion_unidad'] = d['contacto_permiso'] = None
     if d.get('tenencia') not in TENENCIAS: return 'Tenencia inválida (Rentado, Propio o Intercambio)'
     if 'CFE' not in (d.get('energia') or '').split(','): d['voltaje_cfe'] = None
     if 'Solar' not in (d.get('energia') or '').split(','): d['voltaje_solar'] = None
@@ -58,6 +66,13 @@ def migrar(c, N_VEH=18):
         c.execute("ALTER TABLE sitios ADD COLUMN tenencia TEXT DEFAULT 'Propio'")
         for cod, tn in TEN_SPN.items(): c.execute('UPDATE sitios SET tenencia=? WHERE codigo=? AND ejemplo=1', (tn, cod))
     c.execute("UPDATE sitios SET tenencia='Propio' WHERE tenencia IS NULL OR tenencia=''")
+    if 'acceso' not in sc:
+        c.execute("ALTER TABLE sitios ADD COLUMN acceso TEXT DEFAULT 'Libre 24 hrs'")
+        for col in ('anticipacion_valor INTEGER', 'anticipacion_unidad TEXT', 'contacto_permiso TEXT'):
+            if col.split()[0] not in sc: c.execute(f'ALTER TABLE sitios ADD COLUMN {col}')
+        for cod, (v, u, ct) in ACC_SPN.items():
+            c.execute("UPDATE sitios SET acceso='Requiere permiso', anticipacion_valor=?, anticipacion_unidad=?, contacto_permiso=? WHERE codigo=? AND ejemplo=1", (v, u, ct, cod))
+    c.execute("UPDATE sitios SET acceso='Libre 24 hrs' WHERE acceso IS NULL OR acceso=''")
     for cod, vv in VSOL_SPN.items():
         c.execute("UPDATE sitios SET voltaje_solar=? WHERE codigo=? AND ejemplo=1 AND voltaje_solar IS NULL AND ','||COALESCE(energia,'Solar')||',' LIKE '%,Solar,%'", (vv, cod))
     for cod, vv in VOLT_SPN.items():
@@ -236,8 +251,10 @@ def registrar(app, q, db):
         unico=[('nombre','Ese cliente ya existe')]),
      'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
         buscar=['codigo','nombre','ciudad','tipo'],
-        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia','Energía'),('voltaje_cfe','Voltaje CFE'),('voltaje_solar','Voltaje Solar (CD)'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
-        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje CFE disponible','checks',VOLTAJES),('voltaje_solar','Voltaje Solar (CD)','select',VOLT_SOLAR),('direccion','Dirección','text'),
+        sql="""SELECT *, CASE WHEN acceso='Requiere permiso' THEN 'Requiere permiso ('||COALESCE(anticipacion_valor,'?')||' '||COALESCE(anticipacion_unidad,'')||')'
+               ||CASE WHEN COALESCE(contacto_permiso,'')<>'' THEN ' · '||contacto_permiso ELSE '' END ELSE COALESCE(acceso,'Libre 24 hrs') END acceso_txt FROM sitios""",
+        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tenencia','Tenencia'),('acceso_txt','Acceso'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia','Energía'),('voltaje_cfe','Voltaje CFE'),('voltaje_solar','Voltaje Solar (CD)'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
+        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tenencia','Tenencia','select',TENENCIAS,True),('acceso','Acceso','select',ACCESOS,True),('anticipacion_valor','Anticipación para solicitar permiso','number'),('anticipacion_unidad','Unidad (anticipación)','select',UNIDADES_ANT),('contacto_permiso','Contacto para permiso','text'),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('voltaje_cfe','Voltaje CFE disponible','checks',VOLTAJES),('voltaje_solar','Voltaje Solar (CD)','select',VOLT_SOLAR),('direccion','Dirección','text'),
                 ('ciudad','Ciudad','text'),('estado','Estado','text'),('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid,
         pre_del=lambda i: None),

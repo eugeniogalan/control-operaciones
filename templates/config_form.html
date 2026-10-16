@@ -29,5 +29,8 @@ function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=w2.style.d
 var wv=document.getElementById('w_voltaje_cfe'),cfe=document.querySelector('[name=energia][value=CFE]');
 function g(){wv.style.display=cfe.checked?'':'none';if(!cfe.checked)wv.querySelectorAll('input').forEach(function(x){x.checked=false});}cfe.addEventListener('change',g);g();
 var ws=document.getElementById('w_voltaje_solar'),sol=document.querySelector('[name=energia][value=Solar]');
-function h(){ws.style.display=sol.checked?'':'none';if(!sol.checked)ws.querySelector('select').value='';}sol.addEventListener('change',h);h();})();</script>{% endif %}
+function h(){ws.style.display=sol.checked?'':'none';if(!sol.checked)ws.querySelector('select').value='';}sol.addEventListener('change',h);h();
+var ac=document.querySelector('[name=acceso]'),ws2=['anticipacion_valor','anticipacion_unidad','contacto_permiso'].map(function(n){return document.getElementById('w_'+n);});
+function k(){var on=ac.value==='Requiere permiso';ws2.forEach(function(w){w.style.display=on?'':'none';var x=w.querySelector('input,select');if(!on)x.value='';});
+ws2[0].querySelector('input').required=on;ws2[0].querySelector('input').min=on?'1':'';ws2[1].querySelector('select').required=on;}ac.addEventListener('change',k);k();})();</script>{% endif %}
 <button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% endblock %}
