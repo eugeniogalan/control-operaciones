@@ -18,6 +18,7 @@
 <fieldset><legend>Cliente y lugar</legend><div class="grid g2">
 <label>Cliente / nombre<input name="cliente" value="{{v.cliente or ''}}"></label>
 <label>Tipo de cliente<select name="tipo_cliente"><option></option>{% for p in TIPOS_CLIENTE %}<option {{'selected' if v.tipo_cliente==p}}>{{p}}</option>{% endfor %}</select></label>
+<label>Site del catálogo <span class="muted">(opcional)</span><select name="site_id"><option value="">— ninguno —</option>{% for st in sitios %}<option value="{{st.id}}" {{'selected' if v.site_id==st.id}}>{{st.codigo}} · {{st.nombre}}</option>{% endfor %}</select></label>
 <label>Sitio / lugar de la orden<input name="sitio" value="{{v.sitio or ''}}"></label>
 <label>Calle y No.<input name="calle" value="{{v.calle or ''}}"></label>
 <label>Ciudad<input name="ciudad" value="{{v.ciudad or ''}}"></label><label>Estado (entidad)<input name="estado_geo" value="{{v.estado_geo or ''}}"></label>

@@ -1,0 +1,8 @@
+{% extends 'base.html' %}{% block body %}{% from 'config_macros.html' import campo, migas %}{{migas(e)}}
+<h1>{{ ('Cambios · ' if rid else 'Alta · ') ~ e.titulo }}</h1>
+{% if err %}<div class="ej" style="background:#fde0e0;border-color:#f3b4b4;color:#a32020">⚠ {{err}}</div>{% endif %}
+<form class="f" method="post"><fieldset><legend>{{e.titulo}}</legend><div class="grid g2">
+{% for c in campos %}{{ campo(c, r) }}{% endfor %}
+<label><input type="checkbox" name="activo" style="width:auto" {{'checked' if r.get(e.act)!=0}}> Activo</label></div></fieldset>
+{% if k=='vehiculos' %}<p class="muted">Al guardar se crea o renombra automáticamente su almacén “Vehículo NN” y se sincroniza la cuadrilla.</p>{% endif %}
+<button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% endblock %}

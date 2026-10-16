@@ -158,7 +158,7 @@ def ordenes():
     return render_template('ordenes.html', rows=rows, f=f, total=total, page=page, pages=pages, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), clientes=clientes, qs=qs)
 
 CAMPOS = ['categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
- 'cliente','tipo_cliente','calle','ciudad','estado_geo','contacto','telefono','coordenadas','coordenadas_b','sitio','descripcion','cuadrilla_id','ejecuto_puesto',
+ 'cliente','tipo_cliente','calle','ciudad','estado_geo','contacto','telefono','coordenadas','coordenadas_b','sitio','site_id','descripcion','cuadrilla_id','ejecuto_puesto',
  'personas_adicionales','observaciones','notas','folio_evidencias','audito_nombre','audito_puesto','fecha_auditoria','aprobacion','obs_auditoria']
 
 def siguiente_folio(cat):
@@ -174,6 +174,8 @@ def orden_form(oid=None):
     if oid and not o: abort(404)
     if request.method == 'POST':
         d = {k: (request.form.get(k) or None) for k in CAMPOS}
+        if d['site_id'] and not d['sitio']:
+            st = q('SELECT codigo, nombre FROM sitios WHERE id=?', (d['site_id'],), one=True); d['sitio'] = f"{st['codigo']} · {st['nombre']}" if st else None
         if d['cuadrilla_id'] and d['estado'] == 'pendiente': d['estado'] = 'asignada'
         if d['estado'] == 'completada' and not d['fecha_cierre']: d['fecha_cierre'] = ahora()
         folio = request.form.get('folio') or (o['folio'] if o else siguiente_folio(d['categoria'] or 'INST'))
@@ -184,7 +186,7 @@ def orden_form(oid=None):
             cur = db().execute(f"INSERT INTO ordenes(folio,{','.join(CAMPOS)}) VALUES(?{',?'*len(CAMPOS)})", [folio]+[d[k] for k in CAMPOS]); oid = cur.lastrowid
             log(oid, 'Orden creada')
         db().commit(); return redirect(url_for('orden_ver', oid=oid))
-    return render_template('orden_form.html', o=o, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'))
+    return render_template('orden_form.html', o=o, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre FROM sitios WHERE activo=1 OR id=? ORDER BY codigo', ((o['site_id'] if o else None),)))
 
 @app.route('/ordenes/<int:oid>')
 def orden_ver(oid):
@@ -394,6 +396,7 @@ def stock_en(mid, alm):
 N_VEHICULOS = 18
 def asegurar_vehiculos(con):
     # 18 almacenes móviles "Vehículo 01".."Vehículo 18". Cada uno se asigna (reasignable) a una cuadrilla en /vehiculos.
+    if con.execute("SELECT 1 FROM almacenes WHERE tipo='vehiculo' LIMIT 1").fetchone(): return  # ya creados; se administran en Configuración
     for i in range(1, N_VEHICULOS + 1):
         con.execute("INSERT OR IGNORE INTO almacenes(nombre,tipo) VALUES(?,'vehiculo')", (f'Vehículo {i:02d}',))
 def almacenes():
@@ -583,7 +586,9 @@ def vehiculos():
     if request.method == 'POST':
         for v in q("SELECT id FROM almacenes WHERE tipo='vehiculo'"):
             cid = request.form.get(f'v{v["id"]}')
-            if cid is not None: db().execute('UPDATE almacenes SET cuadrilla_id=? WHERE id=?', (int(cid) if cid else None, v['id']))
+            if cid is not None:
+                db().execute('UPDATE almacenes SET cuadrilla_id=? WHERE id=?', (int(cid) if cid else None, v['id']))
+                db().execute('UPDATE vehiculos SET cuadrilla_id=? WHERE almacen_id=?', (int(cid) if cid else None, v['id']))
         db().commit(); return redirect(url_for('vehiculos', ok=1))
     vs = q('''SELECT a.*, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat FROM almacenes a WHERE a.tipo='vehiculo' ORDER BY a.nombre''')
     cu = q('SELECT * FROM cuadrillas ORDER BY id')
@@ -640,8 +645,11 @@ def init_db():
         if col not in mc: c.execute(f'ALTER TABLE materiales ADD COLUMN {col} {typ}')
     c.execute('CREATE INDEX IF NOT EXISTS ix_mat_np ON materiales(numero_parte)')
     sembrar_imagenes_ejemplo(c)
+    CM.migrar(c)
     c.commit(); c.close()
 import syscom_client as SC
+import config_mod as CM
+CONFIG = CM.registrar(app, q, db)
 
 @app.route('/proveedores/syscom', methods=['GET','POST'])
 def syscom_config():
