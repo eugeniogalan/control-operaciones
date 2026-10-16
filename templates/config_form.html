@@ -5,4 +5,6 @@
 {% for c in campos %}{{ campo(c, r) }}{% endfor %}
 <label><input type="checkbox" name="activo" style="width:auto" {{'checked' if r.get(e.act)!=0}}> Activo</label></div></fieldset>
 {% if k=='vehiculos' %}<p class="muted">Al guardar se crea o renombra automáticamente su almacén “Vehículo NN” y se sincroniza la cuadrilla.</p>{% endif %}
+{% if k=='sites' %}<script>(function(){var t=document.querySelector('[name=tipo]'),w=document.getElementById('w_altura_torre'),i=w.querySelector('input'),w2=document.getElementById('w_tipo_torre');
+function f(){var on=(t.value||'').indexOf('Torre')>=0;w.style.display=w2.style.display=on?'':'none';i.required=on;if(!on){i.value='';w2.querySelector('input').value='';}}t.addEventListener('change',f);f();})();</script>{% endif %}
 <button class="btn">Guardar</button> <a class="btn sec" href="/configuracion/{{k}}">Cancelar</a></form>{% endblock %}

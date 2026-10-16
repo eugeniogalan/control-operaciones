@@ -3,6 +3,9 @@
 {% elif typ=='select' %}<label>{{lab}}<select name="{{col}}" {{'required' if req}}>{% if not req %}<option value="">—</option>{% endif %}{% for o in op %}<option {{'selected' if v==o}}>{{o}}</option>{% endfor %}</select></label>
 {% elif typ=='fk' %}<label>{{lab}}<select name="{{col}}"><option value="">— ninguno —</option>{% for i,n in op %}<option value="{{i}}" {{'selected' if v==i}}>{{n}}</option>{% endfor %}</select></label>
 {% elif typ=='multi' %}<fieldset style="grid-column:1/-1"><legend>{{lab}}</legend><div class="grid g5">{% for i,n in op %}<label style="font-weight:400"><input type="checkbox" style="width:auto" name="{{col}}" value="{{i}}" {{'checked' if v and i in v}}> {{n}}</label>{% endfor %}</div></fieldset>
+{% elif typ=='checks' %}{% set sel=(v or '').split(',') %}<fieldset style="grid-column:1/-1" id="w_{{col}}"><legend>{{lab}}</legend><div class="grid g5">{% for o in op %}<label style="font-weight:400"><input type="checkbox" style="width:auto" name="{{col}}" value="{{o}}" {{'checked' if o in sel}}> {{o}}</label>{% endfor %}</div></fieldset>
+{% elif typ=='datalist' %}<label id="w_{{col}}">{{lab}}<input name="{{col}}" list="dl_{{col}}" value="{{v or ''}}" placeholder="Elige o escribe otro"><datalist id="dl_{{col}}">{% for o in op %}<option value="{{o}}">{% endfor %}</datalist></label>
+{% elif typ=='decimal' %}<label id="w_{{col}}">{{lab}}<input name="{{col}}" type="number" step="0.1" min="0" inputmode="decimal" value="{{'' if v is none else v}}"></label>
 {% else %}<label>{{lab}}{{' *' if req}}<input name="{{col}}" type="{{ {'number':'number','date':'date','tel':'tel','email':'email','coord':'text','url':'url'}.get(typ,'text') }}" {{'inputmode=decimal' if typ=='coord'}} value="{{'' if v is none else v}}" {{'required' if req}}></label>{% endif %}
 {% endmacro %}
 {% macro migas(e) %}<div class="muted"><a href="/configuracion">Configuración</a> › {{e.titulo}}</div>{% endmacro %}

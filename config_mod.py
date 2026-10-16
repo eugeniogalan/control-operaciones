@@ -15,6 +15,15 @@ CREATE TABLE IF NOT EXISTS herramientas(id INTEGER PRIMARY KEY, codigo TEXT, num
  almacen_id INTEGER REFERENCES almacenes(id) ON DELETE SET NULL, fecha_calibracion TEXT, notas TEXT, activo INTEGER DEFAULT 1, ejemplo INTEGER DEFAULT 0);
 '''
 TIPOS_SITIO = ['Site','Site + Torre','Gabinete para exteriores','Gabinete para exteriores + Torre','Torre']  # solo sitios propios de Spectro Networks
+ENERGIAS = ['CFE','Solar','Generador']
+TIPOS_TORRE = ['TZ30','TZ45','T60','Autosoportada']
+ENERGIA_SPN = [('SPN-TR-001',30,'CFE,Generador','TZ30'),('SPN-POP-01',None,'CFE,Generador',None),('SPN-CS-003',None,'CFE',None),
+    ('SPN-RP-004',18,'Solar,Generador','Autosoportada'),('SPN-TR-005',42,'CFE,Solar','TZ45')]
+def sitio_valid(d, rid):
+    if 'Torre' in (d.get('tipo') or ''):
+        if d.get('altura_torre') is None: return 'Altura de torre (m) es obligatoria cuando el tipo incluye Torre'
+        if d['altura_torre'] <= 0: return 'Altura de torre debe ser mayor a 0'
+    else: d['altura_torre'] = None; d['tipo_torre'] = None
 TIPOS_HERR = ['Herramienta','Equipo de medición','EPP','Equipo de fusión','Escalera / altura','Vehículo / remolque','Otro']
 ESTADOS_HERR = ['disponible','asignado','en reparación','baja']
 PUESTOS = ['Director','Gerente','Supervisor','Técnico Instalador','Vendedor','Almacenista','Proveedor Externo']
@@ -31,7 +40,12 @@ def migrar(c, N_VEH=18):
         c.execute('ALTER TABLE ordenes ADD COLUMN cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL')
     if 'cliente_id' not in [r[1] for r in c.execute('PRAGMA table_info(sitios)')]:
         c.execute('ALTER TABLE sitios ADD COLUMN cliente_id INTEGER REFERENCES clientes(id) ON DELETE SET NULL')
+    sc = [r[1] for r in c.execute('PRAGMA table_info(sitios)')]
+    for col, typ in (('altura_torre','REAL'), ('energia','TEXT'), ('tipo_torre','TEXT')):
+        if col not in sc: c.execute(f'ALTER TABLE sitios ADD COLUMN {col} {typ}')
     _sembrar_sitios(c)
+    for cod, alt, en, tt in ENERGIA_SPN:
+        c.execute("UPDATE sitios SET altura_torre=COALESCE(altura_torre,?), energia=COALESCE(energia,?), tipo_torre=COALESCE(tipo_torre,?) WHERE codigo=? AND ejemplo=1", (alt, en, tt, cod))
     for t in ('materiales','herramientas'):
         if 'proveedor_id' not in [r[1] for r in c.execute(f'PRAGMA table_info({t})')]:
             c.execute(f'ALTER TABLE {t} ADD COLUMN proveedor_id INTEGER REFERENCES proveedores(id) ON DELETE SET NULL')
@@ -204,10 +218,10 @@ def registrar(app, q, db):
         unico=[('nombre','Ese cliente ya existe')]),
      'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
         buscar=['codigo','nombre','ciudad','tipo'],
-        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
-        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('direccion','Dirección','text'),
+        cols=[('codigo','Código'),('nombre','Nombre'),('tipo','Tipo'),('tipo_torre','Tipo torre'),('altura_torre','Altura torre (m)'),('energia','Energía'),('ciudad','Ciudad'),('estado','Estado'),('lat','Lat'),('lng','Lng')],
+        campos=[('codigo','Código','text',True),('nombre','Nombre','text',True),('tipo','Tipo','select',TIPOS_SITIO),('tipo_torre','Tipo de torre','datalist',TIPOS_TORRE),('altura_torre','Altura de torre (m)','decimal'),('energia','Tipo de energía','checks',ENERGIAS),('direccion','Dirección','text'),
                 ('ciudad','Ciudad','text'),('estado','Estado','text'),('lat','Latitud','coord'),('lng','Longitud','coord'),('contacto','Contacto','text'),('notas','Notas','textarea')],
-        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')],
+        hist=lambda i: existe('SELECT 1 FROM ordenes WHERE site_id=? LIMIT 1', (i,)), unico=[('codigo','Ese código de site ya existe')], valid=sitio_valid,
         pre_del=lambda i: None),
      'almacenes': dict(titulo='Almacenes', icono='🏬', tabla='almacenes', act='activo', orden="tipo, nombre", desc='Bodegas (Torrelit, Autosound) y vehículos 01–18.',
         buscar=['nombre','tipo'],
@@ -265,6 +279,11 @@ def registrar(app, q, db):
                 if typ.endswith('*'): continue
                 v = (F.get(col) or '').strip() or None
                 if v is not None and typ in ('fk','number'): v = int(v)
+                if typ == 'checks':
+                    sel = F.getlist(col); v = ','.join(o for o in f[3] if o in sel) or None
+                if v is not None and typ == 'decimal':
+                    try: v = float(v)
+                    except ValueError: err = f'{f[1]} debe ser numérica'; v = None
                 if v is not None and typ == 'coord':
                     try: v = float(v)
                     except ValueError: err = f'{f[1]} debe ser numérica'
