@@ -1,4 +1,6 @@
 {% extends 'base.html' %}{% block body %}<h1>⚙ Configuración</h1><p class="muted">Altas, bajas y cambios de los catálogos del sistema.</p>
 <div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">{% for k,e in E.items() %}
 <a class="card" href="/configuracion/{{k}}" style="text-decoration:none;color:inherit;display:block"><div style="font-size:28px">{{e.icono}}</div><b style="font-size:18px">{{e.titulo}}</b>
-<div class="muted">{{e.desc}}</div><div style="margin-top:6px"><b>{{cnt[k].a or 0}}</b> activos <span class="muted">/ {{cnt[k].n}} total</span></div></a>{% endfor %}</div>{% endblock %}
+<div class="muted">{{e.desc}}</div><div style="margin-top:6px"><b>{{cnt[k].a or 0}}</b> activos <span class="muted">/ {{cnt[k].n}} total</span></div></a>{% endfor %}
+<a class="card" href="/proveedores/syscom" style="text-decoration:none;color:inherit;display:block"><div style="font-size:28px">🔗</div><b style="font-size:18px">API SYSCOM</b>
+<div class="muted">Credenciales de la API de Syscom y sincronización de catálogo, números de parte, precios y fotos.</div><div style="margin-top:6px"><span class="muted">Integración</span></div></a></div>{% endblock %}

@@ -1,5 +1,5 @@
-{% extends 'base.html' %}{% block body %}<style>.btn[disabled]{opacity:.45;cursor:not-allowed}</style>
-<h1>Proveedor: SYSCOM <span class="muted">catálogo, números de parte y fotos</span></h1>
+{% extends 'base.html' %}{% block title %}API SYSCOM · Control de Operaciones{% endblock %}{% block body %}<style>.btn[disabled]{opacity:.45;cursor:not-allowed}</style>
+<p class="muted" style="margin:0"><a href="/configuracion">Configuración</a> › API SYSCOM</p><h1>API SYSCOM <span class="muted">catálogo, números de parte y fotos</span></h1>
 {% if msg %}<div class="ej" style="background:#e7f6ec;border-color:#b9e3c6;color:#15803d">✔ {{msg}}</div>{% endif %}
 {% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ {{err}}</div>{% endif %}
 <div class="grid g5">

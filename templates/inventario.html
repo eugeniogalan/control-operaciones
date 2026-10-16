@@ -5,7 +5,7 @@
 <a class="btn" href="/inventario/nuevo">+ Material</a>
 <a class="btn verde" href="/inventario/movimiento?tipo=entrada">Entrada</a><a class="btn rojo" href="/inventario/movimiento?tipo=salida">Salida</a>
 <a class="btn ama" href="/inventario/movimiento?tipo=ajuste">Ajuste</a><a class="btn sec" href="/inventario/movimiento?tipo=transferencia">Transferir entre almacenes</a>
-<a class="btn sec" href="/inventario/movimientos">Historial</a><a class="btn sec" href="/proveedores/syscom">Syscom</a></p>
+<a class="btn sec" href="/inventario/movimientos">Historial</a><a class="btn sec" href="/proveedores/syscom">API SYSCOM</a></p>
 <form class="filt card" method="get">
 <label>Buscar<input name="buscar" value="{{f.buscar}}" placeholder="SKU, nombre, variante…"></label>
 <label>Tipo<select name="categoria"><option value="">Todos</option>{% for c in CATS_MAT %}<option {{'selected' if f.categoria==c}}>{{c}}</option>{% endfor %}</select></label>
