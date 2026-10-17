@@ -1,7 +1,7 @@
 {% extends 'base.html' %}{% block body %}
-<div style="display:flex;justify-content:space-between;align-items:center"><h1>Cuadrillas y técnicos</h1><a class="btn" href="/cuadrillas/nueva">+ Nueva cuadrilla</a></div>
+<div style="display:flex;justify-content:space-between;align-items:center"><h1>Cuadrillas y técnicos</h1>{% if can('cuadrillas.editar') %}<a class="btn" href="/cuadrillas/nueva">+ Nueva cuadrilla</a>{% endif %}</div>
 <div class="grid g2">{% for c in cs %}<div class="card"><div style="display:flex;justify-content:space-between"><b>{{c.nombre}}</b>{% if c.ejemplo %}<span class="muted">EJEMPLO</span>{% endif %}</div>
 <div class="muted">{{c.especialidad}} · Zona {{c.zona}} {{'' if c.activa else '· INACTIVA'}}</div>
 {% for t in t.get(c.id,[]) %}<div style="margin-top:6px">{{'👷 Líder' if t.rol=='líder' else '🔧 Técnico'}}: <b>{{t.nombre}}</b> · <a href="tel:{{t.telefono}}">{{t.telefono}}</a><div class="muted">{{t.especialidad}} · {{t.puesto}}</div></div>{% endfor %}
-<div style="margin-top:8px;display:flex;gap:6px"><a class="btn sec" href="/cuadrillas/{{c.id}}">Editar</a><a class="btn sec" href="/ordenes?cuadrilla={{c.id}}">Órdenes</a>
-<form method="post" action="/cuadrillas/{{c.id}}/eliminar" onsubmit="return confirm('¿Eliminar cuadrilla y sus técnicos? Las órdenes quedarán sin asignar.')"><button class="btn rojo">Eliminar</button></form></div></div>{% endfor %}</div>{% endblock %}
+<div style="margin-top:8px;display:flex;gap:6px"><a class="btn sec" href="/cuadrillas/{{c.id}}">{{ 'Editar' if can('cuadrillas.editar') else 'Ver' }}</a>{% if can('ordenes.ver') %}<a class="btn sec" href="/ordenes?cuadrilla={{c.id}}">Órdenes</a>{% endif %}
+{% if can('cuadrillas.editar') %}<form method="post" action="/cuadrillas/{{c.id}}/eliminar" onsubmit="return confirm('¿Eliminar cuadrilla y sus técnicos? Las órdenes quedarán sin asignar.')"><button class="btn rojo">Eliminar</button></form>{% endif %}</div></div>{% endfor %}</div>{% endblock %}

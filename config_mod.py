@@ -168,6 +168,12 @@ SEED_DOM = {
     'SPN-TR-005': ('Camino al Cerro de la Reina','s/n',None,'Calle Hidalgo','Calle Morelos','Cerro de la Reina','45400','Tonalá','Portón verde al final del camino')}
 ESTATUS_CLI = ['Cliente','Prospecto']
 def cli_valid(d, rid):
+    import perm_mod as PERM
+    from flask import g as _fg
+    u = getattr(_fg, 'user', None)
+    if u is not None and PERM.alcance()[0] == 'propias':   # el ejecutivo comercial no reasigna: el cliente queda a su nombre
+        d['ejecutivo_id'] = (_fg.db.execute('SELECT ejecutivo_id FROM clientes WHERE id=?', (rid,)).fetchone()[0] if rid else None) or u['id']
+    elif not rid and not d.get('ejecutivo_id') and u is not None: d['ejecutivo_id'] = u['id']
     if rid and d.get('estatus') == 'Prospecto' and _g.db.execute("SELECT 1 FROM ordenes WHERE cliente_id=? AND clase='cliente' LIMIT 1", (rid,)).fetchone():
         return 'No puede volver a prospecto: ya tiene órdenes de cliente en la categoría Clientes'
     if d.get('cp') and not (len(d['cp']) == 5 and d['cp'].isdigit()): return 'Código postal debe tener 5 dígitos'
@@ -279,12 +285,12 @@ def _partir_contacto(txt):
     return nombre, tel
 TIPOS_HERR = ['Herramienta','Equipo de medición','EPP','Equipo de fusión','Escalera / altura','Vehículo / remolque','Otro']
 ESTADOS_HERR = ['disponible','asignado','en reparación','baja']
-PUESTOS = ['Director','Gerente','Supervisor','Vendedor','Técnico Instalador','Almacenista','Proveedor Externo']
+PUESTOS = ['Director','Gerente de administración','Gerente de operaciones','Gerente de ventas','Gerente de soporte/atención','Ejecutivo comercial','Supervisor','Técnico Instalador','Almacenista','Proveedor Externo']
 from auth_mod import AREAS, ROLES_APP
-PUESTOS_ORDENA = ['Supervisor','Gerente','Director','Vendedor']   # únicos que pueden ser 'Persona que ordena'
+PUESTOS_ORDENA = ['Supervisor','Director','Ejecutivo comercial','Vendedor'] + [p for p in PUESTOS if p.startswith('Gerente')]   # únicos que pueden ser 'Persona que ordena' (+ cualquier «Gerente…»)
 import unicodedata as _ud
 def norm_txt(t): return ''.join(ch for ch in _ud.normalize('NFD', (t or '').strip().lower()) if _ud.category(ch) != 'Mn')
-def puede_ordenar(puesto): return norm_txt(puesto) in {norm_txt(p) for p in PUESTOS_ORDENA}
+def puede_ordenar(puesto): return norm_txt(puesto) in {norm_txt(p) for p in PUESTOS_ORDENA} or norm_txt(puesto).startswith('gerente')
 def puesto_canonico(t):
     n = norm_txt(t)
     for p in PUESTOS:
@@ -292,12 +298,17 @@ def puesto_canonico(t):
     return (t or '').strip() or None
 def migrar_puestos(c):
     """Unifica mayúsculas/acentos de tecnicos.puesto con el catálogo PUESTOS (los valores desconocidos se conservan)."""
+    # puestos anteriores -> catálogo nuevo: Vendedor = Ejecutivo comercial; Gerente según su área
+    c.execute("UPDATE tecnicos SET puesto='Ejecutivo comercial' WHERE LOWER(TRIM(puesto))='vendedor'")
+    _area = 'area' if 'area' in [r[1] for r in c.execute('PRAGMA table_info(tecnicos)')] else 'NULL'   # BD vacía: la columna se agrega después
+    for i, a in c.execute(f"SELECT id, {_area} FROM tecnicos WHERE LOWER(TRIM(puesto))='gerente'").fetchall():
+        c.execute('UPDATE tecnicos SET puesto=? WHERE id=?', ({'administración': 'Gerente de administración', 'ventas': 'Gerente de ventas', 'dirección': 'Gerente de administración'}.get((a or '').lower(), 'Gerente de operaciones'), i))
     for i, p in c.execute('SELECT id, puesto FROM tecnicos WHERE puesto IS NOT NULL').fetchall():
         cp = puesto_canonico(p)
         if cp != p: c.execute('UPDATE tecnicos SET puesto=? WHERE id=?', (cp, i))
     # demo: si hay personal de ejemplo y falta alguno de los puestos que ordenan, se agrega uno de ejemplo
     if c.execute('SELECT 1 FROM tecnicos WHERE ejemplo=1 LIMIT 1').fetchone():
-        DEMO = {'Director': ('Patricia Salinas (ejemplo)', '55-0000-9001'), 'Gerente': ('Roberto Íñiguez (ejemplo)', '55-0000-9002'), 'Vendedor': ('Mónica Durán (ejemplo)', '55-0000-9003'), 'Supervisor': ('Laura Peña (ejemplo)', '55-0000-9004')}
+        DEMO = {'Director': ('Patricia Salinas (ejemplo)', '55-0000-9001'), 'Gerente de administración': ('Roberto Íñiguez (ejemplo)', '55-0000-9002'), 'Ejecutivo comercial': ('Mónica Durán (ejemplo)', '55-0000-9003'), 'Supervisor': ('Laura Peña (ejemplo)', '55-0000-9004')}
         for p, (n, tel) in DEMO.items():
             if not c.execute('SELECT 1 FROM tecnicos WHERE puesto=? AND COALESCE(activo,1)=1', (p,)).fetchone() and not c.execute('SELECT 1 FROM tecnicos WHERE nombre=?', (n,)).fetchone():
                 c.execute("INSERT INTO tecnicos(nombre, puesto, telefono, ejemplo, activo) VALUES(?,?,?,1,1)", (n, p, tel))
@@ -468,6 +479,8 @@ def registrar(app, q, db):
     def opts(sql): return lambda: [(r[0], r[1]) for r in q(sql)]
     CUAD = opts("SELECT id, nombre FROM cuadrillas WHERE activa=1 OR activa IS NULL ORDER BY id")
     PERS = opts("SELECT id, nombre FROM tecnicos WHERE COALESCE(activo,1)=1 ORDER BY nombre")
+    SUPS = opts("SELECT id, nombre||COALESCE(' — '||puesto,'') FROM tecnicos WHERE COALESCE(activo,1)=1 AND (puesto IN ('Supervisor','Director') OR puesto LIKE 'Gerente%') ORDER BY nombre")
+    EJEC = opts("SELECT id, nombre||COALESCE(' — '||puesto,'') FROM tecnicos WHERE COALESCE(activo,1)=1 AND (puesto IN ('Ejecutivo comercial','Vendedor','Director') OR puesto LIKE 'Gerente%') ORDER BY nombre")
     ALM = opts("SELECT id, nombre FROM almacenes WHERE activo=1 ORDER BY tipo, nombre")
     CLI = opts("SELECT id, nombre FROM clientes WHERE activo=1 ORDER BY nombre")
     PROV = opts("SELECT id, razon_social FROM proveedores WHERE activo=1 ORDER BY razon_social")
@@ -571,7 +584,7 @@ def registrar(app, q, db):
                (SELECT group_concat(numero, ', ') FROM vehiculos WHERE cuadrilla_id=c.id) vehs FROM cuadrillas c""",
         cols=[('nombre','Nombre'),('especialidad','Especialidad'),('zona','Zona'),('lider','Líder'),('tecnico','Técnico'),('vehs','Vehículos')],
         campos=[('nombre','Nombre','text',True),('especialidad','Especialidad','select',ESPEC),('zona','Zona','text'),
-                ('lider_id','Líder','fk*',PERS),('tecnico_id','Técnico','fk*',PERS),('vehiculos','Vehículos','multi*',VEH)],
+                ('lider_id','Líder','fk*',PERS),('tecnico_id','Técnico','fk*',PERS),('vehiculos','Vehículos','multi*',VEH),('supervisor_id','Supervisor / gerente a cargo','fk',SUPS)],
         extra=cuad_extra, post=cuad_post, hist=lambda i: existe('SELECT 1 FROM ordenes WHERE cuadrilla_id=? LIMIT 1', (i,)), pre_del=cuad_del),
      'proveedores': dict(titulo='Proveedores', icono='🚛', tabla='proveedores', act='activo', orden='razon_social', desc='Proveedores de materiales, herramientas y servicios (incluye Syscom).',
         buscar=['codigo','razon_social','rfc','contacto','categoria'],
@@ -586,7 +599,7 @@ def registrar(app, q, db):
         filtro=('estatus','Estatus',ESTATUS_CLI),
         campos=[('nombre','Nombre / razón social','text',True),('estatus','Estatus','select',ESTATUS_CLI,True),('tipo_cliente','Tipo de cliente','select',['Empresa','PYME','Residencial','Gobierno']),('rfc','RFC','text'),
                 ('contacto','Persona de contacto','text'),('telefono','Teléfono','tel'),('email','Email','email'),('calle','Calle y No.','text'),('cp','Código postal','cp'),('colonia','Colonia','text'),
-                ('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('lat','Latitud','coord'),('lng','Longitud','coord'),('notas','Notas','textarea')], valid=cli_valid,
+                ('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('lat','Latitud','coord'),('lng','Longitud','coord'),('ejecutivo_id','Ejecutivo / propietario','fk',EJEC),('notas','Notas','textarea')], valid=cli_valid,
         domicilio=['calle','cp','colonia','municipio','estado','lat','lng'], dom_after='email',
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE cliente_id=? LIMIT 1', (i,)),
         unico=[('nombre','Ese cliente ya existe')]),
@@ -656,6 +669,10 @@ def registrar(app, q, db):
         if s: w.append('(' + ' OR '.join(f"{pre}{c} LIKE ?" for c in e['buscar']) + ')'); a += ['%'+s+'%']*len(e['buscar'])
         if ver == 'activos': w.append(f"COALESCE({pre}{e['act']},1)=1")
         elif ver == 'inactivos': w.append(f"COALESCE({pre}{e['act']},1)=0")
+        if k == 'clientes':   # el ejecutivo comercial solo ve sus clientes / prospectos
+            import perm_mod as PERM
+            cs, ca = PERM.cliente_scope('clientes')
+            w.append(cs); a += ca
         fv = request.args.get('f', '') if e.get('filtro') else ''
         if fv in (e.get('filtro') or ('', '', []))[2]: w.append(f"COALESCE({pre}{e['filtro'][0]},'Cliente')=?"); a.append(fv)
         else: fv = ''

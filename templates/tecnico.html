@@ -5,7 +5,7 @@
 .oc textarea,.oc input{width:100%;padding:10px;font-size:16px;border:1px solid #d9d9de;border-radius:8px;margin-top:6px}
 .sel{width:100%;padding:12px;font-size:17px;border-radius:10px;border:1px solid #d9d9de}
 </style>{% endblock %}{% block body %}
-<select class="sel" onchange="location='/tecnico?cuadrilla='+this.value">{% for x in cs %}<option value="{{x.id}}" {{'selected' if x.id==c.id}}>{{x.nombre}} · {{x.especialidad}}</option>{% endfor %}</select>
+{% if mias %}<h1 style="margin:0 0 8px">🛠 {{ 'Mis órdenes' if not c.id else c.nombre }}</h1>{% endif %}{% if not mias or cs %}<select class="sel" onchange="location='/tecnico?cuadrilla='+this.value">{% if mias %}<option value="0" {{'selected' if not c.id}}>Mis órdenes (asignadas a mí o a mi cuadrilla)</option>{% endif %}{% for x in cs %}<option value="{{x.id}}" {{'selected' if x.id==c.id}}>{{x.nombre}} · {{x.especialidad}}</option>{% endfor %}</select>{% endif %}
 <p class="muted">{% for t in equipo %}{{'👷' if t.rol=='líder' else '🔧'}} {{t.nombre}}{{' · ' if not loop.last}}{% endfor %}</p>
 {% macro tarjeta(o) %}<div class="oc s-{{o.estado.split()[0]}}" id="o{{o.id}}">
 <div style="display:flex;justify-content:space-between;gap:6px"><b style="font-size:17px">{{o.folio}}</b><span>{{pri(o.prioridad)}} {{est(o.estado)}}</span></div>
@@ -18,12 +18,12 @@
 {% if o.estado in ('pendiente','asignada','en curso') %}
 <form method="post" action="/ordenes/{{o.id}}/estado"><input type="hidden" name="origen" value="campo">
 <textarea name="nota" rows="2" placeholder="Notas (opcional)"></textarea>
-{% if o.estado!='en curso' %}<button class="btn ama big" name="estado" value="en curso">▶ Iniciar (en curso)</button>
+{% if not can('ordenes.estado') %}{% elif o.estado!='en curso' %}<button class="btn ama big" name="estado" value="en curso">▶ Iniciar (en curso)</button>
 {% else %}<label class="muted">Hora de cierre<input type="datetime-local" name="hora" value="{{ahora}}"></label><button class="btn verde big" name="estado" value="completada">✔ Completada</button>{% endif %}
 </form>
 <form method="post" action="/ordenes/{{o.id}}/nota"><input type="hidden" name="origen" value="campo"><input name="nota" placeholder="Agregar solo una nota…" required><button class="btn sec big">Guardar nota</button></form>
 {% else %}<div class="muted">Cerrada: {{fh(o.fecha_cierre)}}</div>{% endif %}
-<div style="display:flex;gap:8px"><a class="btn sec big" style="text-align:center" href="/ordenes/{{o.id}}/evidencias?origen=campo">📷 Evidencias</a><a class="btn sec big" style="text-align:center" href="/ordenes/{{o.id}}/materiales?origen=campo">📦 Materiales</a></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px">{% if can('evidencias.subir','evidencias.ver') %}<a class="btn sec big" href="/ordenes/{{o.id}}/evidencias?origen=campo" style="text-align:center;font-size:16px;padding:14px 6px"><span style="display:block">📷</span>Evidencias</a>{% endif %}{% if can('ordenes.materiales') %}<a class="btn sec big" href="/ordenes/{{o.id}}/materiales?origen=campo" style="text-align:center;font-size:16px;padding:14px 6px"><span style="display:block">📦</span>Materiales</a>{% endif %}<a class="btn sec big" style="text-align:center;font-size:16px;padding:14px 6px" href="/ordenes/{{o.id}}"><span style="display:block">📄</span>Detalle</a></div>
 </div>{% endmacro %}
 <h2>Hoy ({{de_hoy|length}})</h2>{% for o in de_hoy %}{{tarjeta(o)}}{% else %}<p class="muted">No hay órdenes programadas para hoy.</p>{% endfor %}
 <h2>Pendientes ({{pend|length}})</h2>{% for o in pend %}{{tarjeta(o)}}{% else %}<p class="muted">Sin pendientes.</p>{% endfor %}

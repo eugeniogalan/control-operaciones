@@ -1,0 +1,43 @@
+{% extends 'base.html' %}{% block head %}<style>
+.mx{overflow:auto;border:1px solid var(--line);border-radius:14px;background:#fff;max-height:78vh}
+.mx table{border-collapse:separate;border-spacing:0;min-width:100%;font-size:13px}
+.mx th,.mx td{padding:7px 6px;border-bottom:1px solid #f0f0f2;text-align:center;white-space:nowrap;background:#fff}
+.mx thead th{position:sticky;top:0;z-index:2;background:#fafafb;font-size:12px;vertical-align:bottom;white-space:normal;min-width:84px;max-width:110px;line-height:1.2}
+.mx .c1{position:sticky;left:0;z-index:1;text-align:left;min-width:150px;max-width:190px;white-space:normal;box-shadow:1px 0 0 #e5e5ea}
+.mx thead .c1{z-index:3}
+.mx tr.g td{background:#f5f7fb;font-weight:700;text-align:left;font-size:12px;letter-spacing:.3px;text-transform:uppercase;color:#334}
+.mx tr.g td.c1{background:#f5f7fb}
+.mx input[type=checkbox]{width:18px;height:18px;accent-color:#111}
+.mx td.adm{color:#15803d;font-weight:700;background:#f3faf5;min-width:50px}
+.mx th.adm{min-width:56px}
+.mx select{font-size:12px;padding:4px;max-width:104px}
+@media (max-width:700px){.mx select{max-width:80px;font-size:11px}.mx .mini{font-size:10.5px}}
+.mxnota{display:none}@media (max-width:700px){.mxnota{display:block}}
+.mx .mini{display:flex;flex-direction:column;align-items:flex-start;gap:3px;font-size:11px;text-align:left}
+.mx .mini label{display:flex;gap:4px;align-items:center;font-weight:500;white-space:nowrap}
+@media (max-width:700px){.mx .c1{min-width:112px;max-width:120px;font-size:12px}.mx thead th{min-width:74px;font-size:11px}.mx th.adm,.mx td.adm{display:none}.mx thead th,.mx td{padding:6px 4px}}
+</style>{% endblock %}{% block body %}<div class="muted"><a href="/configuracion">Configuración</a> › <a href="/configuracion/usuarios">Usuarios</a> › Perfiles y permisos</div>
+<h1>🧩 Perfiles y permisos</h1>
+<p class="muted" style="margin-top:0">Marca qué puede hacer cada perfil. Los cambios aplican de inmediato a todos sus usuarios y quedan en la bitácora. <b>Administrador</b> = superadmin de entorno (todo, no editable). <b>Usuarios</b> y esta matriz son solo del superadmin.</p>
+{% if msg %}<div class="ej" style="background:#e7f6ec;border-color:#b9e3c6;color:#15803d">{{msg}}</div>{% endif %}{% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ {{err}}</div>{% endif %}
+<p class="muted mxnota" style="font-size:12px;margin:0 0 6px">↔ Desliza la tabla para ver todos los perfiles. Admin (superadmin) siempre tiene todo.</p><form method="post" id="fm"><div class="mx"><table>
+<thead><tr><th class="c1">Módulo / acción</th><th class="adm" title="Administrador (superadmin de entorno)">Admin<div class="muted" style="font-size:11px;font-weight:400">superadmin</div></th>{% for p in pfs %}<th>{{p.nombre}}<div class="muted" style="font-size:11px;font-weight:400">{{usos.get(p.id,0)}} usuario(s){% if not p.predeterminado %} · personalizado{% endif %}</div></th>{% endfor %}</tr></thead>
+<tbody>
+{% for mod, acc in PERMISOS %}<tr class="g"><td class="c1">{{mod}}</td><td colspan="{{pfs|length+1}}">{% if mod=='Clientes / Prospectos' %}<span style="font-weight:400;text-transform:none;letter-spacing:0">también rige Configuración › Clientes</span>{% endif %}</td></tr>
+{% for k, l in acc %}<tr><td class="c1">{{l}}</td><td class="adm">✓</td>{% for p in pfs %}<td><input type="checkbox" name="p{{p.id}}" value="{{k}}" {{'checked' if k in perms[p.id]}} aria-label="{{p.nombre}}: {{mod}} › {{l}}"></td>{% endfor %}</tr>{% endfor %}
+{% if mod=='Órdenes' %}<tr><td class="c1"><b>Alcance</b><div class="muted" style="font-size:11px">qué órdenes ve</div></td><td class="adm">Todas</td>{% for p in pfs %}<td><select name="a{{p.id}}" aria-label="Alcance {{p.nombre}}">{% for v,t in ALCANCES %}<option value="{{v}}" {{'selected' if p.alcance==v}}>{{t}}</option>{% endfor %}</select></td>{% endfor %}</tr>
+<tr><td class="c1"><b>Categorías</b></td><td class="adm">Todas</td>{% for p in pfs %}{% set cs=(p.categorias or '').split(',') %}<td><div class="mini">{% for v,t in CATS %}<label title="{{t}}"><input type="checkbox" name="c{{p.id}}" value="{{v}}" {{'checked' if v in cs}}>{{ {'infra':'Infra','cliente':'Clientes','prospecto':'Prospectos'}[v] }}</label>{% endfor %}</div></td>{% endfor %}</tr>
+<tr><td class="c1"><b>Variantes</b><div class="muted" style="font-size:11px">solo con alcance «área / tipo»</div></td><td class="adm">—</td>{% for p in pfs %}{% set ts=(p.trabajos or '').split(',') %}<td><div class="mini">{% for t in TRABAJOS %}<label><input type="checkbox" name="t{{p.id}}" value="{{t}}" {{'checked' if t in ts}}>{{t|replace('Mantenimiento','Mant.')|replace('Instalación','Inst.')|replace('Desinstalación','Desinst.')|replace('Factibilidad','Factib.')}}</label>{% endfor %}</div></td>{% endfor %}</tr>{% endif %}
+{% endfor %}
+<tr class="g"><td class="c1">Usuarios</td><td colspan="{{pfs|length+1}}"></td></tr>
+<tr><td class="c1">Altas, bajas, cambios y esta matriz</td><td class="adm">✓</td>{% for p in pfs %}<td class="muted">🔒</td>{% endfor %}</tr>
+<tr><td class="c1"><b>Acciones</b></td><td></td>{% for p in pfs %}<td><div class="mini">{% if p.base in DEFAULTS %}<button class="btn sec" style="padding:3px 8px;font-size:11px" form="r{{p.id}}">↺ Restaurar</button>{% endif %}{% if not p.predeterminado %}<button class="btn rojo" style="padding:3px 8px;font-size:11px" form="d{{p.id}}">Eliminar</button>{% endif %}</div></td>{% endfor %}</tr>
+</tbody></table></div>
+<div style="position:sticky;bottom:64px;padding:10px 0;background:linear-gradient(transparent,var(--bg,#f5f5f7) 30%);display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn">Guardar permisos</button><a class="btn sec" href="/configuracion/usuarios">Volver a Usuarios</a></div></form>
+{% for p in pfs %}{% if p.base in DEFAULTS %}<form id="r{{p.id}}" method="post" action="/configuracion/perfiles/{{p.id}}/restaurar" onsubmit="return confirm('¿Restaurar «{{p.nombre}}» a los valores predeterminados de «{{DEFAULTS[p.base][0]}}»? Se pierden los cambios no guardados de la matriz.')"></form>{% endif %}
+{% if not p.predeterminado %}<form id="d{{p.id}}" method="post" action="/configuracion/perfiles/{{p.id}}/eliminar" onsubmit="return confirm('¿Eliminar el perfil «{{p.nombre}}»?')"></form>{% endif %}{% endfor %}
+<form class="f card" method="post" action="/configuracion/perfiles/nuevo" style="margin-top:14px"><h2 style="margin:0 0 8px">+ Perfil personalizado</h2><div class="grid g2">
+<label>Nombre *<input name="nombre" maxlength="60" required placeholder="p. ej. Coordinador de instalaciones"></label>
+<label>Copiar permisos de<select name="base_id"><option value="">— vacío —</option>{% for p in pfs %}<option value="{{p.id}}">{{p.nombre}}</option>{% endfor %}</select></label></div>
+<button class="btn sec">Crear / duplicar perfil</button> <span class="muted" style="font-size:12px">Un perfil copiado se restaura a los valores predeterminados del perfil original.</span></form>
+<details class="card" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">🧾 Bitácora de permisos ({{logs|length}} recientes)</summary>{% include 'usuarios_log.html' %}</details>{% endblock %}

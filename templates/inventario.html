@@ -2,10 +2,10 @@
 <h1>Inventario de materiales</h1>
 <div class="ej">Las existencias iniciales son <b>de ejemplo</b>; ajústalas con un conteo físico (Ajuste) por almacén.</div>
 <p class="noprint" style="display:flex;flex-wrap:wrap;gap:6px">
-<a class="btn" href="/inventario/nuevo">+ Material</a>
-<a class="btn verde" href="/inventario/movimiento?tipo=entrada">Entrada</a><a class="btn rojo" href="/inventario/movimiento?tipo=salida">Salida</a>
-<a class="btn ama" href="/inventario/movimiento?tipo=ajuste">Ajuste</a><a class="btn sec" href="/inventario/movimiento?tipo=transferencia">Transferir entre almacenes</a>
-<a class="btn sec" href="/inventario/movimientos">Historial</a><a class="btn sec" href="/proveedores/syscom">API SYSCOM</a></p>
+{% if can('config.materiales') %}<a class="btn" href="/inventario/nuevo">+ Material</a>{% endif %}
+{% if can('inventario.entradas') %}<a class="btn verde" href="/inventario/movimiento?tipo=entrada">Entrada</a>{% endif %}{% if can('inventario.salidas') %}<a class="btn rojo" href="/inventario/movimiento?tipo=salida">Salida</a>{% endif %}
+{% if can('inventario.ajustes') %}<a class="btn ama" href="/inventario/movimiento?tipo=ajuste">Ajuste</a>{% endif %}{% if can('inventario.transferencias') %}<a class="btn sec" href="/inventario/movimiento?tipo=transferencia">Transferir entre almacenes</a>{% endif %}
+<a class="btn sec" href="/inventario/movimientos">Historial</a>{% if can('config.syscom') %}<a class="btn sec" href="/proveedores/syscom">API SYSCOM</a>{% endif %}</p>
 <form class="filt card" method="get">
 <label>Buscar<input name="buscar" value="{{f.buscar}}" placeholder="SKU, nombre, variante…"></label>
 <label>Tipo<select name="categoria"><option value="">Todos</option>{% for c in CATS_MAT %}<option {{'selected' if f.categoria==c}}>{{c}}</option>{% endfor %}</select></label>
@@ -21,5 +21,5 @@
 <td class="muted">{{m.sku}}{% if m.numero_parte and m.numero_parte!=m.sku %}<div style="font-size:11px">NP {{m.numero_parte}}</div>{% endif %}</td><td><a href="/inventario/{{m.id}}">{{m.nombre}}</a>{% if m.marca %} <span class="muted" style="font-size:11px">{{m.marca}}</span>{% endif %}{% if m.variantes %}<div class="muted">{{m.variantes}}</div>{% endif %}</td><td class="muted">{{m.categoria}}</td>
 {% set ns=namespace(vh=0,vb=0) %}{% set ns.vb=0 %}{% for a in vehs %}{% set ns.vh=ns.vh+ex.get((m.id,a.id),0) %}{% if mins.get((m.id,a.id)) and ex.get((m.id,a.id),0)<=mins.get((m.id,a.id)) %}{% set ns.vb=ns.vb+1 %}{% endif %}{% endfor %}{% for a in cols %}{% set v=ex.get((m.id,a.id),0) %}{% set mn=mins.get((m.id,a.id),0) %}<td title="mínimo {{'%g'|format(mn)}}" style="text-align:right{{';background:#fdf1dc' if mn and v<=mn}}{{';color:#c62828;font-weight:700' if v<0}}{{';font-weight:700' if f.almacen==a.id|string}}">{{'%g'|format(v)}}</td>{% endfor %}<td style="text-align:right{{';background:#fdf1dc' if ns.vb}}" class="muted">{{'%g'|format(ns.vh)}}{% if ns.vb %}<div style="font-size:11px">{{ns.vb}} bajo mín.</div>{% endif %}</td>
 <td style="text-align:right;font-weight:700" class="{{'venc' if m.bajo}}">{{'%g'|format(m.stock_actual)}}</td><td style="text-align:right">{{'%g'|format(m.stock_minimo)}}</td><td>{{m.unidad}}</td>
-<td style="white-space:nowrap"><a href="/inventario/movimiento?tipo=entrada&material_id={{m.id}}" title="Entrada">＋</a> <a href="/inventario/movimiento?tipo=salida&material_id={{m.id}}" title="Salida">－</a> <a href="/inventario/{{m.id}}/editar" title="Editar">✎</a></td></tr>{% endfor %}
+<td style="white-space:nowrap">{% if can('inventario.entradas') %}<a href="/inventario/movimiento?tipo=entrada&material_id={{m.id}}" title="Entrada">＋</a> {% endif %}{% if can('inventario.salidas') %}<a href="/inventario/movimiento?tipo=salida&material_id={{m.id}}" title="Salida">－</a> {% endif %}{% if can('config.materiales') %}<a href="/inventario/{{m.id}}/editar" title="Editar">✎</a>{% endif %}</td></tr>{% endfor %}
 </table></div>{% endblock %}

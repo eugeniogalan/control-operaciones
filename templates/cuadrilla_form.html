@@ -7,4 +7,4 @@
 <label>Nombre<input name="{{k}}_nombre" value="{{t.nombre if t else ''}}" required></label><label>Teléfono<input name="{{k}}_tel" type="tel" value="{{t.telefono if t else ''}}"></label>
 <label>Especialidad<input name="{{k}}_esp" value="{{t.especialidad if t else ''}}"></label>
 <label>Puesto<select name="{{k}}_puesto">{% for p in PUESTOS_EJEC %}<option {{'selected' if t and t.puesto==p}}>{{p}}</option>{% endfor %}</select></label></div></fieldset>{% endfor %}
-<button class="btn">Guardar</button> <a class="btn sec" href="/cuadrillas">Cancelar</a></form>{% endblock %}
+{% if can('cuadrillas.editar') %}<button class="btn">Guardar</button> {% endif %}<a class="btn sec" href="/cuadrillas">{{ 'Cancelar' if can('cuadrillas.editar') else 'Volver' }}</a></form>{% endblock %}

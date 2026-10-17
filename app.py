@@ -28,6 +28,7 @@ app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config.update(SESSION_COOKIE_SECURE=_HTTPS, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax', PERMANENT_SESSION_LIFETIME=dt.timedelta(days=14))
 
 import auth_mod as AU
+import perm_mod as PERM
 AU.registrar(app, lambda *a, **k: q(*a, **k), lambda: db(), CFG)
 import plantillas_mod as PM
 PM.JSON = os.path.join(BASE, 'plantillas.json'); PM.DB = DB
@@ -142,9 +143,9 @@ def plantilla_de(o):
     return PM.por_tipo_orden(o['tipo_orden'])   # clientes: la clasificación (FO, MO, SAT, FO P-P, MO P-P, Wi-Fi, Router) define la plantilla en cualquier variante
 ESTADOS = ['pendiente','asignada','en curso','completada','cancelada']
 PRIORIDADES = ['baja','media','alta','urgente']
-PUESTOS_ORDENA = ['Director','Gerente','Vendedor','Supervisor']
+PUESTOS_ORDENA = ['Director','Gerente','Ejecutivo comercial','Supervisor']   # casillas del formato impreso (Gerente = cualquier «Gerente…»)
 PUESTOS_EJEC = ['Supervisor','Técnico Instalador','Proveedor Externo']
-PUESTOS_AUD = ['Director','Gerente','Supervisor']
+PUESTOS_AUD = ['Director','Gerente','Supervisor']   # formato impreso
 TIPOS_CLIENTE = ['Empresa','PYME','Residencial','Gobierno']
 
 SCHEMA = '''
@@ -190,15 +191,16 @@ VENCIDA = "(o.estado NOT IN ('completada','cancelada') AND o.fecha_programada < 
 
 @app.route('/')
 def dashboard():
+    S, SA = PERM.orden_scope('o')   # el panel solo cuenta las órdenes que el perfil puede ver
     por_estado = {e: 0 for e in ESTADOS}
-    for r in q('SELECT estado, COUNT(*) n FROM ordenes GROUP BY estado'): por_estado[r['estado']] = r['n']
+    for r in q(f'SELECT estado, COUNT(*) n FROM ordenes o WHERE {S} GROUP BY estado', SA): por_estado[r['estado']] = r['n']
     por_cuad = q(f'''SELECT c.id, c.nombre, COUNT(o.id) total, SUM(o.estado='completada') comp, SUM(o.estado IN ('pendiente','asignada','en curso')) abiertas,
-        SUM({VENCIDA}) venc FROM cuadrillas c LEFT JOIN ordenes o ON o.cuadrilla_id=c.id GROUP BY c.id ORDER BY c.id''')
-    vencidas = q(f'SELECT o.*, c.nombre cuad FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id WHERE {VENCIDA} ORDER BY o.fecha_programada LIMIT 50')
-    por_cat = q("SELECT clase, red, trabajo, COUNT(*) n, SUM(estado IN ('pendiente','asignada','en curso')) abiertas FROM ordenes GROUP BY clase, red, trabajo ORDER BY clase='cliente', red, trabajo")
-    pend_autoriz = q("SELECT COUNT(*) n, SUM(autorizacion='rechazada') r FROM ordenes WHERE autorizacion IN ('pendiente','rechazada')", one=True)
-    hoy_n = q("SELECT COUNT(*) n FROM ordenes WHERE fecha_programada=date('now','localtime')", one=True)['n']
-    pend_aud = q("SELECT COUNT(*) n FROM ordenes WHERE estado='completada' AND (aprobacion IS NULL OR aprobacion='')", one=True)['n']
+        SUM({VENCIDA}) venc FROM cuadrillas c LEFT JOIN ordenes o ON o.cuadrilla_id=c.id AND {S} GROUP BY c.id {'' if PERM.alcance()[0] in ('todas','tipo') else 'HAVING COUNT(o.id)>0'} ORDER BY c.id''', SA)
+    vencidas = q(f'SELECT o.*, c.nombre cuad FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id WHERE {VENCIDA} AND {S} ORDER BY o.fecha_programada LIMIT 50', SA)
+    por_cat = q(f"SELECT clase, red, trabajo, COUNT(*) n, SUM(estado IN ('pendiente','asignada','en curso')) abiertas FROM ordenes o WHERE {S} GROUP BY clase, red, trabajo ORDER BY clase='cliente', red, trabajo", SA)
+    pend_autoriz = q(f"SELECT COUNT(*) n, SUM(autorizacion='rechazada') r FROM ordenes o WHERE autorizacion IN ('pendiente','rechazada') AND {S}", SA, one=True)
+    hoy_n = q(f"SELECT COUNT(*) n FROM ordenes o WHERE fecha_programada=date('now','localtime') AND {S}", SA, one=True)['n']
+    pend_aud = q(f"SELECT COUNT(*) n FROM ordenes o WHERE estado='completada' AND (aprobacion IS NULL OR aprobacion='') AND {S}", SA, one=True)['n']
     stock_alm = q(f"SELECT a.id, a.nombre, a.tipo, c.nombre cuad, COUNT(CASE WHEN e.stock>0 THEN 1 END) n, SUM(CASE WHEN e.stock<0 THEN 1 ELSE 0 END) neg, SUM(CASE WHEN m.activo=1 AND {BAJO_ALM} THEN 1 ELSE 0 END) bajo FROM almacenes a LEFT JOIN existencias e ON e.almacen_id=a.id LEFT JOIN materiales m ON m.id=e.material_id LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id GROUP BY a.id ORDER BY a.tipo='vehiculo', CASE WHEN a.tipo='bodega' THEN a.id END, a.nombre")
     bajo_min = q(f'''SELECT m.id, m.sku, m.nombre, m.unidad, a.nombre alm, e.stock, e.minimo FROM existencias e JOIN materiales m ON m.id=e.material_id JOIN almacenes a ON a.id=e.almacen_id
         WHERE m.activo=1 AND {BAJO_ALM} ORDER BY (e.stock - e.minimo) / e.minimo LIMIT 10''')
@@ -215,7 +217,8 @@ def dashboard():
 @app.route('/ordenes')
 def ordenes():
     f = {k: request.args.get(k, '') for k in ('estado','cuadrilla','cliente','desde','hasta','categoria','clase','red','trabajo','clasif','aut','buscar','vencidas')}
-    w, a = ['1=1'], []
+    S, SA = PERM.orden_scope('o')
+    w, a = [S], list(SA)
     for k in ('clase','red','trabajo'):
         if f[k]: w.append(f'o.{k}=?'); a.append(f[k])
     if f['estado']: w.append('o.estado=?'); a.append(f['estado'])
@@ -232,11 +235,11 @@ def ordenes():
     total = q(f'SELECT COUNT(*) n FROM ordenes o WHERE {where}', a, one=True)['n']
     per = 20; pages = max(1, math.ceil(total/per)); page = min(max(1, int(request.args.get('page', 1) or 1)), pages)
     rows = q(f'SELECT o.*, c.nombre cuad, {VENCIDA} vencida, cl.estatus cli_estatus, (SELECT nombre||COALESCE(\' — \'||puesto,\'\') FROM tecnicos WHERE id=o.responsable_id) resp_txt, (SELECT COUNT(*) FROM orden_personal op WHERE op.orden_id=o.id AND op.personal_id IS NOT o.responsable_id) n_tecs, (SELECT GROUP_CONCAT(st.codigo, \', \') FROM orden_sitios os JOIN sitios st ON st.id=os.site_id WHERE os.orden_id=o.id) sites_txt FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id LEFT JOIN clientes cl ON cl.id=o.cliente_id WHERE {where} ORDER BY o.fecha_programada DESC, o.id DESC LIMIT ? OFFSET ?', a+[per, (page-1)*per])
-    clientes = [r['cliente'] for r in q('SELECT DISTINCT cliente FROM ordenes WHERE cliente IS NOT NULL ORDER BY cliente')]
+    clientes = [r['cliente'] for r in q(f'SELECT DISTINCT cliente FROM ordenes o WHERE cliente IS NOT NULL AND {S} ORDER BY cliente', SA)]
     qs = {k: v for k, v in f.items() if v}
     return render_template('ordenes.html', rows=rows, f=f, total=total, page=page, pages=pages, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), clientes=clientes, qs=qs)
 
-CAMPOS = ['clase','red','trabajo','clasif_otro','ordena_personal_id','responsable_id','audito_personal_id','categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
+CAMPOS = ['ejecutivo_id','clase','red','trabajo','clasif_otro','ordena_personal_id','responsable_id','audito_personal_id','categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
  'cliente','cliente_id','tipo_cliente','calle','ciudad','estado_geo','contacto','telefono','coordenadas','coordenadas_b','sitio','site_id','descripcion','cuadrilla_id','ejecuto_puesto',
  'personas_adicionales','observaciones','notas','folio_evidencias','audito_nombre','audito_puesto','fecha_auditoria','aprobacion','obs_auditoria']
 
@@ -251,13 +254,15 @@ def siguiente_folio(cat):
 def orden_form(oid=None):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) if oid else None
     if oid and not o: abort(404)
+    alc, cats_ok, trab_ok = PERM.alcance()
     tec_sel = [r['personal_id'] for r in q('SELECT personal_id FROM orden_personal WHERE orden_id=?', (oid,))] if oid else []
     err = None; sel_sites = [r['site_id'] for r in q('SELECT site_id FROM orden_sitios WHERE orden_id=?', (oid,))] if oid else []
     if request.method == 'POST':
         d = {k: (request.form.get(k) or '').strip() or None for k in CAMPOS}
         sel_sites = [int(x) for x in request.form.getlist('sites') if x.isdigit() and q('SELECT 1 FROM sitios WHERE id=?', (int(x),), one=True)]
         sel_tecs = [int(x) for x in request.form.getlist('tecnicos') if x.isdigit()]
-        err = validar_orden(d, sel_sites, o) or validar_personal(d, sel_tecs, o)
+        err = permisos_orden(d, o, sel_tecs, tec_sel)
+        err = err or validar_orden(d, sel_sites, o) or validar_personal(d, sel_tecs, o)
         if not err:
             folio = (request.form.get('folio') or '').strip() or (o['folio'] if o else siguiente_folio(d['categoria']))
             if q('SELECT 1 FROM ordenes WHERE folio=? AND id IS NOT ?', (folio, oid), one=True): err = f'El folio {folio} ya existe'
@@ -286,13 +291,41 @@ def orden_form(oid=None):
         v = dict(o or {}); v.update(d); v['folio'] = request.form.get('folio') or (o['folio'] if o else '')
         tec_sel = sel_tecs
         for k in ('cliente_id', 'site_id', 'cuadrilla_id', 'ordena_personal_id', 'responsable_id', 'audito_personal_id'): v[k] = int(v[k]) if v.get(k) and str(v[k]).isdigit() else None
-    else: v = dict(o) if o else {'clase': request.args.get('clase') or 'cliente', 'red': request.args.get('red'), 'trabajo': request.args.get('trabajo')}
+    else:
+        v = dict(o) if o else {'clase': request.args.get('clase') or 'cliente', 'red': request.args.get('red'), 'trabajo': request.args.get('trabajo')}
+        if not o and v['clase'] not in cats_ok: v['clase'] = cats_ok[0] if cats_ok else None
     plant_map = {t: plantilla_de({'tipo_orden': t, 'clase': 'cliente', 'red': None, 'trabajo': None, 'categoria': 'INST'}) for t in INSTALACIONES}
     ids = set(tec_sel) | {v.get(k) for k in ('ordena_personal_id', 'responsable_id', 'audito_personal_id') if v.get(k)}
     personal = q(f"SELECT t.id, t.nombre, t.puesto, t.rol, t.cuadrilla_id, t.activo, c.nombre cuad FROM tecnicos t LEFT JOIN cuadrillas c ON c.id=t.cuadrilla_id WHERE COALESCE(t.activo,1)=1 OR t.id IN ({','.join('?'*len(ids)) or 'NULL'}) ORDER BY t.nombre", list(ids))
     ordenantes = [dict(t, no_aut=not CM.puede_ordenar(t['puesto'])) for t in personal if CM.puede_ordenar(t['puesto']) and t['activo'] != 0 or t['id'] == v.get('ordena_personal_id')]
-    return render_template('orden_form.html', o=o, v=v, err=err, plant_map=plant_map, personal=personal, ordenantes=ordenantes, tec_sel=tec_sel, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
-        clientes_cat=q("SELECT *, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE activo=1 OR id=? ORDER BY estatus='Prospecto', nombre", ((o['cliente_id'] if o else None),)), ESTADOS_MX=CM.ESTADOS_MX)
+    CS, CSA = PERM.cliente_scope('clientes')
+    trab_form = {k: [t for t in ts if alc != 'tipo' or not trab_ok or t in trab_ok] for k, ts in TRABAJOS.items()}
+    ejecutivos = q("SELECT id, nombre, puesto FROM tecnicos WHERE (COALESCE(activo,1)=1 AND (puesto IN ('Ejecutivo comercial','Vendedor','Director','Supervisor') OR puesto LIKE 'Gerente%')) OR id=? ORDER BY nombre", (v.get('ejecutivo_id'),))
+    return render_template('orden_form.html', cats_ok=cats_ok, trab_form=trab_form, ejecutivos=ejecutivos, fija_ejecutivo=(alc == 'propias' and not AU.es_su()), o=o, v=v, err=err, plant_map=plant_map, personal=personal, ordenantes=ordenantes, tec_sel=tec_sel, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
+        clientes_cat=q(f"SELECT *, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE (activo=1 AND {CS}) OR id=? ORDER BY estatus='Prospecto', nombre", CSA + [(o['cliente_id'] if o else None)]), ESTADOS_MX=CM.ESTADOS_MX)
+
+def permisos_orden(d, o, sel_tecs, tec_prev):
+    """Aplica la matriz de permisos al guardar una orden: categoría/variante y clientes del alcance, asignación, estado y propietario."""
+    alc, cats, trab = PERM.alcance(); su = AU.es_su(); u = AU.usuario_actual()
+    if not su:
+        if d['clase'] not in cats: return f"Tu perfil no puede crear ni editar órdenes de la categoría «{CLASES.get(d['clase'], d['clase'] or '—')}»"
+        if alc == 'tipo' and trab and d['trabajo'] not in trab: return f"Tu perfil solo maneja: {', '.join(trab)}"
+        if d['cliente_id'] and str(d['cliente_id']).isdigit() and d['clase'] != 'infra' and not PERM.cliente_visible(int(d['cliente_id'])) and not (o and str(o['cliente_id']) == str(d['cliente_id'])):
+            return 'Ese cliente no está asignado a ti'
+    if not PERM.can('ordenes.asignar'):   # sin permiso de asignar: se conservan cuadrilla, responsable y técnicos
+        d['cuadrilla_id'] = str(o['cuadrilla_id']) if o and o['cuadrilla_id'] else None
+        d['responsable_id'] = str(o['responsable_id']) if o and o['responsable_id'] else None
+        sel_tecs[:] = list(tec_prev) if o else []
+    prev = o['estado'] if o else 'pendiente'
+    if d['estado'] != prev:
+        if d['estado'] == 'cancelada' and not PERM.can('ordenes.cancelar'): return 'Tu perfil no puede cancelar órdenes'
+        if d['estado'] != 'cancelada' and not PERM.can('ordenes.estado'): d['estado'] = prev
+    if d['estado'] is None: d['estado'] = prev
+    ej = d.get('ejecutivo_id')
+    if not su and alc == 'propias': d['ejecutivo_id'] = o['ejecutivo_id'] if o else u['id']
+    elif ej and str(ej).isdigit() and q('SELECT 1 FROM tecnicos WHERE id=?', (int(ej),), one=True): d['ejecutivo_id'] = int(ej)
+    else: d['ejecutivo_id'] = None if o else (u['id'] if u else None)   # nueva: propietario = quien la crea
+    return None
 
 # ---- Autorización de órdenes (clientes · Instalación nueva) ----
 CAMPOS_CLAVE_AUT = ('clase', 'trabajo', 'cliente_id', 'tipo_orden', 'clasif_otro')
@@ -325,6 +358,16 @@ def exigir_autorizada(o, campo=False):
     if bloqueada(o):
         msg = 'Orden pendiente de autorización' if o['autorizacion'] == 'pendiente' else 'Orden rechazada: corrígela y reenvíala a autorización'
         abort(409, msg)
+
+@app.before_request
+def _alcance():
+    """Una orden o cliente fuera del alcance del perfil no se puede abrir ni modificar (403)."""
+    import re
+    if not getattr(g, 'user', None): return   # superadmin o rutas sin sesión
+    m = re.match(r'^/ordenes/(\d+)(/|$)', request.path)
+    if m and q('SELECT 1 FROM ordenes WHERE id=?', (int(m.group(1)),), one=True) and not PERM.orden_visible(int(m.group(1))): abort(403)
+    m = re.match(r'^/configuracion/clientes/(\d+)/', request.path)
+    if m and not PERM.cliente_visible(int(m.group(1))): abort(403)
 
 @app.errorhandler(409)
 def _409(e):
@@ -359,7 +402,7 @@ def validar_personal(d, sel_tecs, o=None):
             p = ok[int(d['ordena_personal_id'])]
             sin_cambio = o is not None and str(o['ordena_personal_id']) == str(d['ordena_personal_id'])
             if not CM.puede_ordenar(p['puesto']) and not sin_cambio:
-                return f"«{p['nombre']}» ({p['puesto'] or 'sin puesto'}) no puede ordenar: la persona que ordena debe ser Supervisor, Gerente, Director o Vendedor"
+                return f"«{p['nombre']}» ({p['puesto'] or 'sin puesto'}) no puede ordenar: la persona que ordena debe ser Supervisor, Gerente, Director o Ejecutivo comercial"
         if d['ordena_personal_id']: p = ok[int(d['ordena_personal_id'])]; d['ordena_nombre'], d['ordena_puesto'] = p['nombre'], p['puesto'] or d['ordena_puesto']
         if d['audito_personal_id']: p = ok[int(d['audito_personal_id'])]; d['audito_nombre'], d['audito_puesto'] = p['nombre'], p['puesto'] or d['audito_puesto']
         if d['responsable_id'] and not d['ejecuto_puesto'] and ok[int(d['responsable_id'])]['puesto'] in PUESTOS_EJEC: d['ejecuto_puesto'] = ok[int(d['responsable_id'])]['puesto']
@@ -421,8 +464,9 @@ def api_prospecto():
             except ValueError: return jsonify(error='Coordenadas inválidas'), 400
     if q('SELECT 1 FROM clientes WHERE nombre=?', (d['nombre'],), one=True): return jsonify(error='Ya existe un cliente o prospecto con ese nombre'), 400
     calle = ' '.join(x for x in (d['calle'], d['num_ext']) if x) or None
-    cid = db().execute("INSERT INTO clientes(nombre,contacto,telefono,email,calle,colonia,cp,municipio,ciudad,estado,lat,lng,estatus,activo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'Prospecto',1)",
-        (d['nombre'], d['contacto'], d['telefono'], d['email'], calle, d['colonia'], d['cp'], d['municipio'], d['municipio'], d['estado'], d['lat'], d['lng'])).lastrowid
+    u = AU.usuario_actual()
+    cid = db().execute("INSERT INTO clientes(nombre,contacto,telefono,email,calle,colonia,cp,municipio,ciudad,estado,lat,lng,estatus,activo,ejecutivo_id) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'Prospecto',1,?)",
+        (d['nombre'], d['contacto'], d['telefono'], d['email'], calle, d['colonia'], d['cp'], d['municipio'], d['municipio'], d['estado'], d['lat'], d['lng'], u['id'] if u else None)).lastrowid
     db().commit()
     return jsonify(id=cid, nombre=d['nombre'], estatus='Prospecto', contacto=d['contacto'] or '', telefono=d['telefono'] or '', calle=calle or '', ciudad=d['municipio'] or '', estado=d['estado'] or '', lat=d['lat'], lng=d['lng'])
 
@@ -443,6 +487,7 @@ def orden_eliminar(oid):
 def orden_estado(oid):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) or abort(404)
     e = request.form['estado']; assert e in ESTADOS
+    if not PERM.can('ordenes.cancelar' if e == 'cancelada' else 'ordenes.estado'): abort(403)
     if e != 'cancelada': exigir_autorizada(o)
     sets = {'estado': e}
     if e == 'en curso' and not o['fecha_inicio']: sets['fecha_inicio'] = request.form.get('hora') or ahora()
@@ -452,7 +497,7 @@ def orden_estado(oid):
     db().execute(f"UPDATE ordenes SET {', '.join(k+'=?' for k in sets)} WHERE id=?", list(sets.values())+[oid])
     log(oid, f"Estado: {o['estado']} → {e}" + (f' · Nota: {nota}' if nota else '') + (' (campo)' if request.form.get('origen')=='campo' else ''))
     db().commit()
-    if request.form.get('origen') == 'campo': return redirect(url_for('tecnico', cuadrilla=o['cuadrilla_id'], _anchor=f'o{oid}'))
+    if request.form.get('origen') == 'campo': return redirect(url_campo(o, _anchor=f'o{oid}'))
     return redirect(url_for('orden_ver', oid=oid))
 
 @app.route('/ordenes/<int:oid>/nota', methods=['POST'])
@@ -461,7 +506,7 @@ def orden_nota(oid):
     nota = (request.form.get('nota') or '').strip()
     if nota:
         db().execute('UPDATE ordenes SET notas=? WHERE id=?', (((o['notas'] or '') + f"\n[{ahora().replace('T',' ')}] {nota}").strip(), oid)); log(oid, 'Nota: '+nota); db().commit()
-    if request.form.get('origen') == 'campo': return redirect(url_for('tecnico', cuadrilla=o['cuadrilla_id'], _anchor=f'o{oid}'))
+    if request.form.get('origen') == 'campo': return redirect(url_campo(o, _anchor=f'o{oid}'))
     return redirect(url_for('orden_ver', oid=oid))
 
 @app.route('/ordenes/<int:oid>/materiales', methods=['GET','POST'])
@@ -511,7 +556,7 @@ def orden_materiales(oid):
             elif d < 0: mover(con, k[0], k[1], 'devolucion', -d, 'Devolución / corrección de orden', o['folio'], oid)
         log(oid, 'Materiales actualizados' + (f' · {sum(1 for d in deltas.values() if d)} movimientos de inventario' if any(deltas.values()) else '') + (' · con stock negativo' if negs else ''))
         con.commit()
-        if request.form.get('origen') == 'campo': return redirect(url_for('tecnico', cuadrilla=o['cuadrilla_id']))
+        if request.form.get('origen') == 'campo': return redirect(url_campo(o))
         return redirect(url_for('orden_ver', oid=oid))
     filas = q('SELECT * FROM orden_materiales WHERE orden_id=?', (oid,))
     actual = {r['concepto']+'|'+r['seccion']: r for r in filas}
@@ -585,16 +630,36 @@ def cuadrilla_eliminar(cid):
     db().execute('DELETE FROM cuadrillas WHERE id=?', (cid,)); db().commit(); return redirect(url_for('cuadrillas'))
 
 # ---------- Vista técnico ----------
+def url_campo(o, **kw):
+    """Regreso a la vista técnico; quien solo ve sus órdenes vuelve a «Mis órdenes» si la cuadrilla no es suya."""
+    cid = o['cuadrilla_id']
+    if PERM.alcance()[0] in ('propias', 'equipo') and not AU.es_su():
+        u = AU.usuario_actual()
+        if not (cid and (cid == u['cuadrilla_id'] or q('SELECT 1 FROM cuadrillas WHERE id=? AND supervisor_id=?', (cid, u['id']), one=True))): cid = None
+    return url_for('tecnico', cuadrilla=cid, **kw)
+app.jinja_env.globals['url_campo'] = url_campo
+
 @app.route('/tecnico')
 def tecnico():
-    cid = request.args.get('cuadrilla', type=int); cs = q('SELECT * FROM cuadrillas ORDER BY id')
-    if not cid: return render_template('tecnico_elegir.html', cs=cs)
-    c = q('SELECT * FROM cuadrillas WHERE id=?', (cid,), one=True) or abort(404)
-    base = f"SELECT o.*, {VENCIDA} vencida FROM ordenes o WHERE o.cuadrilla_id=? AND NOT (o.clase='cliente' AND o.trabajo='Instalación nueva' AND COALESCE(o.autorizacion,'')<>'autorizada') "
-    de_hoy = q(base + "AND (o.fecha_programada=date('now','localtime') OR (o.estado='completada' AND substr(o.fecha_cierre,1,10)=date('now','localtime'))) ORDER BY CASE o.estado WHEN 'en curso' THEN 0 WHEN 'asignada' THEN 1 WHEN 'pendiente' THEN 1 ELSE 2 END, o.prioridad='urgente' DESC", (cid,))
+    S, SA = PERM.orden_scope('o'); alc = PERM.alcance()[0]
+    cid = request.args.get('cuadrilla', type=int)
+    if alc in ('propias', 'equipo') and not AU.es_su():   # solo «mis órdenes» y las cuadrillas propias / supervisadas
+        u = AU.usuario_actual()
+        cs = q('SELECT * FROM cuadrillas WHERE id=? OR (? AND supervisor_id=?) ORDER BY id', (u['cuadrilla_id'], alc == 'equipo', u['id']))
+        mias = True
+        if cid and cid not in [x['id'] for x in cs]: abort(403)
+    else:
+        cs = q('SELECT * FROM cuadrillas ORDER BY id'); mias = False
+        if not cid: return render_template('tecnico_elegir.html', cs=cs)
+    if cid: c = q('SELECT * FROM cuadrillas WHERE id=?', (cid,), one=True) or abort(404)
+    else: c = {'id': 0, 'nombre': 'Mis órdenes', 'especialidad': ''}
+    base = (f"SELECT o.*, {VENCIDA} vencida FROM ordenes o WHERE {S} AND " + ('o.cuadrilla_id=? ' if cid else '1=1 ') +
+            "AND NOT (o.clase='cliente' AND o.trabajo='Instalación nueva' AND COALESCE(o.autorizacion,'')<>'autorizada') ")
+    args = SA + ([cid] if cid else [])
+    de_hoy = q(base + "AND (o.fecha_programada=date('now','localtime') OR (o.estado='completada' AND substr(o.fecha_cierre,1,10)=date('now','localtime'))) ORDER BY CASE o.estado WHEN 'en curso' THEN 0 WHEN 'asignada' THEN 1 WHEN 'pendiente' THEN 1 ELSE 2 END, o.prioridad='urgente' DESC", args)
     ids = [o['id'] for o in de_hoy]
-    pend = [o for o in q(base + "AND o.estado IN ('pendiente','asignada','en curso') ORDER BY o.fecha_programada", (cid,)) if o['id'] not in ids]
-    return render_template('tecnico.html', c=c, cs=cs, de_hoy=de_hoy, pend=pend, equipo=q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (cid,)), ahora=ahora())
+    pend = [o for o in q(base + "AND o.estado IN ('pendiente','asignada','en curso') ORDER BY o.fecha_programada", args) if o['id'] not in ids]
+    return render_template('tecnico.html', c=c, cs=cs, mias=mias, de_hoy=de_hoy, pend=pend, equipo=q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (cid,)) if cid else [], ahora=ahora())
 
 @app.route('/reportes/materiales')
 def reporte_materiales():
@@ -721,7 +786,7 @@ def material_eliminar(mid):
 
 @app.route('/inventario/movimiento', methods=['GET','POST'])
 def movimiento_form():
-    tipo = request.values.get('tipo', 'entrada')
+    tipo = request.values.get('tipo') or next((t for t in ('entrada','salida','ajuste','transferencia') if PERM.can(PERM.MOV_PERM[t])), 'entrada')
     if tipo not in ('entrada','salida','ajuste','transferencia'): tipo = 'entrada'
     err = warn = None; fv = request.form
     if request.method == 'POST':
@@ -807,6 +872,7 @@ def api_escanear():
     try: alm = int(d.get('almacen_id')); cant = float(d.get('cantidad') or 1)
     except (TypeError, ValueError): return jsonify(ok=False, error='almacen_id/cantidad inválidos'), 400
     if tipo not in ('entrada', 'salida'): return jsonify(ok=False, error='tipo debe ser entrada o salida'), 400
+    if not PERM.can(PERM.MOV_PERM[tipo]): return jsonify(ok=False, error=f'Tu perfil no permite registrar {tipo}s'), 403
     if cant <= 0: return jsonify(ok=False, error='La cantidad debe ser mayor a 0'), 400
     a = q('SELECT * FROM almacenes WHERE id=? AND activo=1', (alm,), one=True)
     if not a: return jsonify(ok=False, error='Almacén no existe'), 400
@@ -838,12 +904,14 @@ def vehiculos():
 # ---------- API JSON ----------
 @app.route('/api/resumen')
 def api_resumen():
-    return jsonify(estados={r['estado']: r['n'] for r in q('SELECT estado, COUNT(*) n FROM ordenes GROUP BY estado')},
-                   total=q('SELECT COUNT(*) n FROM ordenes', one=True)['n'], vencidas=q(f'SELECT COUNT(*) n FROM ordenes o WHERE {VENCIDA}', one=True)['n'],
+    S, SA = PERM.orden_scope('o')
+    return jsonify(estados={r['estado']: r['n'] for r in q(f'SELECT estado, COUNT(*) n FROM ordenes o WHERE {S} GROUP BY estado', SA)},
+                   total=q(f'SELECT COUNT(*) n FROM ordenes o WHERE {S}', SA, one=True)['n'], vencidas=q(f'SELECT COUNT(*) n FROM ordenes o WHERE {VENCIDA} AND {S}', SA, one=True)['n'],
                    cuadrillas=q('SELECT COUNT(*) n FROM cuadrillas', one=True)['n'], tecnicos=q('SELECT COUNT(*) n FROM tecnicos', one=True)['n'])
 @app.route('/api/ordenes')
 def api_ordenes():
-    return jsonify([dict(r) for r in q('SELECT * FROM ordenes ORDER BY fecha_programada DESC LIMIT 500')])
+    S, SA = PERM.orden_scope('o')
+    return jsonify([dict(r) for r in q(f'SELECT o.* FROM ordenes o WHERE {S} ORDER BY o.fecha_programada DESC LIMIT 500', SA)])
 
 def ean13(base12):
     d = [int(x) for x in base12]; s = sum(d[0::2]) + 3*sum(d[1::2]); return base12 + str((10 - s % 10) % 10)
@@ -892,6 +960,7 @@ def init_db():
     SD.migrar(c)
     PM.migrar(c, PM.JSON, PLANT_DE_TIPO)
     migrar_ordenes(c)
+    PERM.demo(c)   # solo datos de ejemplo; no hace nada si ya hay propietarios asignados
     c.commit(); c.close()
 import syscom_client as SC
 import config_mod as CM

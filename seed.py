@@ -114,6 +114,7 @@ for n in range(150):
             c.execute('INSERT INTO orden_materiales(orden_id,material_id,almacen_id,seccion,concepto,tipo,cantidad,unidad) VALUES(?,?,?,?,?,?,?,?)', (oid, mid, alm, m['seccion'], m['concepto'], random.choice(tipos), q, un))
             A.mover(c, mid, alm, 'salida', q, 'Consumo en orden', f'{pref}{cnt[pref]:04d}', oid, permitir_negativo=True, fecha=fin)
 A.migrar_ordenes(c)
+A.PERM.demo(c)   # la ejecutiva comercial de ejemplo es propietaria de algunos clientes
 print('usuarios demo:', ', '.join(f"{u[0]} ({'con acceso' if u[4] else 'sin acceso'})" for u in A.AU.demo_usuarios(c)) or 'ninguno')
 # autorización de ejemplo: algunas instalaciones nuevas aún sin iniciar quedan pendientes / una rechazada
 _pend = [r[0] for r in c.execute("SELECT id FROM ordenes WHERE clase='cliente' AND trabajo='Instalación nueva' AND estado IN ('pendiente','asignada') AND fecha_inicio IS NULL ORDER BY fecha_programada DESC LIMIT 5")]

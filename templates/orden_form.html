@@ -17,7 +17,7 @@
 <input type="hidden" name="categoria" value="{{v.categoria or ''}}"><input type="hidden" name="tipo_grupo" value="{{v.tipo_grupo or ''}}">
 <fieldset><legend>Clasificación de la orden</legend>
 <div class="qlbl">1 · Categoría</div>
-<div class="seg big" id="segClase">{% for k,t in CLASES.items() %}<label><input type="radio" name="clase" value="{{k}}" {{'checked' if v.clase==k}} required><span>{{ {'infra':'🏗 ','cliente':'🏢 ','prospecto':'🎯 '}[k] }}{{t}}<small>{{ {'infra':'Red y sitios de Spectro Networks','cliente':'Servicios a clientes','prospecto':'Factibilidad para prospectos'}[k] }}</small></span></label>{% endfor %}</div>
+<div class="seg big" id="segClase">{% for k,t in CLASES.items() if k in cats_ok or k==v.clase %}<label><input type="radio" name="clase" value="{{k}}" {{'checked' if v.clase==k}} required><span>{{ {'infra':'🏗 ','cliente':'🏢 ','prospecto':'🎯 '}[k] }}{{t}}<small>{{ {'infra':'Red y sitios de Spectro Networks','cliente':'Servicios a clientes','prospecto':'Factibilidad para prospectos'}[k] }}</small></span></label>{% endfor %}</div>
 <div id="wRed"><div class="qlbl">2 · Red</div>
 <div class="seg">{% for k,t in REDES.items() %}<label><input type="radio" name="red" value="{{k}}" {{'checked' if v.red==k}}><span>{{t}}</span></label>{% endfor %}</div></div>
 <div id="wInst"><div class="qlbl">2 · Clasificación *</div><select id="inst"></select>
@@ -32,12 +32,13 @@
 <fieldset><legend>Datos generales</legend><div class="grid g2">
 <label>Folio <span class="muted">(vacío = automático)</span><input name="folio" value="{{v.folio or ''}}"></label>
 <label>Prioridad<select name="prioridad">{% for p in PRIORIDADES %}<option {{'selected' if (v.prioridad or 'media')==p}}>{{p}}</option>{% endfor %}</select></label>
-{% if v.autorizacion in ('pendiente','rechazada') %}<div class="ej" style="grid-column:1/-1;background:#fdf6e3;border-color:#ecd59a;color:#a16207;font-size:13px;margin:0">{{ '⏳ Pendiente de autorización' if v.autorizacion=='pendiente' else '⛔ Rechazada: al guardar se reenvía a autorización' }} — el estado queda en «pendiente» hasta que Administración o Dirección la autorice.</div>{% endif %}<label>Estado<select name="estado">{% for e in ESTADOS %}<option {{'selected' if (v.estado or 'pendiente')==e}}>{{e}}</option>{% endfor %}</select></label>
+{% if v.autorizacion in ('pendiente','rechazada') %}<div class="ej" style="grid-column:1/-1;background:#fdf6e3;border-color:#ecd59a;color:#a16207;font-size:13px;margin:0">{{ '⏳ Pendiente de autorización' if v.autorizacion=='pendiente' else '⛔ Rechazada: al guardar se reenvía a autorización' }} — el estado queda en «pendiente» hasta que Administración o Dirección la autorice.</div>{% endif %}{% set _pe = can('ordenes.estado') %}<label>Estado{% if not _pe %} <span class="muted">(tu perfil no cambia estados)</span>{% endif %}<select name="estado" {{'disabled' if not _pe and not can('ordenes.cancelar')}}>{% for e in ESTADOS if e==(v.estado or 'pendiente') or (e=='cancelada' and can('ordenes.cancelar')) or (e!='cancelada' and _pe) %}<option {{'selected' if (v.estado or 'pendiente')==e}}>{{e}}</option>{% endfor %}</select></label>
+<label>Ejecutivo / propietario{% if fija_ejecutivo %} <span class="muted">(tú)</span>{% endif %}<select name="ejecutivo_id" {{'disabled' if fija_ejecutivo}}><option value="">— {{ 'Quien la crea' if not o else 'Sin asignar' }} —</option>{% for t in ejecutivos %}<option value="{{t.id}}" {{'selected' if v.ejecutivo_id==t.id}}>{{t.nombre}} — {{t.puesto or 'sin puesto'}}</option>{% endfor %}</select></label>
 <label>Fecha de la orden<input type="date" name="fecha_emision" value="{{v.fecha_emision or hoy}}"></label>
 <label><span id="lblFP">Fecha en que se debe ejecutar</span><input type="date" name="fecha_programada" value="{{v.fecha_programada or ''}}" required></label>
 </div></fieldset>
 <fieldset><legend>Persona que ordena</legend><div class="grid g2">
-<label style="grid-column:1/-1">Persona (Configuración › Personal) <span class="muted">· Supervisor, Gerente, Director o Vendedor</span><select name="ordena_personal_id"><option value="">— Selecciona persona —</option>{% for t in ordenantes %}<option value="{{t.id}}" data-puesto="{{t.puesto or ''}}" {{'selected' if v.ordena_personal_id==t.id}}>{{t.nombre}} — {{t.puesto or 'sin puesto'}}{{' (puesto no autorizado)' if t.no_aut}}{{' (inactivo)' if t.activo==0}}</option>{% endfor %}</select></label>
+<label style="grid-column:1/-1">Persona (Configuración › Personal) <span class="muted">· Supervisor, Gerente, Director o Ejecutivo comercial</span><select name="ordena_personal_id"><option value="">— Selecciona persona —</option>{% for t in ordenantes %}<option value="{{t.id}}" data-puesto="{{t.puesto or ''}}" {{'selected' if v.ordena_personal_id==t.id}}>{{t.nombre}} — {{t.puesto or 'sin puesto'}}{{' (puesto no autorizado)' if t.no_aut}}{{' (inactivo)' if t.activo==0}}</option>{% endfor %}</select></label>
 {% set sel_o = ordenantes|selectattr('id','equalto',v.ordena_personal_id)|list %}{% if sel_o and sel_o[0].no_aut %}<div class="ej" style="grid-column:1/-1;background:#fdf6e3;border-color:#ecd59a;color:#a16207;font-size:13px;margin:0">⚠ {{sel_o[0].nombre}} ({{sel_o[0].puesto or 'sin puesto'}}) ya no puede ordenar. Se conserva en esta orden hasta que elijas a un Supervisor, Gerente, Director o Vendedor.</div>{% endif %}
 {% if not ordenantes %}<div class="muted" style="grid-column:1/-1;font-size:12px">No hay personal activo con puesto autorizado. Agrégalo en <a href="/configuracion/personal/nuevo" target="_blank">Configuración › Personal</a>.</div>{% endif %}
 {% if v.ordena_nombre and not v.ordena_personal_id %}<div class="muted" style="grid-column:1/-1;font-size:12px">Valor anterior (texto libre): <b>{{v.ordena_nombre}}</b>{% if v.ordena_puesto %} — {{v.ordena_puesto}}{% endif %}. Elige a la persona para actualizarla.</div>{% endif %}
@@ -49,7 +50,7 @@
 <select name="cliente_id" id="cli" onchange="cliSel()"><option value="">— Selecciona —</option>
 <optgroup label="Clientes" id="ogC">{% for c in clientes_cat if c.estatus!='Prospecto' %}<option value="{{c.id}}" data-est="Cliente" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.municipio or c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" data-gps="{{ '%s,%s'|format(c.lat,c.lng) if c.lat is not none and c.lng is not none else '' }}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}}</option>{% endfor %}</optgroup>
 <optgroup label="Prospectos" id="ogP">{% for c in clientes_cat if c.estatus=='Prospecto' %}<option value="{{c.id}}" data-est="Prospecto" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.municipio or c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" data-gps="{{ '%s,%s'|format(c.lat,c.lng) if c.lat is not none and c.lng is not none else '' }}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}} · prospecto</option>{% endfor %}</optgroup></select></label>
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center"><button type="button" class="btn" id="btnP" onclick="abrirP()">+ Nuevo prospecto</button><a class="muted" href="/configuracion/clientes/nuevo" target="_blank" id="lnkCli">+ nuevo cliente en catálogo</a><span id="cliMsg" class="muted" style="font-size:12px"></span></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center">{% if can('clientes.crear') %}<button type="button" class="btn" id="btnP" onclick="abrirP()">+ Nuevo prospecto</button>{% else %}<span id="btnP"></span>{% endif %}{% if can('clientes.crear') %}<a class="muted" href="/configuracion/clientes/nuevo" target="_blank" id="lnkCli">+ nuevo cliente en catálogo</a>{% else %}<span id="lnkCli"></span>{% endif %}<span id="cliMsg" class="muted" style="font-size:12px"></span></div>
 {% if v.cliente and not v.cliente_id %}<div class="muted">Valor anterior (orden antigua): <b>{{v.cliente}}</b> — elige el cliente del catálogo para actualizarla.</div>{% endif %}</div>
 <label>Tipo de cliente<select name="tipo_cliente"><option></option>{% for p in TIPOS_CLIENTE %}<option {{'selected' if v.tipo_cliente==p}}>{{p}}</option>{% endfor %}</select></label>
 <label>Calle y No.<input name="calle" value="{{v.calle or ''}}"></label>
@@ -60,7 +61,7 @@
 <fieldset id="blkSites"><legend>Sites de Spectro <span id="reqSites" class="muted"></span></legend>
 <input id="site_q" placeholder="Filtrar por código, nombre o municipio…" autocomplete="off" oninput="filtSites()">
 <div class="sitelist" id="sitelist">{% for st in sitios %}<label data-t="{{(st.codigo~' '~st.nombre~' '~(st.municipio or '')~' '~(st.estado or ''))|lower}}"><input type="checkbox" name="sites" value="{{st.id}}" {{'checked' if st.id in sel_sites}}><div><b>{{st.codigo}}</b> · {{st.nombre}}<br><small>{{st.tipo or ''}}{% if st.municipio %} · {{st.municipio}}{% endif %}</small></div></label>{% else %}<div class="muted" style="padding:10px">No hay sites en el catálogo.</div>{% endfor %}</div>
-<p class="muted" style="font-size:12px;margin:6px 0 0"><span id="nSites">0</span> seleccionado(s) · <a href="/configuracion/sites/nuevo" target="_blank">+ nuevo site</a></p>
+<p class="muted" style="font-size:12px;margin:6px 0 0"><span id="nSites">0</span> seleccionado(s){% if can('config.sites') %} · <a href="/configuracion/sites/nuevo" target="_blank">+ nuevo site</a>{% endif %}</p>
 {% if v.sitio and not sel_sites %}<details open><summary class="muted">Sitio en texto libre (orden antigua)</summary><input name="sitio" value="{{v.sitio}}"></details>{% else %}<details><summary class="muted">¿No está en el catálogo? Texto libre</summary><input name="sitio" value="{{'' if sel_sites else (v.sitio or '')}}"></details>{% endif %}
 </fieldset>
 
@@ -108,7 +109,7 @@
 </form></dialog>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const TR={{TRABAJOS|tojson}},DET={{DETALLES|tojson}},INST={{INSTALACIONES|tojson}},FACT={{FACTIBILIDAD|tojson}};
+const TR={{trab_form|tojson}},DET={{DETALLES|tojson}},INST={{INSTALACIONES|tojson}},FACT={{FACTIBILIDAD|tojson}};
 const ini={tr:{{(v.trabajo or '')|tojson}},det:{{(v.tipo_orden or '')|tojson}}};
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],F=document.getElementById('forden');
 const radio=n=>(F.querySelector('[name='+n+']:checked')||{}).value||'';
@@ -179,4 +180,6 @@ cuad.addEventListener('change',()=>cargarCuad(false));$('#btnCuad').onclick=()=>
 resp.addEventListener('change',()=>{const o=resp.selectedOptions[0],ep=F.querySelector('[name=ejecuto_puesto]');if(o&&o.value&&!ep.value&&[...ep.options].some(x=>x.text===o.dataset.puesto))ep.value=o.dataset.puesto;cntTec();});
 $$('[name=tecnicos]').forEach(x=>x.onchange=cntTec);
 pintaTr();upd();filtSites();cntTec();arribaTec();
-</script><script src="/static/cp.js?v=1" defer></script>{% endblock %}
+{% if not can('ordenes.asignar') %}
+(function(){['#cuad','[name=responsable_id]','#btnCuad'].forEach(function(x){var e=document.querySelector(x);if(e)e.disabled=true;});document.querySelectorAll('[name=tecnicos]').forEach(function(e){e.disabled=true;});var f=document.querySelector('#cuad');if(f){var n=document.createElement('div');n.className='muted';n.style.cssText='grid-column:1/-1;font-size:12px';n.textContent='🔒 Tu perfil no asigna cuadrilla ni personal; se conservan los actuales.';f.closest('.grid').prepend(n);}})();
+{% endif %}</script><script src="/static/cp.js?v=1" defer></script>{% endblock %}

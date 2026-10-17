@@ -1,5 +1,5 @@
 {% extends 'base.html' %}{% block body %}<h1>Registrar {{TIPOS_MOV[tipo]|lower}}</h1>
-<p style="display:flex;flex-wrap:wrap;gap:6px">{% for t in ['entrada','salida','ajuste','transferencia'] %}<a class="btn {{'' if t==tipo else 'sec'}}" href="?tipo={{t}}{{'&material_id='~sel if sel}}">{{TIPOS_MOV[t]}}</a>{% endfor %}</p>
+<p style="display:flex;flex-wrap:wrap;gap:6px">{% for t in ['entrada','salida','ajuste','transferencia'] if can({'entrada':'inventario.entradas','salida':'inventario.salidas','ajuste':'inventario.ajustes','transferencia':'inventario.transferencias'}[t]) %}<a class="btn {{'' if t==tipo else 'sec'}}" href="?tipo={{t}}{{'&material_id='~sel if sel}}">{{TIPOS_MOV[t]}}</a>{% endfor %}</p>
 {% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">{{err}}</div>{% endif %}
 {% if warn %}<div class="ej">⚠ {{warn}}</div>{% endif %}
 <form method="post" class="f card" style="max-width:640px"><input type="hidden" name="tipo" value="{{tipo}}">
