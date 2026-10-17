@@ -19,6 +19,12 @@ El servicio se duerme tras ~15 min sin uso (primer acceso tarda ~1 min).
 - **Mínimos**: `stock_minimo` global (suma) + `existencias.minimo` por almacén (se edita en la ficha del material). Alerta cuando la existencia queda en o por debajo; el panel muestra conteos por almacén y /inventario?almacen=ID&bajo=1 filtra.
 - `seed.py` crea 89 materiales (de plantillas.json) con existencias **de EJEMPLO**.
 
+## Vehículos (Configuración › Vehículos)
+- **Fotografías**: Frente del vehículo, Trasero del vehículo, Costado derecho y Costado izquierdo (cámara o galería, con vista previa). Se capturan en el mismo formulario y se suben al guardar, también en el alta. Se comprimen igual que las de Sites (uploads/vehiculos).
+- **Documentos (solo PDF, hasta 15 MB)**: Tarjeta de circulación y Póliza de seguro. Se valida que el archivo sea PDF; ver, descargar, reemplazar (el nuevo sustituye al anterior) o eliminar.
+- **Seguro**: compañía, número de póliza y vencimiento. Estado: 🟢 Vigente, 🟠 Próxima a vencer (30 días o menos), 🔴 Vencida. Se muestra en la lista (con filtro por estado), en el formulario, en /vehiculos y en el panel («Seguros de vehículos») para los perfiles con permiso de vehículos.
+- Permisos: alta, cambios y adjuntos requieren «Configuración › Vehículos»; las fotos y PDFs solo los ven perfiles con «Vehículos: ver» o «Configuración › Vehículos».
+
 ## Proveedor SYSCOM (números de parte y fotos)
 
 Página: **/proveedores/syscom** (menú "Syscom"). Cliente: `syscom_client.py` (OAuth2 `client_credentials` contra `https://developers.syscom.mx/api/v1/oauth/token`).

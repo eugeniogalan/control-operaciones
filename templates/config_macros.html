@@ -12,3 +12,5 @@
 {% else %}<label id="w_{{col}}">{{lab}}{{' *' if req}}<input name="{{col}}" type="{{ {'number':'number','date':'date','tel':'tel','email':'email','coord':'text','url':'url','time':'time'}.get(typ,'text') }}" {{'inputmode=decimal' if typ=='coord'}} value="{{'' if v is none else v}}" {{'required' if req}}></label>{% endif %}
 {% endmacro %}
 {% macro migas(e) %}<div class="muted"><a href="/configuracion">Configuración</a> › {{e.titulo}}</div>{% endmacro %}
+{# Badge de estado del seguro de un vehículo: vigente / proxima / vencida #}
+{% macro seg_badge(est, fecha=None, id=None) %}{% set t = SEGURO_ESTADOS.get(est) %}<span{% if id %} id="{{id}}"{% endif %} title="{{ ('Vence: ' ~ fecha) if fecha else '' }}" style="display:inline-block;white-space:nowrap;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:700;{{ t[1] if t else 'background:#f5f5f7;color:#8e8e93;border:1px solid #e5e5ea' }}">🛡 {{ t[0] if t else 'Sin vencimiento' }}</span>{% endmacro %}

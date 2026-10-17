@@ -1,5 +1,7 @@
 """Menú Configuración: altas, bajas y cambios de catálogos (Materiales, Personal, Vehículos, Cuadrillas, Sites, Almacenes, Herramientas y Equipo)."""
 from flask import render_template, request, redirect, url_for, abort, g as _g
+import datetime as _dt_mod
+import vehiculo_adj as VA
 
 SCHEMA_CFG = '''
 CREATE TABLE IF NOT EXISTS sitios(id INTEGER PRIMARY KEY, codigo TEXT UNIQUE, nombre TEXT NOT NULL, cliente TEXT, direccion TEXT, ciudad TEXT, estado TEXT,
@@ -506,6 +508,11 @@ def registrar(app, q, db):
             con.execute('UPDATE almacenes SET tipo=?, cuadrilla_id=?, activo=? WHERE id=?', ('vehiculo', d['cuadrilla_id'], d['activo'], aid))
             con.execute('UPDATE vehiculos SET almacen_id=? WHERE id=?', (aid, vid))
     def veh_valid(d, rid):
+        if d.get('seguro_vence'):
+            try: d['seguro_vence'] = _dt_mod.date.fromisoformat(d['seguro_vence']).isoformat()
+            except ValueError: return 'Vencimiento de póliza: fecha inválida (usa AAAA-MM-DD)'
+        e = VA.validar_pdfs()
+        if e: return e
         n = (d['numero'] or '').strip()
         if n.isdigit(): d['numero'] = f'{int(n):02d}'
         v = q('SELECT almacen_id FROM vehiculos WHERE id=?', (rid,), one=True) if rid else None
@@ -524,6 +531,7 @@ def registrar(app, q, db):
     def veh_hist(vid):
         v = q('SELECT almacen_id FROM vehiculos WHERE id=?', (vid,), one=True); return bool(v and v['almacen_id'] and alm_hist(v['almacen_id']))
     def veh_del(vid):
+        VA.borrar_todo(db, q, vid)
         v = q('SELECT almacen_id FROM vehiculos WHERE id=?', (vid,), one=True)
         if v and v['almacen_id']:
             db().execute('UPDATE vehiculos SET almacen_id=NULL WHERE id=?', (vid,)); alm_del(v['almacen_id']); db().execute('DELETE FROM almacenes WHERE id=?', (v['almacen_id'],))
@@ -573,10 +581,12 @@ def registrar(app, q, db):
         valid=pers_valid),
      'vehiculos': dict(titulo='Vehículos', icono='🚚', tabla='vehiculos', act='activo', orden='numero', desc='Vehículos 01–18 (cada uno es un almacén móvil); varios por cuadrilla.',
         buscar=['numero','placas','marca','modelo'],
-        sql="SELECT v.*, c.nombre cuadrilla, a.nombre almacen FROM vehiculos v LEFT JOIN cuadrillas c ON c.id=v.cuadrilla_id LEFT JOIN almacenes a ON a.id=v.almacen_id",
-        cols=[('numero','Número'),('placas','Placas'),('marca','Marca'),('modelo','Modelo'),('anio','Año'),('cuadrilla','Cuadrilla'),('almacen','Almacén')],
+        sql="SELECT v.*, c.nombre cuadrilla, a.nombre almacen, "+VA.seg_sql('v.')+" seguro_estado, (SELECT COUNT(*) FROM vehiculo_fotos f WHERE f.vehiculo_id=v.id) nfotos, (SELECT COUNT(*) FROM vehiculo_documentos d WHERE d.vehiculo_id=v.id) ndocs FROM vehiculos v LEFT JOIN cuadrillas c ON c.id=v.cuadrilla_id LEFT JOIN almacenes a ON a.id=v.almacen_id",
+        cols=[('numero','Número'),('seguro_vence','Seguro'),('placas','Placas'),('marca','Marca'),('modelo','Modelo'),('anio','Año'),('cuadrilla','Cuadrilla'),('almacen','Almacén')],
         campos=[('numero','Número (01–18)','text',True),('placas','Placas','text'),('marca','Marca','text'),('modelo','Modelo','text'),('anio','Año','number'),
-                ('cuadrilla_id','Cuadrilla asignada','fk',CUAD),('notas','Notas','textarea')],
+                ('cuadrilla_id','Cuadrilla asignada','fk',CUAD),('notas','Notas','textarea'),
+                ('seguro_compania','Compañía de seguros','text'),('seguro_poliza','Número de póliza','text'),('seguro_vence','Vencimiento de póliza','date')],
+        seguro=VA.SEGURO, seg_filtro=True,
         valid=veh_valid, post=veh_post, hist=veh_hist, soft=veh_baja_soft, pre_del=veh_del, unico=[('numero','Ese número de vehículo ya existe')]),
      'cuadrillas': dict(titulo='Cuadrillas', icono='👥', tabla='cuadrillas', act='activa', orden='id', desc='Líder y técnico (desde Personal), especialidad, zona y vehículos.',
         buscar=['nombre','especialidad','zona'],
@@ -676,11 +686,17 @@ def registrar(app, q, db):
         fv = request.args.get('f', '') if e.get('filtro') else ''
         if fv in (e.get('filtro') or ('', '', []))[2]: w.append(f"COALESCE({pre}{e['filtro'][0]},'Cliente')=?"); a.append(fv)
         else: fv = ''
+        seg = request.args.get('seg', '') if e.get('seg_filtro') else ''
+        fs_ = VA.filtro_sql(seg, pre) if seg else None
+        if fs_: w.append(fs_[0]); a += fs_[1]
+        else: seg = ''
         orden = ', '.join(pre + o.strip() for o in e['orden'].split(','))
         rows = q(f"{sql} {'WHERE '+' AND '.join(w) if w else ''} ORDER BY {orden} LIMIT 500", a)
         if e.get('post_sql'): rows = e['post_sql'](rows)
         nf = {r[0]: r[1] for r in q(f"SELECT COALESCE({e['filtro'][0]},'Cliente'), COUNT(*) FROM {e['tabla']} WHERE COALESCE({e['act']},1)=1 GROUP BY 1")} if e.get('filtro') else {}
-        return render_template('config_lista.html', k=k, e=e, rows=rows, s=s, ver=ver, fv=fv, nf=nf, msg=request.args.get('msg'))
+        nseg = {r[0] or 'sin': r[1] for r in q(f"SELECT {VA.seg_sql()}, COUNT(*) FROM {e['tabla']} WHERE COALESCE({e['act']},1)=1 GROUP BY 1")} if e.get('seg_filtro') else {}
+        if nseg: nseg['alerta'] = nseg.get('proxima', 0) + nseg.get('vencida', 0); nseg[''] = sum(v for k_, v in nseg.items() if k_ in ('vigente','proxima','vencida','sin'))
+        return render_template('config_lista.html', k=k, e=e, rows=rows, s=s, ver=ver, fv=fv, nf=nf, seg=seg, nseg=nseg, msg=request.args.get('msg'))
 
     @app.route('/configuracion/clientes/<int:rid>/convertir', methods=['POST'])
     def cli_convertir(rid):
@@ -739,6 +755,13 @@ def registrar(app, q, db):
                 if k == 'sites' and nuevo:
                     import sitio_fotos as SF
                     extra = SF.adjuntos_nuevo(db, rid, d.get('tenencia'))
+                if k == 'vehiculos':   # fotos y PDFs capturados en el mismo formulario (alta o cambios)
+                    ex, malos = VA.adjuntos(db, q, rid)
+                    db().commit()
+                    if ex or malos:
+                        from urllib.parse import quote
+                        m = ('Vehículo guardado' + (' con ' + ex if ex else '')) + (('; rechazados: ' + '; '.join(malos)) if malos else '')
+                        return redirect(f'/configuracion/vehiculos/{rid}/editar?msg=' + quote(m) + '#fotos')
                 db().commit()
                 if k == 'sites' and nuevo and extra: return redirect(f'/configuracion/sites/{rid}/editar?msg=' + 'Site guardado con ' + extra + '#fotos')
                 return redirect(url_for('cfg_lista', k=k, msg='Guardado'))

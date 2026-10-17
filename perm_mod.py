@@ -194,6 +194,7 @@ def requerido(p, m):
     if re.match(r'^/inventario/\d+/minimos$', p): return ['inventario.ajustes']
     if p.startswith('/inventario') : return ['inventario.ver']
     if p == '/api/materiales': return ['inventario.ver', 'ordenes.materiales']
+    if p.startswith('/uploads/vehiculos/'): return ['vehiculos.ver', 'config.vehiculos']   # fotos, tarjeta de circulación y póliza
     if p.startswith('/vehiculos'): return ['vehiculos.editar'] if post else ['vehiculos.ver']
     if p.startswith('/proveedores/syscom') or p.startswith('/api/syscom') or p.startswith('/catalogo'): return ['config.syscom']
     if p.startswith('/sites/'): return ['config.sites']

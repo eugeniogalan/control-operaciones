@@ -210,8 +210,9 @@ def dashboard():
         UNION ALL SELECT id, codigo, nombre, 'UPS', ups_id, num_baterias, TRIM(COALESCE(marca,'')||' '||(CASE WHEN capacidad_kva=CAST(capacidad_kva AS INT) THEN CAST(capacidad_kva AS INT) ELSE capacidad_kva END)||'kVA'), bat_cambio, alerta FROM ({UPS.PANEL_SQL})
         ) WHERE alerta IS NOT NULL ORDER BY cambio""")
     contratos = q(f"SELECT id, codigo, nombre, tenencia, CASE tenencia WHEN 'Rentado' THEN arr_nombre ELSE int_nombre END contraparte, vence, CASE WHEN tenencia='Rentado' THEN arr_renta END arr_renta, alerta FROM (SELECT *, {SD.VENCE_SQL} vence, {SD.ALERTA_SQL} alerta FROM sitios WHERE activo=1) WHERE alerta IS NOT NULL ORDER BY vence")
+    seguros = q(f"SELECT * FROM (SELECT v.id, v.numero, v.placas, v.marca, v.modelo, v.seguro_compania, v.seguro_poliza, v.seguro_vence, {VA.seg_sql('v.')} estado FROM vehiculos v WHERE COALESCE(v.activo,1)=1) WHERE estado IN ('proxima','vencida') ORDER BY seguro_vence") if (PERM.can('vehiculos.ver') or PERM.can('config.vehiculos')) else []
     total = sum(por_estado.values()); maxc = max([r['total'] for r in por_cuad] + [1])
-    return render_template('dashboard.html', pend_autoriz=pend_autoriz, por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, contratos=contratos, hoy=dt.date.today())
+    return render_template('dashboard.html', pend_autoriz=pend_autoriz, por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, contratos=contratos, seguros=seguros, hoy=dt.date.today())
 
 # ---------- Órdenes ----------
 @app.route('/ordenes')
@@ -897,7 +898,8 @@ def vehiculos():
                 db().execute('UPDATE almacenes SET cuadrilla_id=? WHERE id=?', (int(cid) if cid else None, v['id']))
                 db().execute('UPDATE vehiculos SET cuadrilla_id=? WHERE almacen_id=?', (int(cid) if cid else None, v['id']))
         db().commit(); return redirect(url_for('vehiculos', ok=1))
-    vs = q('''SELECT a.*, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat FROM almacenes a WHERE a.tipo='vehiculo' ORDER BY a.nombre''')
+    vs = q(f'''SELECT a.*, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat, ve.id veh_id, ve.placas, ve.seguro_compania, ve.seguro_vence, {VA.seg_sql('ve.')} seguro_estado
+        FROM almacenes a LEFT JOIN vehiculos ve ON ve.almacen_id=a.id WHERE a.tipo='vehiculo' ORDER BY a.nombre''')
     cu = q('SELECT * FROM cuadrillas ORDER BY id')
     return render_template('vehiculos.html', vs=vs, cu=cu, ok=request.args.get('ok'))
 
@@ -955,11 +957,13 @@ def init_db():
     c.execute('CREATE INDEX IF NOT EXISTS ix_mat_np ON materiales(numero_parte)')
     sembrar_imagenes_ejemplo(c)
     CM.migrar(c)
+    VA.migrar(c)
     SF.migrar(c)
     UPS.migrar(c)
     SD.migrar(c)
     PM.migrar(c, PM.JSON, PLANT_DE_TIPO)
     migrar_ordenes(c)
+    VA.demo(c)     # solo datos de ejemplo: seguro ficticio de vehículos
     PERM.demo(c)   # solo datos de ejemplo; no hace nada si ya hay propietarios asignados
     c.commit(); c.close()
 import syscom_client as SC
@@ -967,6 +971,7 @@ import config_mod as CM
 import sitio_fotos as SF
 import sitio_ups as UPS
 import sitio_docs as SD
+import vehiculo_adj as VA
 import sepomex
 app.jinja_env.filters['todate'] = lambda v: dt.date.fromisoformat(v)
 CONFIG = CM.registrar(app, q, db)
@@ -976,6 +981,7 @@ sepomex.registrar(app)
 PM.MAPA_TIPO = PLANT_DE_TIPO
 PM.registrar(app, q, db, [t for cat in TIPOS.values() for lst in cat.values() for t in lst])
 SD.registrar(app, q, db)
+VA.registrar(app, q, db)
 app.config.setdefault('MAX_CONTENT_LENGTH', 80 * 1024 * 1024)
 
 @app.route('/proveedores/syscom', methods=['GET','POST'])
