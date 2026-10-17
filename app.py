@@ -272,7 +272,7 @@ def orden_form(oid=None):
         d = {k: (request.form.get(k) or '').strip() or None for k in CAMPOS}
         sel_sites = [int(x) for x in request.form.getlist('sites') if x.isdigit() and q('SELECT 1 FROM sitios WHERE id=?', (int(x),), one=True)]
         sel_tecs = [int(x) for x in request.form.getlist('tecnicos') if x.isdigit()]
-        err = validar_orden(d, sel_sites, o) or validar_personal(d, sel_tecs)
+        err = validar_orden(d, sel_sites, o) or validar_personal(d, sel_tecs, o)
         if not err:
             folio = (request.form.get('folio') or '').strip() or (o['folio'] if o else siguiente_folio(d['categoria']))
             if q('SELECT 1 FROM ordenes WHERE folio=? AND id IS NOT ?', (folio, oid), one=True): err = f'El folio {folio} ya existe'
@@ -298,10 +298,11 @@ def orden_form(oid=None):
     plant_map = {t: plantilla_de({'tipo_orden': t, 'clase': 'cliente', 'red': None, 'trabajo': None, 'categoria': 'INST'}) for t in INSTALACIONES}
     ids = set(tec_sel) | {v.get(k) for k in ('ordena_personal_id', 'responsable_id', 'audito_personal_id') if v.get(k)}
     personal = q(f"SELECT t.id, t.nombre, t.puesto, t.rol, t.cuadrilla_id, t.activo, c.nombre cuad FROM tecnicos t LEFT JOIN cuadrillas c ON c.id=t.cuadrilla_id WHERE COALESCE(t.activo,1)=1 OR t.id IN ({','.join('?'*len(ids)) or 'NULL'}) ORDER BY t.nombre", list(ids))
-    return render_template('orden_form.html', o=o, v=v, err=err, plant_map=plant_map, personal=personal, tec_sel=tec_sel, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
+    ordenantes = [dict(t, no_aut=not CM.puede_ordenar(t['puesto'])) for t in personal if CM.puede_ordenar(t['puesto']) and t['activo'] != 0 or t['id'] == v.get('ordena_personal_id')]
+    return render_template('orden_form.html', o=o, v=v, err=err, plant_map=plant_map, personal=personal, ordenantes=ordenantes, tec_sel=tec_sel, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
         clientes_cat=q("SELECT *, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE activo=1 OR id=? ORDER BY estatus='Prospecto', nombre", ((o['cliente_id'] if o else None),)), ESTADOS_MX=CM.ESTADOS_MX)
 
-def validar_personal(d, sel_tecs):
+def validar_personal(d, sel_tecs, o=None):
     """Personal elegido: debe existir (activo, salvo que ya estuviera en la orden); copia nombre/puesto a los campos del formato."""
     for k in ('ordena_personal_id', 'responsable_id', 'audito_personal_id'):
         if d[k] and not str(d[k]).isdigit(): d[k] = None
@@ -309,6 +310,11 @@ def validar_personal(d, sel_tecs):
     if todos:
         ok = {r['id']: r for r in q(f"SELECT id, nombre, puesto FROM tecnicos WHERE id IN ({','.join('?'*len(todos))})", todos)}
         if any(i not in ok for i in todos): return 'Persona no encontrada en Configuración › Personal'
+        if d['ordena_personal_id']:
+            p = ok[int(d['ordena_personal_id'])]
+            sin_cambio = o is not None and str(o['ordena_personal_id']) == str(d['ordena_personal_id'])
+            if not CM.puede_ordenar(p['puesto']) and not sin_cambio:
+                return f"«{p['nombre']}» ({p['puesto'] or 'sin puesto'}) no puede ordenar: la persona que ordena debe ser Supervisor, Gerente, Director o Vendedor"
         if d['ordena_personal_id']: p = ok[int(d['ordena_personal_id'])]; d['ordena_nombre'], d['ordena_puesto'] = p['nombre'], p['puesto'] or d['ordena_puesto']
         if d['audito_personal_id']: p = ok[int(d['audito_personal_id'])]; d['audito_nombre'], d['audito_puesto'] = p['nombre'], p['puesto'] or d['audito_puesto']
         if d['responsable_id'] and not d['ejecuto_puesto'] and ok[int(d['responsable_id'])]['puesto'] in PUESTOS_EJEC: d['ejecuto_puesto'] = ok[int(d['responsable_id'])]['puesto']

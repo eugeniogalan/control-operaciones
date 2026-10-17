@@ -279,7 +279,27 @@ def _partir_contacto(txt):
     return nombre, tel
 TIPOS_HERR = ['Herramienta','Equipo de medición','EPP','Equipo de fusión','Escalera / altura','Vehículo / remolque','Otro']
 ESTADOS_HERR = ['disponible','asignado','en reparación','baja']
-PUESTOS = ['Director','Gerente','Supervisor','Técnico Instalador','Vendedor','Almacenista','Proveedor Externo']
+PUESTOS = ['Director','Gerente','Supervisor','Vendedor','Técnico Instalador','Almacenista','Proveedor Externo']
+PUESTOS_ORDENA = ['Supervisor','Gerente','Director','Vendedor']   # únicos que pueden ser 'Persona que ordena'
+import unicodedata as _ud
+def norm_txt(t): return ''.join(ch for ch in _ud.normalize('NFD', (t or '').strip().lower()) if _ud.category(ch) != 'Mn')
+def puede_ordenar(puesto): return norm_txt(puesto) in {norm_txt(p) for p in PUESTOS_ORDENA}
+def puesto_canonico(t):
+    n = norm_txt(t)
+    for p in PUESTOS:
+        if norm_txt(p) == n: return p
+    return (t or '').strip() or None
+def migrar_puestos(c):
+    """Unifica mayúsculas/acentos de tecnicos.puesto con el catálogo PUESTOS (los valores desconocidos se conservan)."""
+    for i, p in c.execute('SELECT id, puesto FROM tecnicos WHERE puesto IS NOT NULL').fetchall():
+        cp = puesto_canonico(p)
+        if cp != p: c.execute('UPDATE tecnicos SET puesto=? WHERE id=?', (cp, i))
+    # demo: si hay personal de ejemplo y falta alguno de los puestos que ordenan, se agrega uno de ejemplo
+    if c.execute('SELECT 1 FROM tecnicos WHERE ejemplo=1 LIMIT 1').fetchone():
+        DEMO = {'Director': ('Patricia Salinas (ejemplo)', '55-0000-9001'), 'Gerente': ('Roberto Íñiguez (ejemplo)', '55-0000-9002'), 'Vendedor': ('Mónica Durán (ejemplo)', '55-0000-9003'), 'Supervisor': ('Laura Peña (ejemplo)', '55-0000-9004')}
+        for p, (n, tel) in DEMO.items():
+            if not c.execute('SELECT 1 FROM tecnicos WHERE puesto=? AND COALESCE(activo,1)=1', (p,)).fetchone() and not c.execute('SELECT 1 FROM tecnicos WHERE nombre=?', (n,)).fetchone():
+                c.execute("INSERT INTO tecnicos(nombre, puesto, telefono, ejemplo, activo) VALUES(?,?,?,1,1)", (n, p, tel))
 ESPEC = ['Fibra Óptica','Microondas','Redes / Wi-Fi','Satelital','Instalaciones a cliente','Mixta']
 
 def migrar(c, N_VEH=18):
@@ -407,6 +427,7 @@ def migrar(c, N_VEH=18):
     _mapear_torre(c)
     _migrar_alm_dom(c)
     _migrar_cli_dom(c)
+    migrar_puestos(c)
 
 def _mapear_torre(c):
     # tipo_torre libre -> categoría/modelo (solo filas aún sin categoría)
@@ -510,6 +531,7 @@ def registrar(app, q, db):
         con.execute('UPDATE vehiculos SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,)); con.execute('UPDATE almacenes SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,))
         con.execute('UPDATE herramientas SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,))
     def pers_valid(d, rid):
+        if d.get('puesto'): d['puesto'] = puesto_canonico(d['puesto'])
         if d.get('rol') and d.get('cuadrilla_id'):
             o = q('SELECT nombre FROM tecnicos WHERE cuadrilla_id=? AND rol=? AND id IS NOT ?', (d['cuadrilla_id'], d['rol'], rid), one=True)
             if o: db().execute('UPDATE tecnicos SET rol=NULL WHERE cuadrilla_id=? AND rol=? AND id IS NOT ?', (d['cuadrilla_id'], d['rol'], rid))
@@ -530,7 +552,7 @@ def registrar(app, q, db):
         buscar=['nombre','puesto','telefono','email','especialidad'],
         sql='SELECT t.*, c.nombre cuadrilla FROM tecnicos t LEFT JOIN cuadrillas c ON c.id=t.cuadrilla_id',
         cols=[('nombre','Nombre'),('puesto','Puesto'),('telefono','Teléfono'),('email','Email'),('especialidad','Especialidad'),('cuadrilla','Cuadrilla'),('rol','Rol')],
-        campos=[('nombre','Nombre','text',True),('puesto','Puesto','select',PUESTOS),('telefono','Teléfono','tel'),('email','Email','email'),('especialidad','Especialidad','select',ESPEC),
+        campos=[('nombre','Nombre','text',True),('puesto','Puesto','select',lambda: PUESTOS + [r[0] for r in q("SELECT DISTINCT puesto FROM tecnicos WHERE TRIM(COALESCE(puesto,''))<>'' ORDER BY 1") if r[0] not in PUESTOS]),('telefono','Teléfono','tel'),('email','Email','email'),('especialidad','Especialidad','select',ESPEC),
                 ('cuadrilla_id','Cuadrilla','fk',CUAD),('rol','Rol en la cuadrilla','select',['líder','técnico'])],
         hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)) or existe('SELECT 1 FROM orden_personal WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM ordenes WHERE ? IN (ordena_personal_id, responsable_id, audito_personal_id)', (i,)),
         valid=pers_valid),

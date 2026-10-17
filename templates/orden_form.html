@@ -37,7 +37,9 @@
 <label><span id="lblFP">Fecha en que se debe ejecutar</span><input type="date" name="fecha_programada" value="{{v.fecha_programada or ''}}" required></label>
 </div></fieldset>
 <fieldset><legend>Persona que ordena</legend><div class="grid g2">
-<label style="grid-column:1/-1">Persona (Configuración › Personal){{ psel('ordena_personal_id', v.ordena_personal_id, '— Selecciona persona —') }}</label>
+<label style="grid-column:1/-1">Persona (Configuración › Personal) <span class="muted">· Supervisor, Gerente, Director o Vendedor</span><select name="ordena_personal_id"><option value="">— Selecciona persona —</option>{% for t in ordenantes %}<option value="{{t.id}}" data-puesto="{{t.puesto or ''}}" {{'selected' if v.ordena_personal_id==t.id}}>{{t.nombre}} — {{t.puesto or 'sin puesto'}}{{' (puesto no autorizado)' if t.no_aut}}{{' (inactivo)' if t.activo==0}}</option>{% endfor %}</select></label>
+{% set sel_o = ordenantes|selectattr('id','equalto',v.ordena_personal_id)|list %}{% if sel_o and sel_o[0].no_aut %}<div class="ej" style="grid-column:1/-1;background:#fdf6e3;border-color:#ecd59a;color:#a16207;font-size:13px;margin:0">⚠ {{sel_o[0].nombre}} ({{sel_o[0].puesto or 'sin puesto'}}) ya no puede ordenar. Se conserva en esta orden hasta que elijas a un Supervisor, Gerente, Director o Vendedor.</div>{% endif %}
+{% if not ordenantes %}<div class="muted" style="grid-column:1/-1;font-size:12px">No hay personal activo con puesto autorizado. Agrégalo en <a href="/configuracion/personal/nuevo" target="_blank">Configuración › Personal</a>.</div>{% endif %}
 {% if v.ordena_nombre and not v.ordena_personal_id %}<div class="muted" style="grid-column:1/-1;font-size:12px">Valor anterior (texto libre): <b>{{v.ordena_nombre}}</b>{% if v.ordena_puesto %} — {{v.ordena_puesto}}{% endif %}. Elige a la persona para actualizarla.</div>{% endif %}
 <input type="hidden" name="ordena_nombre" value="{{v.ordena_nombre or ''}}"><input type="hidden" name="ordena_puesto" value="{{v.ordena_puesto or ''}}"></div></fieldset>
 

@@ -18,6 +18,7 @@ for i,(n,e,z) in enumerate(CU):
         k = i*2+j
         c.execute('INSERT INTO tecnicos(cuadrilla_id,rol,nombre,telefono,especialidad,puesto,ejemplo) VALUES(?,?,?,?,?,?,1)',
           (cid, rol, f'{NOM[k]} {AP[k]} (ejemplo)', f'55-0000-{k:04d}', e, 'Supervisor' if rol=='líder' else 'Técnico Instalador'))
+A.CM.migrar_puestos(c)   # Director, Gerente, Vendedor y Supervisor de ejemplo (pueden ordenar)
 today = dt.date.today()
 # ---- Inventario: catálogo desde plantillas.json + 20 almacenes (Torrelit, Autosound, Vehículo 01..18) ----
 A.asegurar_vehiculos(c)
