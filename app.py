@@ -48,7 +48,9 @@ def login():
 @app.route('/logout')
 def logout():
     session.clear(); return redirect(url_for('login'))
-PLANT = json.load(open(os.path.join(BASE, 'plantillas.json'), encoding='utf-8'))
+import plantillas_mod as PM
+PM.JSON = os.path.join(BASE, 'plantillas.json'); PM.DB = DB
+PLANT = PM.Plantillas()  # plantillas de Reporte de evidencias (BD; ver plantillas_mod.py)
 
 # ---- Catálogos tomados de los formatos de Excel ----
 CATEGORIAS = {
@@ -69,9 +71,11 @@ TIPOS = {
 PLANT_DE_TIPO = {'Enlace a Internet vía Fibra Optica':'FO','Enlace a Internet vía Microondas':'MO','Enlace a Internet vía Satelital':'SAT',
  'Enlace Punto-Punto vía Fibra Optica':'FO P-P','Enlace Punto-Punto vía Microondas':'MO P-P','Red Inalámbrica (Wi-Fi)':'Red WIFI','Router/Firewall/Switch':'ROUTER-FW'}
 def plantilla_de(o):
+    k = PM.ligada_a(o['tipo_orden'])  # plantilla ligada explícitamente a este tipo de orden (Configuración › Reporte de evidencias)
+    if k: return k
     if o['categoria']=='EJ-FO': return 'FO'
     if o['categoria']=='EJ-MO': return 'MO'
-    return PLANT_DE_TIPO.get(o['tipo_orden'])
+    return PM.por_tipo_orden(o['tipo_orden'])
 ESTADOS = ['pendiente','asignada','en curso','completada','cancelada']
 PRIORIDADES = ['baja','media','alta','urgente']
 PUESTOS_ORDENA = ['Director','Gerente','Vendedor','Supervisor']
@@ -360,12 +364,6 @@ def tecnico():
     ids = [o['id'] for o in de_hoy]
     pend = [o for o in q(base + "AND o.estado IN ('pendiente','asignada','en curso') ORDER BY o.fecha_programada", (cid,)) if o['id'] not in ids]
     return render_template('tecnico.html', c=c, cs=cs, de_hoy=de_hoy, pend=pend, equipo=q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (cid,)), ahora=ahora())
-
-# ---------- Catálogo de materiales ----------
-@app.route('/catalogo')
-def catalogo():
-    p = request.args.get('plantilla', 'FO')
-    return render_template('catalogo.html', plant=PLANT, p=p)
 
 @app.route('/reportes/materiales')
 def reporte_materiales():
@@ -659,6 +657,7 @@ def init_db():
     SF.migrar(c)
     UPS.migrar(c)
     SD.migrar(c)
+    PM.migrar(c, PM.JSON, PLANT_DE_TIPO)
     c.commit(); c.close()
 import syscom_client as SC
 import config_mod as CM
@@ -671,6 +670,8 @@ CONFIG = CM.registrar(app, q, db)
 SF.registrar(app, q, db, UP)
 UPS.registrar(app, q, db)
 sepomex.registrar(app)
+PM.MAPA_TIPO = PLANT_DE_TIPO
+PM.registrar(app, q, db, [t for cat in TIPOS.values() for lst in cat.values() for t in lst])
 SD.registrar(app, q, db)
 app.config.setdefault('MAX_CONTENT_LENGTH', 80 * 1024 * 1024)
 

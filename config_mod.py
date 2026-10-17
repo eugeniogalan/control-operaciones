@@ -611,7 +611,7 @@ def registrar(app, q, db):
     @app.route('/configuracion')
     def configuracion():
         cnt = {k: q(f"SELECT COUNT(*) n, SUM({e['act']}=1) a FROM {e['tabla']}", one=True) for k, e in E.items()}
-        return render_template('config_inicio.html', E=E, cnt=cnt)
+        return render_template('config_inicio.html', E=E, cnt=cnt, n_plantillas=q('SELECT COUNT(*) n FROM plantillas_evidencia WHERE activo=1', one=True)['n'])
 
     def ent(k): return E.get(k) or abort(404)
 

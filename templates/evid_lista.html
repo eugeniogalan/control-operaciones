@@ -1,0 +1,11 @@
+{% extends 'base.html' %}{% block title %}Reporte de evidencias · Control de Operaciones{% endblock %}{% block body %}
+<p class="muted" style="margin:0"><a href="/configuracion">Configuración</a> › Reporte de evidencias</p>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h1>📸 Reporte de evidencias</h1><a class="btn" href="/configuracion/evidencias/nueva">+ Nueva plantilla</a></div>
+<p class="muted" style="margin-top:-8px">Plantillas que se usan al cerrar una orden: las <b>fotografías</b> que debe tomar el técnico, los <b>reportes/PDF</b> a entregar y el <b>catálogo de materiales</b> que se puede cargar. La plantilla se elige según el tipo de orden.</p>
+{% if msg %}<div class="ej">{{msg}}</div>{% endif %}
+<div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))">{% for p in rs %}
+<div class="card" style="{{'opacity:.55' if not p.activo}}"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><span class="b">{{p.clave}}</span>{% if not p.activo %} <span class="b">inactiva</span>{% endif %}
+<div style="font-size:17px;font-weight:600;margin-top:8px">{{p.nombre}}</div>{% if p.tipo_orden %}<div class="muted">Tipo de orden: {{p.tipo_orden}}</div>{% endif %}{% if p.descripcion %}<div class="muted">{{p.descripcion}}</div>{% endif %}</div></div>
+<div style="display:flex;gap:16px;margin:12px 0"><div><div style="font-size:24px;font-weight:600">{{p.fotos|length}}</div><div class="muted">fotografías</div></div><div><div style="font-size:24px;font-weight:600">{{p.reportes|length}}</div><div class="muted">reportes</div></div><div><div style="font-size:24px;font-weight:600">{{p.materiales|length}}</div><div class="muted">materiales</div></div></div>
+<div style="display:flex;gap:6px;flex-wrap:wrap"><a class="btn sec" href="/configuracion/evidencias/{{p.id}}">Ver</a><a class="btn sec" href="/configuracion/evidencias/{{p.id}}/editar">Editar</a><a class="btn sec" href="/configuracion/evidencias/nueva?copiar={{p.id}}">Duplicar</a></div></div>
+{% else %}<p class="muted">Sin plantillas.</p>{% endfor %}</div>{% endblock %}
