@@ -134,3 +134,6 @@ c.commit(); print('materiales', c.execute('SELECT COUNT(*) FROM materiales').fet
   '· movimientos', c.execute('SELECT tipo,COUNT(*) FROM movimientos GROUP BY tipo').fetchall(), '· bajo mínimo (global)', c.execute('SELECT COUNT(*) FROM materiales WHERE stock_actual<=stock_minimo').fetchone()[0], '· alertas por almacén', c.execute('SELECT COUNT(*) FROM existencias WHERE minimo>0 AND stock<=minimo').fetchone()[0],
   '· existencias negativas', c.execute('SELECT COUNT(*) FROM existencias WHERE stock<0').fetchone()[0])
 print('órdenes', c.execute('SELECT estado,COUNT(*) FROM ordenes GROUP BY estado').fetchall())
+# los datos de ejemplo de módulos posteriores (flotilla: combustible y mantenimiento) solo se cargan en una BD recién sembrada
+c.execute('CREATE TABLE IF NOT EXISTS app_meta(k TEXT PRIMARY KEY, v TEXT)')
+c.execute("INSERT OR REPLACE INTO app_meta VALUES('demo_flota','pendiente')"); c.commit()

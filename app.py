@@ -961,6 +961,7 @@ def init_db():
     VA.migrar(c)
     CL.migrar(c)
     RM.migrar(c)
+    FL.migrar(c)
     SF.migrar(c)
     UPS.migrar(c)
     SD.migrar(c)
@@ -969,6 +970,7 @@ def init_db():
     CL.demo(c, UP)  # solo datos de ejemplo: historial de checklists diarios (días anteriores)
     VA.demo(c)     # solo datos de ejemplo: seguro ficticio de vehículos
     RM.demo(c, UP, os.path.join(BASE, 'static'))   # solo datos de ejemplo: asignaciones y cartas responsivas
+    FL.demo(c, UP)  # solo datos de ejemplo: tanques, cargas de combustible y mantenimientos
     PERM.demo(c)   # solo datos de ejemplo; no hace nada si ya hay propietarios asignados
     c.commit(); c.close()
 import syscom_client as SC
@@ -979,6 +981,7 @@ import sitio_docs as SD
 import vehiculo_adj as VA
 import checklist_mod as CL
 import responsiva_mod as RM
+import flota_mod as FL
 import sepomex
 app.jinja_env.filters['todate'] = lambda v: dt.date.fromisoformat(v)
 CONFIG = CM.registrar(app, q, db)
@@ -991,6 +994,7 @@ SD.registrar(app, q, db)
 VA.registrar(app, q, db)
 CL.registrar(app, q, db, UP)
 RM.registrar(app, q, db, UP)
+FL.registrar(app, q, db, UP)
 app.config.setdefault('MAX_CONTENT_LENGTH', 80 * 1024 * 1024)
 
 @app.route('/proveedores/syscom', methods=['GET','POST'])

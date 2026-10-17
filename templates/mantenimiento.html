@@ -1,0 +1,19 @@
+{% extends 'base.html' %}{% block body %}{% from 'flota_macros.html' import servicios_blk %}
+<style>.mt{border:1px solid #ececf0;border-radius:14px;background:#fff;padding:12px 14px;margin:0 0 10px}.mt .hd{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.chip{display:inline-block;white-space:nowrap;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:700;margin:2px 4px 0 0}.mt .dt{font-size:13px;color:#55555a;margin-top:3px;line-height:1.5}
+.ad{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}.ad a{display:flex;align-items:center;gap:6px;font-size:12px;border:1px solid #e5e5ea;border-radius:10px;padding:4px 8px;text-decoration:none;color:#333;max-width:100%}.ad img{width:44px;height:44px;object-fit:cover;border-radius:8px}</style>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h1 style="margin:0">🔧 Bitácora de mantenimiento</h1>
+{% if can('mantenimiento.registrar') %}<span style="display:flex;gap:6px"><a class="btn sec" href="/mantenimiento/intervalos{{ '?vehiculo=' ~ vf if vf }}">⚙ Intervalos</a><a class="btn" href="/mantenimiento/nuevo{{ '?vehiculo=' ~ vf if vf }}">+ Servicio</a></span>{% endif %}</div>
+{% if msg %}<div class="ej" style="margin-top:10px;background:#e7f6ec;border-color:#b9e3c6;color:#15803d">{{msg}}</div>{% endif %}
+<form method="get" class="f" style="margin:12px 0"><div class="grid" style="grid-template-columns:1fr 1fr;gap:8px"><label>Vehículo<select name="vehiculo" onchange="this.form.submit()"><option value="">Todos</option>{% for x in vs %}<option value="{{x.id}}" {{'selected' if vf==x.id}}>Vehículo {{x.numero}}{{ ' · ' ~ x.asignado if x.asignado }}</option>{% endfor %}</select></label>
+<label>Categoría<select name="categoria" onchange="this.form.submit()"><option value="">Todas</option>{% for c in FL_CATS %}<option {{'selected' if cat==c}}>{{c}}</option>{% endfor %}</select></label></div></form>
+{% if v %}<div class="card" id="servicios"><h2 style="margin-top:0">Próximos servicios · Vehículo {{v.numero}}</h2>{{ servicios_blk(serv, ka, v.id) }}</div>{% endif %}
+<p class="muted" style="margin:4px 0 10px">{{rows|length}} servicio(s) · costo total ${{'{:,.0f}'.format(total)}}</p>
+{% for r in rows %}<div class="mt"><div class="hd"><div><b style="font-size:15px">{{r.categoria}}</b> <span class="chip" style="{{'background:#eef4ff;color:#1d4ed8' if r.tipo=='Preventivo' else 'background:#fdecec;color:#c62828'}}">{{r.tipo}}</span>
+<div class="dt"><b style="color:#111">Vehículo {{r.numero}}</b> · {{r.fecha}}{{ ' · ' ~ '{:,}'.format(r.km) ~ ' km' if r.km is not none }}{{ ' · ' ~ r.taller if r.taller }}</div></div><b style="font-size:17px;white-space:nowrap">{{ '$' ~ '{:,.0f}'.format(r.costo) if r.costo is not none else '' }}</b></div>
+{% if r.descripcion %}<div class="dt">{{r.descripcion}}</div>{% endif %}
+{% if r.prox_km or r.prox_fecha %}<div class="dt">⏭ Próximo servicio: <b style="color:#111">{{ '{:,} km'.format(r.prox_km) if r.prox_km }}{{ ' o ' if r.prox_km and r.prox_fecha }}{{ r.prox_fecha or '' }}</b></div>{% endif %}
+{% if adj.get(r.id) %}<div class="ad">{% for a in adj[r.id] %}<a href="/uploads/mantenimiento/{{a.archivo}}" target="_blank">{% if a.es_pdf %}📕{% else %}<img src="/uploads/mantenimiento/t_{{a.archivo}}" alt="">{% endif %}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:150px">{{a.nombre}}</span></a>{% endfor %}</div>{% endif %}
+<div class="muted" style="font-size:11.5px;margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:6px">{{r.registrado_por or ''}}{% if can('mantenimiento.registrar') %}<a href="/mantenimiento/{{r.id}}/editar">Editar</a>{% endif %}</div></div>
+{% else %}<div class="card" style="text-align:center"><p class="muted">Sin servicios registrados{{ ' para este vehículo' if v }}.</p></div>{% endfor %}
+{% endblock %}

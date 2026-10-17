@@ -1,0 +1,33 @@
+{% extends 'base.html' %}{% block body %}
+<style>.req{color:#c62828}.g2m{display:grid;grid-template-columns:1fr 1fr;gap:10px}.seg2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}.seg2 label{margin:0!important}.seg2 input{position:absolute;opacity:0}
+.seg2 span{display:block;text-align:center;padding:11px 6px;border:1px solid #d9d9de;border-radius:12px;font-weight:600;background:#fff;cursor:pointer}.seg2 input:checked+span{background:#111;color:#fff;border-color:#111}
+.px{background:#f5f8ff;border:1px solid #d6e2fb;border-radius:14px;padding:12px;margin:4px 0 12px}.px h3{margin:0 0 4px;font-size:15px}</style>
+<div class="muted"><a href="/mantenimiento{{ '?vehiculo=' ~ r.vehiculo_id if r.vehiculo_id }}">Bitácora de mantenimiento</a> › {{ 'Editar servicio' if r.id else 'Nuevo servicio' }}</div>
+<h1 style="margin:4px 0 10px">🔧 {{ 'Editar servicio' if r.id else 'Registrar servicio' }}</h1>
+{% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">{% for e in err %}<div>⚠ {{e}}</div>{% endfor %}</div>{% endif %}
+<form class="f" method="post" enctype="multipart/form-data"><div class="card">
+<label>Vehículo <span class="req">*</span><select name="vehiculo_id" id="veh" required><option value="">— Selecciona —</option>{% for v in vs %}<option value="{{v.id}}" {{'selected' if r.vehiculo_id==v.id}}>Vehículo {{v.numero}}{{ ' · ' ~ v.placas if v.placas }}</option>{% endfor %}</select></label>
+<p class="muted" id="kmi" style="margin:-4px 0 10px;font-size:12.5px"></p>
+<div class="seg2">{% for t in FL_TMANT %}<label><input type="radio" name="tipo" value="{{t}}" {{'checked' if r.tipo==t}}><span>{{t}}</span></label>{% endfor %}</div>
+<label>Categoría <span class="req">*</span><select name="categoria" id="cat" required><option value="">— Selecciona —</option>{% for c in FL_CATS %}<option {{'selected' if r.categoria==c}}>{{c}}</option>{% endfor %}</select></label>
+<div class="g2m"><label>Fecha <span class="req">*</span><input type="date" name="fecha" id="fe" value="{{r.fecha or ''}}" required></label><label>Kilometraje<input type="number" name="km" id="km" inputmode="numeric" min="0" value="{{r.km if r.get('km') is not none else ''}}"></label></div>
+<label>Descripción<textarea name="descripcion" rows="3" placeholder="Qué se hizo, refacciones, observaciones">{{r.descripcion or ''}}</textarea></label>
+<div class="g2m"><label>Taller / proveedor<input name="taller" value="{{r.taller or ''}}" maxlength="160"></label><label>Costo ($ MXN)<input type="number" name="costo" step="0.01" min="0" inputmode="decimal" value="{{r.costo if r.get('costo') is not none else ''}}"></label></div>
+<div class="px"><h3>⏭ Próximo servicio</h3><p class="muted" id="ivt" style="margin:0 0 8px;font-size:12.5px">Se llena con el intervalo de la categoría; puedes cambiarlo o dejarlo vacío.</p>
+<div class="g2m"><label style="margin:0">Por kilometraje<input type="number" name="prox_km" id="pk" inputmode="numeric" min="0" value="{{r.prox_km if r.get('prox_km') is not none else ''}}"></label><label style="margin:0">Por fecha<input type="date" name="prox_fecha" id="pf" value="{{r.prox_fecha or ''}}"></label></div></div>
+<label>Factura / fotos (PDF o imagen)<input type="file" name="adjuntos" multiple accept="application/pdf,image/*"></label>
+{% if adj %}<div style="display:flex;gap:8px;flex-wrap:wrap;margin:0 0 8px">{% for a in adj %}<span style="display:flex;gap:6px;align-items:center;border:1px solid #e5e5ea;border-radius:10px;padding:4px 8px;font-size:12px"><a href="/uploads/mantenimiento/{{a.archivo}}" target="_blank">{{ '📕' if a.es_pdf else '🖼' }} {{a.nombre}}</a><button form="fdel{{a.id}}" class="btn rojo" style="padding:1px 8px;font-size:11px">✕</button></span>{% endfor %}</div>{% endif %}
+</div><button class="btn" style="width:100%;padding:14px">Guardar servicio</button></form>
+{% for a in adj %}<form id="fdel{{a.id}}" method="post" action="/mantenimiento/adjuntos/{{a.id}}/borrar" onsubmit="return confirm('¿Quitar el adjunto?')"></form>{% endfor %}
+{% if r.id %}<form method="post" action="/mantenimiento/{{r.id}}/borrar" onsubmit="return confirm('¿Eliminar este servicio de la bitácora?')" style="margin-top:10px;text-align:center"><button class="btn rojo">Eliminar servicio</button></form>{% endif %}
+<script>var IV={{iv|tojson}},KM={{kmact|tojson}};(function(){var v=document.getElementById('veh'),c=document.getElementById('cat'),fe=document.getElementById('fe'),km=document.getElementById('km'),pk=document.getElementById('pk'),pf=document.getElementById('pf'),
+ man={pk:{{'true' if r.get('prox_km') is not none else 'false'}},pf:{{'true' if r.get('prox_fecha') else 'false'}}};
+pk.addEventListener('input',function(){man.pk=true});pf.addEventListener('input',function(){man.pf=true});
+function addM(s,m){var d=new Date(s+'T12:00:00');var day=d.getDate();d.setMonth(d.getMonth()+m);if(d.getDate()<day)d.setDate(0);return d.toISOString().slice(0,10)}
+function upd(){var i=(IV[v.value]||{})[c.value],k=KM[v.value];document.getElementById('kmi').textContent=k!=null?'Kilometraje actual registrado: '+k.toLocaleString('es-MX')+' km':'';
+ if(km.value===''&&k!=null&&!{{'true' if r.id else 'false'}})km.placeholder=k;
+ var t=document.getElementById('ivt');if(!i){t.textContent='Esta categoría no tiene intervalo configurado: captura el próximo servicio si aplica.';return}
+ t.textContent='Intervalo: '+(i[0]?'cada '+i[0].toLocaleString('es-MX')+' km':'')+(i[0]&&i[1]?' o ':'')+(i[1]?i[1]+' meses':'')+' (lo que ocurra primero). Puedes cambiarlo.';
+ if(!man.pk){var b=parseInt(km.value);pk.value=(i[0]&&b>=0)?b+i[0]:''} if(!man.pf){pf.value=(i[1]&&fe.value)?addM(fe.value,i[1]):''}}
+[v,c,fe,km].forEach(function(e){e.addEventListener('input',upd);e.addEventListener('change',upd)});upd();})();</script>
+{% endblock %}

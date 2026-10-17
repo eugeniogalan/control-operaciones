@@ -19,7 +19,9 @@ PERMISOS = [
                     ('inventario.ajustes', 'Ajustes y mínimos'), ('inventario.transferencias', 'Transferencias')]),
     ('Escanear', [('escanear', 'Escanear códigos')]),
     ('Cuadrillas', [('cuadrillas.ver', 'Ver'), ('cuadrillas.editar', 'Editar')]),
-    ('Vehículos', [('vehiculos.ver', 'Ver'), ('vehiculos.editar', 'Asignar a cuadrilla')]),
+    ('Vehículos', [('vehiculos.ver', 'Ver'), ('vehiculos.editar', 'Asignar a cuadrilla'), ('vehiculos.dashboard', 'Dashboard de vehículos')]),
+    ('Cargas de combustible', [('combustible.registrar', 'Registrar cargas / ver las propias'), ('combustible.ver_todo', 'Ver y administrar todas las cargas')]),
+    ('Mantenimiento de vehículos', [('mantenimiento.ver', 'Ver bitácora y próximos servicios'), ('mantenimiento.registrar', 'Registrar servicios e intervalos')]),
     ('Responsivas de vehículo', [('responsivas.ver', 'Ver cartas responsivas'), ('responsivas.firmar_presencial', 'Capturar firma en persona')]),
     ('Checklist diario', [('checklist.realizar', 'Rutina obligatoria al iniciar el día'), ('checklist.ver', 'Ver checklists diarios')]),
     ('Clientes / Prospectos', [('clientes.ver', 'Ver'), ('clientes.crear', 'Crear'), ('clientes.editar', 'Editar / baja'), ('clientes.convertir', 'Convertir prospecto')]),
@@ -60,8 +62,12 @@ DEFAULTS = {
     'almacenista': ('Almacenista', _s('panel.ver', 'ordenes.ver', 'reportes.ver', 'config.materiales', 'config.almacenes', 'config.herramientas', 'config.proveedores') | _INV,
                     'todas', _ALL_CATS, ''),
 }
+for _k in DEFAULTS: DEFAULTS[_k][1].add('combustible.registrar')   # todos registran sus cargas de combustible
+for _k in ('gerente_admin', 'gerente_operaciones'): DEFAULTS[_k][1].update({'combustible.ver_todo', 'vehiculos.dashboard', 'mantenimiento.ver', 'mantenimiento.registrar'})
+DEFAULTS['supervisor'][1].add('mantenimiento.ver')
 ORDEN_DEF = list(DEFAULTS)
-PERM_NUEVOS = ['checklist.realizar', 'checklist.ver', 'config.checklist', 'responsivas.ver', 'responsivas.firmar_presencial']   # agregados a la matriz después de su creación
+PERM_NUEVOS = ['checklist.realizar', 'checklist.ver', 'config.checklist', 'responsivas.ver', 'responsivas.firmar_presencial',
+              'vehiculos.dashboard', 'combustible.registrar', 'combustible.ver_todo', 'mantenimiento.ver', 'mantenimiento.registrar']   # agregados a la matriz después de su creación
 # puesto (Configuración › Personal) -> perfil predeterminado
 PUESTO_PERFIL = {'director': 'director', 'gerente de administracion': 'gerente_admin', 'gerente de operaciones': 'gerente_operaciones', 'gerente de ventas': 'gerente_ventas',
                  'gerente de soporte/atencion': 'gerente_soporte', 'ejecutivo comercial': 'ejecutivo', 'vendedor': 'ejecutivo', 'supervisor': 'supervisor',
@@ -212,6 +218,12 @@ def requerido(p, m):
     if p == '/checklist' or p.startswith('/checklist/'): return ['checklist.realizar']
     if p.startswith('/uploads/checklists/'): return ['checklist.ver', 'checklist.realizar']
     if p.startswith('/uploads/vehiculos/'): return ['vehiculos.ver', 'config.vehiculos']   # fotos, tarjeta de circulación y póliza
+    if p.startswith('/vehiculos/dashboard'): return ['vehiculos.dashboard']
+    if p.startswith('/combustible'): return ['combustible.registrar', 'combustible.ver_todo']
+    if p.startswith('/uploads/combustible/'): return ['combustible.registrar', 'combustible.ver_todo']
+    if p == '/mantenimiento': return ['mantenimiento.ver']
+    if p.startswith('/mantenimiento'): return ['mantenimiento.registrar'] if (post or p != '/mantenimiento/intervalos') else ['mantenimiento.ver', 'mantenimiento.registrar']
+    if p.startswith('/uploads/mantenimiento/'): return ['mantenimiento.ver']
     if p.startswith('/vehiculos'): return ['vehiculos.editar'] if post else ['vehiculos.ver']
     if p.startswith('/proveedores/syscom') or p.startswith('/api/syscom') or p.startswith('/catalogo'): return ['config.syscom']
     if p.startswith('/sites/'): return ['config.sites']
@@ -232,7 +244,7 @@ def requerido(p, m):
 def inicio():
     """Primera sección permitida (para quien no ve el panel)."""
     for perm, url in (('panel.ver', '/'), ('ordenes.ver', '/tecnico'), ('inventario.ver', '/inventario'), ('clientes.ver', '/configuracion/clientes'),
-                      ('escanear', '/inventario/escanear'), ('cuadrillas.ver', '/cuadrillas'), ('vehiculos.ver', '/vehiculos'), ('reportes.ver', '/reportes/materiales'), ('checklist.ver', '/checklists')):
+                      ('escanear', '/inventario/escanear'), ('cuadrillas.ver', '/cuadrillas'), ('vehiculos.ver', '/vehiculos'), ('reportes.ver', '/reportes/materiales'), ('checklist.ver', '/checklists'), ('vehiculos.dashboard', '/vehiculos/dashboard'), ('combustible.registrar', '/combustible')):
         if can(perm): return url
     return None
 

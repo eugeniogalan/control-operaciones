@@ -513,6 +513,7 @@ def registrar(app, q, db):
             con.execute('UPDATE vehiculos SET almacen_id=? WHERE id=?', (aid, vid))
         if _g.get('veh_asig_cambio'): VA.historial(con, vid, d)   # historial + carta responsiva de la nueva asignación
     def veh_valid(d, rid):
+        if d.get('tanque_litros') is not None and not (0 < d['tanque_litros'] <= 400): return 'Capacidad del tanque: entre 1 y 400 litros'
         if d.get('seguro_vence'):
             try: d['seguro_vence'] = _dt_mod.date.fromisoformat(d['seguro_vence']).isoformat()
             except ValueError: return 'Vencimiento de póliza: fecha inválida (usa AAAA-MM-DD)'
@@ -538,7 +539,7 @@ def registrar(app, q, db):
     def veh_baja_soft(vid):
         db().execute('UPDATE almacenes SET activo=0 WHERE id=(SELECT almacen_id FROM vehiculos WHERE id=?)', (vid,))
     def veh_hist(vid):
-        if existe('SELECT 1 FROM checklists WHERE vehiculo_id=?', (vid,)) or existe('SELECT 1 FROM vehiculo_responsivas WHERE vehiculo_id=?', (vid,)): return True   # checklists / cartas responsivas: se conservan
+        if existe('SELECT 1 FROM checklists WHERE vehiculo_id=?', (vid,)) or existe('SELECT 1 FROM vehiculo_responsivas WHERE vehiculo_id=?', (vid,)) or existe('SELECT 1 FROM cargas_combustible WHERE vehiculo_id=?', (vid,)) or existe('SELECT 1 FROM mantenimientos WHERE vehiculo_id=?', (vid,)): return True   # checklists / cartas responsivas: se conservan
         v = q('SELECT almacen_id FROM vehiculos WHERE id=?', (vid,), one=True); return bool(v and v['almacen_id'] and alm_hist(v['almacen_id']))
     def veh_del(vid):
         VA.borrar_todo(db, q, vid)
@@ -588,14 +589,14 @@ def registrar(app, q, db):
         cols=[('nombre','Nombre'),('puesto','Puesto'),('area','Área'),('acceso_txt','Acceso'),('telefono','Teléfono'),('email','Email'),('especialidad','Especialidad'),('cuadrilla','Cuadrilla'),('rol','Rol')],
         campos=[('nombre','Nombre','text',True),('puesto','Puesto','select',lambda: PUESTOS + [r[0] for r in q("SELECT DISTINCT puesto FROM tecnicos WHERE TRIM(COALESCE(puesto,''))<>'' ORDER BY 1") if r[0] not in PUESTOS]),('telefono','Teléfono','tel'),('email','Email','email'),('especialidad','Especialidad','select',ESPEC),
                 ('cuadrilla_id','Cuadrilla','fk',CUAD),('rol','Rol en la cuadrilla','select',['líder','técnico']),('area','Área / Departamento','select',AREAS)],
-        hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)) or existe('SELECT 1 FROM orden_personal WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM ordenes WHERE ? IN (ordena_personal_id, responsable_id, audito_personal_id)', (i,)) or existe('SELECT 1 FROM checklists WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM responsiva_firmas WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM vehiculo_asignaciones WHERE personal_id=?', (i,)),
+        hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)) or existe('SELECT 1 FROM orden_personal WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM ordenes WHERE ? IN (ordena_personal_id, responsable_id, audito_personal_id)', (i,)) or existe('SELECT 1 FROM checklists WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM responsiva_firmas WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM vehiculo_asignaciones WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM cargas_combustible WHERE personal_id=?', (i,)),
         valid=pers_valid),
      'vehiculos': dict(titulo='Vehículos', icono='🚚', tabla='vehiculos', act='activo', orden='numero', desc='Vehículos 01–18 (cada uno es un almacén móvil); varios por cuadrilla.',
         buscar=['numero','placas','marca','modelo','numero_serie'],
         sql="SELECT v.*, c.nombre cuadrilla, a.nombre almacen, "+VA.seg_sql('v.')+" seguro_estado, "+VA.asignado_sql('v.')+" asignado, (SELECT estado FROM vehiculo_responsivas r WHERE r.vehiculo_id=v.id ORDER BY r.id DESC LIMIT 1) resp_estado, (SELECT COUNT(*) FROM vehiculo_fotos f WHERE f.vehiculo_id=v.id) nfotos, (SELECT COUNT(*) FROM vehiculo_documentos d WHERE d.vehiculo_id=v.id) ndocs FROM vehiculos v LEFT JOIN cuadrillas c ON c.id=v.cuadrilla_id LEFT JOIN almacenes a ON a.id=v.almacen_id",
         cols=[('numero','Número'),('asignado','Asignado a'),('seguro_vence','Seguro'),('placas','Placas'),('marca','Marca'),('modelo','Modelo'),('anio','Año'),('almacen','Almacén')],
         campos=[('numero','Número (01–18)','text',True),('placas','Placas','text'),('marca','Marca','text'),('modelo','Modelo','text'),('anio','Año','number'),
-                ('numero_serie','Número de serie (VIN)','text'),
+                ('numero_serie','Número de serie (VIN)','text'),('tanque_litros','Capacidad del tanque (litros)','decimal'),
                 ('asignacion_tipo','Tipo de asignación','select',VA.ASIG_TIPOS),('cuadrilla_id','Cuadrilla asignada','fk',CUAD),('personal_id','Persona asignada','fk',PERS),
                 ('asignacion_fecha','Fecha de asignación','date'),('asignacion_km','Kilometraje al asignar','number'),('notas','Notas','textarea'),
                 ('seguro_compania','Compañía de seguros','text'),('seguro_poliza','Número de póliza','text'),('seguro_vence','Vencimiento de póliza','date')],

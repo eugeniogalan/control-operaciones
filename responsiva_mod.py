@@ -74,6 +74,8 @@ def demo(c, up, static_dir):
         rnd = __import__('random').Random(11)
         for v in c.execute("SELECT id, numero, asignacion_tipo, cuadrilla_id, personal_id FROM vehiculos WHERE asignacion_tipo IN ('Cuadrilla','Persona') ORDER BY numero").fetchall():
             km = rnd.randint(15000, 90000)
+            uk = VA.ultimo_km(v['id'], c)
+            if uk: km = max(uk - rnd.randint(1500, 3000), 0)   # coherente con los checklists de ejemplo
             c.execute('UPDATE vehiculos SET asignacion_fecha=?, asignacion_km=COALESCE(asignacion_km,?) WHERE id=?', (f30, km, v['id']))
             d = {'asignacion_tipo': v['asignacion_tipo'], 'cuadrilla_id': v['cuadrilla_id'], 'personal_id': v['personal_id'], 'asignacion_fecha': f30}
             VA.historial(c, v['id'], d)

@@ -1,0 +1,13 @@
+{% extends 'base.html' %}{% block body %}
+<div class="muted"><a href="/mantenimiento{{ '?vehiculo=' ~ vf if vf }}">Bitácora de mantenimiento</a> › Intervalos</div>
+<h1 style="margin:4px 0 6px">⚙ Intervalos de servicio</h1>
+<p class="muted" style="margin:0 0 10px">Se usan para pre-llenar el «próximo servicio» al registrar un mantenimiento y para calcular el próximo cuando no se capturó. Lo que ocurra primero (km o meses).</p>
+{% if msg %}<div class="ej" style="background:#e7f6ec;border-color:#b9e3c6;color:#15803d">{{msg}}</div>{% endif %}
+<form method="get" class="f"><label>Aplicar a<select name="vehiculo" onchange="this.form.submit()"><option value="">Todos los vehículos (predeterminado)</option>{% for v in vs %}<option value="{{v.id}}" {{'selected' if vf==v.id}}>Solo Vehículo {{v.numero}}</option>{% endfor %}</select></label></form>
+<form method="post" class="f"><input type="hidden" name="vehiculo" value="{{vf or ''}}"><div class="tw"><table><tr><th>Servicio</th>{% if vf %}<th>Propio</th>{% endif %}<th>Cada km</th><th>Cada meses</th></tr>
+{% for c in FL_CATS %}{% set g0 = glob.get(c) %}{% set p0 = prop.get(c) %}{% set x = p0 or g0 %}<tr><td style="font-weight:600">{{c}}{% if vf and g0 and (g0.km or g0.meses) %}<div class="muted" style="font-size:11px;font-weight:400">General: {{ '{:,}'.format(g0.km) ~ ' km' if g0.km }}{{ ' / ' if g0.km and g0.meses }}{{ g0.meses ~ ' m' if g0.meses }}</div>{% endif %}</td>
+{% if vf %}<td><input type="checkbox" name="propio_{{c}}" value="1" style="width:auto" {{'checked' if p0}}></td>{% endif %}
+<td><input type="number" name="km_{{c}}" min="0" step="500" inputmode="numeric" style="min-width:90px" value="{{x.km if x and x.km else ''}}"></td><td><input type="number" name="me_{{c}}" min="0" max="120" inputmode="numeric" style="min-width:70px" value="{{x.meses if x and x.meses else ''}}"></td></tr>{% endfor %}</table></div>
+{% if vf %}<p class="muted" style="font-size:12px">Marca «Propio» para que este vehículo use su propio intervalo; sin marcar usa el general.</p>{% endif %}
+{% if can('mantenimiento.registrar') %}<button class="btn" style="margin-top:10px;width:100%">Guardar intervalos</button>{% endif %}</form>
+{% endblock %}

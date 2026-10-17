@@ -1,0 +1,40 @@
+{% extends 'base.html' %}{% block body %}
+<style>.fot{display:flex;align-items:center;gap:12px;border:1.5px dashed #c7c7cc;border-radius:14px;padding:12px;background:#fafafc;cursor:pointer;margin:4px 0 12px!important;position:relative}
+.fot input{position:absolute;opacity:0;width:1px;height:1px}.fot img{width:72px;height:72px;object-fit:cover;border-radius:10px;display:none}.fot.has img{display:block}.fot.has{border-style:solid;border-color:#16a34a;background:#f3fbf5}
+.fot .ico{font-size:30px}.fot.has .ico{display:none}.fot b{display:block;color:#111;font-size:15px}.req{color:#c62828}
+.w{background:#fdf6e3;border:1px solid #ecd59a;color:#7a5200;border-radius:12px;padding:10px 12px;font-size:13px;margin:-4px 0 12px}.w label{margin:6px 0 0!important;font-weight:600;color:#7a5200;display:flex!important;gap:8px;align-items:center}
+.pl{display:flex;justify-content:space-between;align-items:center;background:#f5f5f7;border-radius:12px;padding:10px 14px;margin:0 0 12px;font-size:14px}.pl b{font-size:20px}
+.tl{display:flex!important;gap:10px;align-items:center;border:1px solid #d9d9de;border-radius:12px;padding:12px;font-weight:600}.tl input{width:22px!important;height:22px}
+.g2m{display:grid;grid-template-columns:1fr 1fr;gap:10px}</style>
+<div class="muted"><a href="/combustible">Combustible</a> › Nueva carga</div>
+<h1 style="margin:4px 0 10px">⛽ Registrar carga</h1>
+{% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">{% for e in err %}<div>⚠ {{e}}</div>{% endfor %}</div>{% endif %}
+{% if avisos %}<div class="ej">Revisa los avisos marcados y confirma para guardar.{% if request.files.get('foto_ticket') and request.files['foto_ticket'].filename %} Vuelve a adjuntar la foto del ticket.{% endif %}</div>{% endif %}
+{% set av = dict(avisos) %}
+<form class="f" method="post" enctype="multipart/form-data" id="frm">
+<div class="card">
+<label>Vehículo <span class="req">*</span><select name="vehiculo_id" id="veh" required><option value="">— Selecciona —</option>{% for v in vs %}<option value="{{v.id}}" {{'selected' if sel==v.id}}>Vehículo {{v.numero}}{{ ' · ' ~ v.placas if v.placas }}{{ ' (asignado a ti)' if v.id==propio else (' (tu cuadrilla)' if v.id==cuad) }}</option>{% endfor %}</select></label>
+<p class="muted" id="vinfo" style="margin:-4px 0 10px;font-size:12.5px"></p>
+<label>Fecha y hora <span class="req">*</span><input type="datetime-local" name="fecha" value="{{F.get('fecha') or ahora}}" max="{{ahora}}" required></label>
+<div class="g2m"><label>Litros <span class="req">*</span><input name="litros" id="lit" type="number" inputmode="decimal" step="0.01" min="0.1" required value="{{F.get('litros','')}}" placeholder="Ej. 42.5"></label>
+<label>Monto ($ MXN) <span class="req">*</span><input name="monto" id="mon" type="number" inputmode="decimal" step="0.01" min="1" required value="{{F.get('monto','')}}" placeholder="Ej. 1,015.75"></label></div>
+<div class="w" id="wl" style="{{'' if av.litros else 'display:none'}}"><div id="wlt">{{av.litros}}</div><label><input type="checkbox" name="confirma_litros" value="1" style="width:auto"> Confirmo los litros</label></div>
+<div class="pl"><span>Precio por litro</span><b id="ppl">—</b></div>
+<label>Kilometraje <span class="req">*</span><input name="km" id="km" type="number" inputmode="numeric" step="1" min="0" required value="{{F.get('km','')}}" placeholder="Lectura del odómetro"></label>
+<div class="w" id="wk" style="{{'' if av.km else 'display:none'}}"><div id="wkt">{{av.km}}</div><label><input type="checkbox" name="confirma_km" value="1" style="width:auto"> Confirmo que el kilometraje es correcto</label></div>
+<label>Tipo de combustible <span class="req">*</span><select name="tipo" id="tipo" required>{% for t in FL_TIPOS %}<option {{'selected' if F.get('tipo')==t}}>{{t}}</option>{% endfor %}</select></label>
+<label class="tl"><input type="checkbox" name="tanque_lleno" value="1" {{'checked' if F.get('tanque_lleno') or not F}}><span style="flex:1">¿Tanque lleno?<span class="muted" style="display:block;font-weight:400;font-size:12px">Llénalo hasta el tope: mejora el cálculo de rendimiento</span></span></label>
+<label class="fot" id="f_tk" style="margin-top:12px!important"><input type="file" name="foto_ticket" accept="image/*" capture="environment"><span class="ico">🧾</span><img alt=""><span><b>Foto del ticket</b><span class="muted">Opcional, pero recomendada: toca para tomarla</span></span></label>
+<label>Estación / gasolinera<input name="estacion" value="{{F.get('estacion','')}}" placeholder="Opcional" maxlength="120"></label>
+<label>Notas<textarea name="notas" rows="2" placeholder="Opcional">{{F.get('notas','')}}</textarea></label></div>
+<button class="btn" style="width:100%;padding:14px">Guardar carga</button></form>
+<script>var INF={{info|tojson}};(function(){var v=document.getElementById('veh'),l=document.getElementById('lit'),m=document.getElementById('mon'),k=document.getElementById('km'),t=document.getElementById('tipo'),tocoT={{'true' if F.get('tipo') else 'false'}};
+function fmt(n){return n.toLocaleString('es-MX')}
+function upd(){var i=INF[v.value]||{},s=[];if(i.tanque)s.push('Tanque: '+fmt(i.tanque)+' L');if(i.ult)s.push('Último km: '+fmt(i.ult.km)+' ('+i.ult.fuente.toLowerCase()+', '+i.ult.fecha+')');document.getElementById('vinfo').textContent=s.join(' · ');
+ if(i.tipo&&!tocoT)t.value=i.tipo;var L=parseFloat(l.value),M=parseFloat(m.value);document.getElementById('ppl').textContent=(L>0&&M>0)?'$'+(M/L).toFixed(2)+' /L':'—';
+ var wl=document.getElementById('wl'),wk=document.getElementById('wk');
+ if(i.tanque&&L>i.tanque){wl.style.display='';document.getElementById('wlt').textContent='⚠ '+L+' L supera la capacidad del tanque ('+i.tanque+' L).';}else if(!{{'true' if av.litros else 'false'}})wl.style.display='none';
+ var K=parseInt(k.value);if(i.ult&&K>=0&&K<i.ult.km){wk.style.display='';document.getElementById('wkt').textContent='⚠ Menor al último kilometraje registrado ('+fmt(i.ult.km)+' km). Se marcará para revisión.';}else if(!{{'true' if av.km else 'false'}})wk.style.display='none';}
+[v,l,m,k].forEach(function(e){e.addEventListener('input',upd);e.addEventListener('change',upd)});t.addEventListener('change',function(){tocoT=true});upd();
+document.querySelectorAll('.fot input').forEach(function(inp){inp.addEventListener('change',function(){var f=inp.files[0],lb=inp.closest('.fot');if(!f){lb.classList.remove('has');return}var r=new FileReader();r.onload=function(e){lb.querySelector('img').src=e.target.result;lb.classList.add('has')};r.readAsDataURL(f)})});})();</script>
+{% endblock %}
