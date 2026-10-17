@@ -1,7 +1,49 @@
 {% extends 'base.html' %}{% block title %}{{p.nombre}} · Reporte de evidencias{% endblock %}{% block body %}
+<style>
+.pv-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.pv-doc{max-width:980px}
+.pv-sec{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px 18px;margin-bottom:14px}
+.pv-sec h2{margin:0 0 12px;font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx2);display:flex;align-items:center;gap:8px}
+.pv-sec h2 .n{font-size:11px;background:var(--card2);border:1px solid var(--line);border-radius:999px;padding:1px 8px;letter-spacing:0;text-transform:none}
+.pv-g{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}
+.pv-f label{display:block;font-size:12px;color:var(--tx2);font-weight:500;margin-bottom:5px}.pv-f label b{color:#c62828}
+.pv-in{border:1px solid var(--line2);border-radius:12px;min-height:42px;padding:10px 12px;color:var(--tx3);font-size:13px;background:#fbfbfc;display:flex;align-items:center;gap:8px}
+.pv-in.big{min-height:84px;align-items:flex-start}.pv-in.firma{min-height:84px;align-items:flex-end;justify-content:center;border-style:dashed}
+.pv-in.firma span{border-top:1px solid #8e8e93;width:80%;text-align:center;padding-top:4px;font-size:11px}
+.pv-ops{display:flex;flex-wrap:wrap;gap:6px}.pv-ops span{border:1px solid var(--line2);border-radius:999px;padding:5px 11px;font-size:12px;color:var(--tx2);background:#fff}
+.pv-ops span.sel{background:#111;color:#fff;border-color:#111}
+.pv-ayuda{font-size:11.5px;color:var(--tx3);margin-top:4px}
+.pv-fotos{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.pv-foto{border:1.5px dashed #c7c7cc;border-radius:14px;background:#fbfbfc;padding:10px;display:flex;flex-direction:column;gap:6px}
+.pv-foto .ph{aspect-ratio:4/3;border-radius:10px;background:#f2f2f5;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#8e8e93;font-size:26px}
+.pv-foto .ph small{font-size:11px;margin-top:2px}.pv-foto .num{font-size:11px;font-weight:600;color:var(--tx2);letter-spacing:.04em}.pv-foto .lb{font-size:12.5px;line-height:1.3}
+.pv-grp{font-size:12px;font-weight:600;margin:12px 0 8px;color:var(--tx);display:flex;align-items:center;gap:6px}.pv-grp:first-child{margin-top:0}
+.pv-pdf{border:1.5px dashed #c7c7cc;border-radius:14px;padding:12px;display:flex;gap:12px;align-items:center;background:#fbfbfc}
+.pv-pdf .ic{width:42px;height:52px;border-radius:6px;background:#fdecec;color:#c62828;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex:none}
+.pv-t th{white-space:nowrap}.pv-t td.cell{color:#c7c7cc}.pv-t tr.sub td{background:#f5f5f7;font-weight:600;font-size:12px;letter-spacing:.04em}
+</style>
 <p class="muted" style="margin:0"><a href="/configuracion">Configuración</a> › <a href="/configuracion/evidencias">Reporte de evidencias</a> › {{p.clave}}</p>
-<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h1>{{p.nombre}} <span class="b">{{p.clave}}</span></h1><div style="display:flex;gap:6px"><a class="btn" href="/configuracion/evidencias/{{p.id}}/editar">Editar</a><a class="btn sec" href="/configuracion/evidencias/nueva?copiar={{p.id}}">Duplicar</a></div></div>
-{% if p.tipo_orden %}<p class="muted" style="margin-top:-8px">Se aplica a órdenes de tipo <b>{{p.tipo_orden}}</b>.{% if not p.activo %} · Inactiva{% endif %}</p>{% endif %}{% if p.descripcion %}<p>{{p.descripcion}}</p>{% endif %}
-<div class="grid g2"><div class="card"><h2 style="margin-top:0">📷 Fotografías requeridas ({{p.fotos|length}})</h2><ol style="margin:0;padding-left:20px;line-height:1.7">{% for f in p.fotos %}<li>{{f}}</li>{% endfor %}</ol>
-<h2>📄 Reportes / archivos ({{p.reportes|length}})</h2><ul style="margin:0;padding-left:20px;line-height:1.7">{% for r in p.reportes %}<li>{{r}}</li>{% else %}<li class="muted">Ninguno</li>{% endfor %}</ul></div>
-<div class="tw"><table><tr><th>Sección</th><th>Concepto</th><th>Tipos</th><th>Unidad</th></tr>{% for m in p.materiales %}<tr><td class="muted">{{m.seccion}}</td><td>{{m.concepto}}</td><td>{{m.tipos}}</td><td>{{m.unidad}}</td></tr>{% else %}<tr><td colspan="4" class="muted">Sin materiales</td></tr>{% endfor %}</table></div></div>{% endblock %}
+<div class="pv-h"><div><h1 style="margin-bottom:4px">{{p.nombre}}</h1><p class="muted" style="margin:0 0 16px"><span class="b">{{p.clave}}</span>{% if p.tipo_orden %} · Se aplica a órdenes «{{p.tipo_orden}}»{% endif %}{% if not p.activo %} · <b>Inactiva</b>{% endif %}</p></div>
+<div style="display:flex;gap:6px"><a class="btn" href="/configuracion/evidencias/{{p.id}}/editar">Editar campos</a><a class="btn sec" href="/configuracion/evidencias/nueva?copiar={{p.id}}">Duplicar</a></div></div>
+{% set tot = namespace(c=0,f=0,r=0) %}{% for sc in p.secciones %}{% for c in sc.campos or [] %}{% set tot.c = tot.c + 1 %}{% if c.tipo=='foto' %}{% set tot.f = tot.f + 1 %}{% elif c.tipo=='pdf' %}{% set tot.r = tot.r + 1 %}{% endif %}{% endfor %}{% endfor %}
+<div class="pv-doc">
+<div class="pv-sec" style="background:#111;color:#fff;border-color:#111"><div style="font-size:11px;letter-spacing:.14em;opacity:.7">REPORTE DE EVIDENCIAS Y ACTA DE ENTREGA</div><div style="font-size:20px;font-weight:600;margin-top:4px">{{p.titulo}}</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:13px;opacity:.85"><span>{{p.secciones|length}} secciones</span><span>{{tot.c}} campos</span><span>📷 {{tot.f}} fotografías</span><span>📄 {{tot.r}} archivos PDF</span><span>📦 {{p.materiales|length}} conceptos</span></div></div>
+{% macro campo(c) %}<div class="pv-f" style="{{'grid-column:1/-1' if c.tipo in ('texto_largo','seleccion') and (c.opciones or [])|length > 3 or c.tipo=='texto_largo'}}"><label>{{c.nombre}}{% if c.req %} <b>*</b>{% endif %}</label>
+{% if c.tipo=='seleccion' %}<div class="pv-ops">{% for o in c.opciones %}<span class="{{'sel' if o==c.valor}}">{{ '●' if o==c.valor else '○' }} {{o}}</span>{% endfor %}</div>
+{% elif c.tipo=='fecha' %}<div class="pv-in">📅 DD / MM / AAAA</div>{% elif c.tipo=='numero' %}<div class="pv-in"># 0</div>
+{% elif c.tipo=='gps' %}<div class="pv-in">📍 Lectura GPS · latitud, longitud</div>{% elif c.tipo=='firma' %}<div class="pv-in firma"><span>✍ Firma</span></div>
+{% elif c.tipo=='texto_largo' %}<div class="pv-in big">Texto…</div>{% elif c.tipo=='pdf' %}<div class="pv-pdf"><div class="ic">PDF</div><div style="font-size:12.5px">Archivo PDF</div></div>
+{% else %}<div class="pv-in">Texto</div>{% endif %}{% if c.ayuda %}<div class="pv-ayuda">{{c.ayuda}}</div>{% endif %}</div>{% endmacro %}
+{% set nf = namespace(i=0) %}
+{% for sc in p.secciones %}<div class="pv-sec"><h2>{{sc.titulo}} <span class="n">{{ (sc.filas|length ~ ' conceptos') if sc.clase=='tabla' else (sc.campos|length ~ ' campo' ~ ('s' if sc.campos|length!=1 else '')) }}</span></h2>
+{% if sc.clase=='tabla' %}<div class="tw pv-t"><table><tr>{% for col in sc.columnas %}<th>{{col}}</th>{% endfor %}</tr>{% set prev = namespace(s=None) %}
+{% for f in sc.filas %}{% if f.seccion and f.seccion!=prev.s %}<tr class="sub"><td colspan="{{sc.columnas|length}}">{{f.seccion}}</td></tr>{% set prev.s=f.seccion %}{% endif %}
+<tr><td>{{f.concepto}}</td><td class="muted">{{f.tipos}}</td>{% for col in sc.columnas[2:] %}<td class="{{'' if col=='Unidad' else 'cell'}}">{{ f.unidad if col=='Unidad' else ('▢' if 'Foto' in col else '—') }}</td>{% endfor %}</tr>{% endfor %}</table></div>
+{% else %}{% set fotos = sc.campos|selectattr('tipo','equalto','foto')|list %}{% set otros = sc.campos|rejectattr('tipo','equalto','foto')|list %}
+{% if otros %}<div class="pv-g">{% for c in otros %}{{ campo(c) }}{% endfor %}</div>{% endif %}
+{% if fotos %}<div style="{{'margin-top:14px' if otros}}">{% set g = namespace(v=None, open=false) %}{% for c in fotos %}{% set nf.i = nf.i + 1 %}
+{% if (c.grupo or '') != g.v %}{% if g.open %}</div>{% endif %}{% if c.grupo %}<div class="pv-grp">📍 {{c.grupo}}</div>{% endif %}<div class="pv-fotos">{% set g.v = c.grupo or '' %}{% set g.open = true %}{% elif not g.open %}<div class="pv-fotos">{% set g.open = true %}{% endif %}
+<div class="pv-foto"><div class="ph">📷<small>Toca para tomar</small></div><div class="num">FOTOGRAFÍA {{ '%02d'|format(nf.i) }}{% if c.req %} <b style="color:#c62828">*</b>{% endif %}</div><div class="lb">{{c.nombre}}</div></div>
+{% endfor %}{% if g.open %}</div>{% endif %}</div>{% endif %}{% endif %}</div>{% endfor %}
+<p class="muted">* obligatorio. Esta es una vista previa del formato; el técnico lo llena desde la orden (Evidencias y Materiales).</p></div>{% endblock %}

@@ -1,16 +1,30 @@
 {% extends 'base.html' %}{% block title %}{{ 'Editar' if pid else 'Nueva' }} plantilla · Reporte de evidencias{% endblock %}{% block body %}
+<style>
+.ed-sec{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:14px}
+.ed-sh{display:flex;gap:8px;align-items:center;margin-bottom:10px}.ed-sh input{font-weight:600}
+.ed-row{display:grid;grid-template-columns:1fr;gap:6px;border:1px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;background:#fbfbfc}
+.ed-row .top{display:flex;gap:6px;align-items:center}.ed-row .top input{flex:1}
+.ed-row .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center}.ed-row .meta select{width:auto;flex:1;min-width:140px}
+.ed-row .meta input{flex:1;min-width:120px}.ed-row .meta label{display:flex;align-items:center;gap:6px;margin:0;font-size:12.5px;white-space:nowrap}
+.ed-row input,.ed-row select,.ed-sh input,.ed-cols{padding:9px 11px;border:1px solid var(--line2);border-radius:10px;font:inherit;background:#fff;width:100%}
+.ib{border:1px solid var(--line2);background:#fff;border-radius:999px;width:32px;height:32px;cursor:pointer;font-size:13px;flex:none;color:var(--tx)}.ib:hover{background:#f2f2f5}.ib.x{color:#c62828;border-color:#f0b4b4}
+.ed-add{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}.chip-t{font-size:11px;border-radius:999px;padding:2px 8px;background:#f2f2f5;border:1px solid var(--line);white-space:nowrap}
+.ed-tr{display:grid;grid-template-columns:1.1fr 1.6fr 1.4fr .7fr auto;gap:6px;align-items:center;margin-bottom:6px}
+@media(max-width:700px){.ed-tr{grid-template-columns:1fr 1fr;background:#fbfbfc;border:1px solid var(--line);border-radius:12px;padding:8px}.ed-tr .acts{grid-column:1/-1;display:flex;gap:6px;justify-content:flex-end}}
+.ed-tr input{padding:8px 10px;border:1px solid var(--line2);border-radius:10px;font:inherit;background:#fff;width:100%;min-width:0}
+</style>
 <p class="muted" style="margin:0"><a href="/configuracion">Configuración</a> › <a href="/configuracion/evidencias">Reporte de evidencias</a> › {{ p.clave if pid else 'Nueva' }}</p>
 <h1>{{ 'Editar plantilla' if pid else 'Nueva plantilla' }}</h1>{% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ {{err}}</div>{% endif %}
-<form class="f" method="post"><fieldset><legend>Datos generales</legend><div class="grid g2">
+<form class="f" method="post" id="fp"><fieldset><legend>Datos generales</legend><div class="grid g2">
 <label>Clave *<input name="clave" value="{{p.clave}}" {{'readonly' if pid else 'required'}} maxlength="20" placeholder="p.ej. FO, MO, SAT"></label>
 <label>Nombre *<input name="nombre" value="{{p.nombre}}" required></label>
 <label>Tipo de orden que la usa<select name="tipo_orden"><option value="">— ninguno —</option>{% for t in tipos_orden %}<option {{'selected' if t==p.tipo_orden}}>{{t}}</option>{% endfor %}</select></label>
 <label>Descripción<input name="descripcion" value="{{p.descripcion or ''}}"></label></div>
-<label><input type="checkbox" name="activo" {{'checked' if p.activo}}> Activa</label>{% if pid %}<p class="muted" style="margin:0">La clave no se puede cambiar (las órdenes existentes la usan).</p>{% endif %}</fieldset>
-<fieldset><legend>📷 Fotografías requeridas</legend><p class="muted" style="margin:0 0 6px">Una por renglón, en el orden en que se toman.</p><label><textarea name="fotos" rows="12" id="tf">{{ p.fotos|join('\n') }}</textarea></label><div class="muted" id="cf"></div></fieldset>
-<fieldset><legend>📄 Reportes / archivos a entregar</legend><p class="muted" style="margin:0 0 6px">Uno por renglón, p.ej. “Reporte de datos de entrega (PDF)”.</p><label><textarea name="reportes" rows="4">{{ p.reportes|join('\n') }}</textarea></label></fieldset>
-<fieldset><legend>📦 Catálogo de materiales</legend><p class="muted" style="margin:0 0 6px">Un concepto por renglón: <code>Sección | Concepto | Tipos | Unidad</code></p>
-<label><textarea name="materiales" rows="12" style="font-family:ui-monospace,Menlo,monospace;font-size:13px">{% for m in p.materiales %}{{m.seccion}} | {{m.concepto}} | {{m.tipos}} | {{m.unidad}}
-{% endfor %}</textarea></label></fieldset>
+<label><input type="checkbox" name="activo" {{'checked' if p.activo}}> Activa</label>{% if pid %}<p class="muted" style="margin:0">La clave no se puede cambiar (las órdenes existentes la usan). Si renombras una fotografía o PDF ya usado, las evidencias anteriores conservan el nombre viejo.</p>{% endif %}</fieldset>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:6px 0 10px"><h2 style="margin:0">Secciones y campos</h2><span class="muted" id="resumen"></span></div>
+<div id="eds"></div>
+<div class="ed-add" style="margin-bottom:16px"><button type="button" class="btn sec" data-addsec="campos">+ Sección de campos</button><button type="button" class="btn sec" data-addsec="tabla">+ Tabla de materiales</button></div>
+<input type="hidden" name="secciones" id="secjson">
 <button class="btn">Guardar</button> <a class="btn sec" href="{{ '/configuracion/evidencias/%d'%pid if pid else '/configuracion/evidencias' }}">Cancelar</a></form>
-<script>(function(){var t=document.getElementById('tf'),c=document.getElementById('cf');function f(){c.textContent=t.value.split('\n').filter(function(x){return x.trim()}).length+' fotografía(s)';}t.addEventListener('input',f);f();})();</script>{% endblock %}
+<script src="/static/evid_editor.js?v=1"></script>
+<script>EvidEditor({{ p.secciones|tojson }}, {{ TIPOS_CAMPO|tojson }});</script>{% endblock %}
