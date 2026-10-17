@@ -17,7 +17,7 @@
 <input type="hidden" name="categoria" value="{{v.categoria or ''}}"><input type="hidden" name="tipo_grupo" value="{{v.tipo_grupo or ''}}">
 <fieldset><legend>Clasificación de la orden</legend>
 <div class="qlbl">1 · Categoría</div>
-<div class="seg big" id="segClase">{% for k,t in CLASES.items() %}<label><input type="radio" name="clase" value="{{k}}" {{'checked' if v.clase==k}} required><span>{{ '🏗 ' if k=='infra' else '🏢 ' }}{{t}}<small>{{ 'Red y sitios de Spectro Networks' if k=='infra' else 'Servicios a clientes y prospectos' }}</small></span></label>{% endfor %}</div>
+<div class="seg big" id="segClase">{% for k,t in CLASES.items() %}<label><input type="radio" name="clase" value="{{k}}" {{'checked' if v.clase==k}} required><span>{{ {'infra':'🏗 ','cliente':'🏢 ','prospecto':'🎯 '}[k] }}{{t}}<small>{{ {'infra':'Red y sitios de Spectro Networks','cliente':'Servicios a clientes','prospecto':'Factibilidad para prospectos'}[k] }}</small></span></label>{% endfor %}</div>
 <div id="wRed"><div class="qlbl">2 · Red</div>
 <div class="seg">{% for k,t in REDES.items() %}<label><input type="radio" name="red" value="{{k}}" {{'checked' if v.red==k}}><span>{{t}}</span></label>{% endfor %}</div></div>
 <div id="wInst"><div class="qlbl">2 · Clasificación *</div><select id="inst"></select>
@@ -46,7 +46,7 @@
 <select name="cliente_id" id="cli" onchange="cliSel()"><option value="">— Selecciona —</option>
 <optgroup label="Clientes" id="ogC">{% for c in clientes_cat if c.estatus!='Prospecto' %}<option value="{{c.id}}" data-est="Cliente" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.municipio or c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" data-gps="{{ '%s,%s'|format(c.lat,c.lng) if c.lat is not none and c.lng is not none else '' }}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}}</option>{% endfor %}</optgroup>
 <optgroup label="Prospectos" id="ogP">{% for c in clientes_cat if c.estatus=='Prospecto' %}<option value="{{c.id}}" data-est="Prospecto" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.municipio or c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" data-gps="{{ '%s,%s'|format(c.lat,c.lng) if c.lat is not none and c.lng is not none else '' }}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}} · prospecto</option>{% endfor %}</optgroup></select></label>
-<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center"><button type="button" class="btn sec" id="btnP" onclick="abrirP()">+ Nuevo prospecto</button><a class="muted" href="/configuracion/clientes/nuevo" target="_blank" id="lnkCli">+ nuevo cliente en catálogo</a><span id="cliMsg" class="muted" style="font-size:12px"></span></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center"><button type="button" class="btn" id="btnP" onclick="abrirP()">+ Nuevo prospecto</button><a class="muted" href="/configuracion/clientes/nuevo" target="_blank" id="lnkCli">+ nuevo cliente en catálogo</a><span id="cliMsg" class="muted" style="font-size:12px"></span></div>
 {% if v.cliente and not v.cliente_id %}<div class="muted">Valor anterior (orden antigua): <b>{{v.cliente}}</b> — elige el cliente del catálogo para actualizarla.</div>{% endif %}</div>
 <label>Tipo de cliente<select name="tipo_cliente"><option></option>{% for p in TIPOS_CLIENTE %}<option {{'selected' if v.tipo_cliente==p}}>{{p}}</option>{% endfor %}</select></label>
 <label>Calle y No.<input name="calle" value="{{v.calle or ''}}"></label>
@@ -108,20 +108,21 @@ const show=(el,on)=>{if(el)el.style.display=on?'':'none';};
 let det=$('#det'),inst=$('#inst');
 function opts(sel,arr,cur,ph){sel.innerHTML=(ph!==null?'<option value="">'+(ph||'—')+'</option>':'')+arr.map(x=>`<option ${x==cur?'selected':''}>${x}</option>`).join('');}
 function pintaTr(){const c=radio('clase'),cur=radio('trabajo')||ini.tr;$('#segTr').innerHTML=(TR[c]||[]).map(t=>`<label><input type="radio" name="trabajo" value="${t}" ${t==cur?'checked':''} required><span>${t}</span></label>`).join('');
- $$('[name=trabajo]').forEach(r=>r.onchange=upd);}
-function upd(){const c=radio('clase'),r=radio('red'),t=radio('trabajo'),inf=c==='infra',cli=c==='cliente',fac=t===FACT;
- show($('#wRed'),inf);$$('[name=red]').forEach(x=>x.required=inf);$('#lblTr').textContent=inf?'3 · Tipo de trabajo':'3 · Variante';
+ $$('[name=trabajo]').forEach(r=>r.onchange=upd);const rs=$$('[name=trabajo]');if(rs.length===1)rs[0].checked=true;}
+function upd(){const c=radio('clase'),r=radio('red'),t=radio('trabajo'),inf=c==='infra',pro=c==='prospecto',cli=c==='cliente'||pro,fac=t===FACT;
+ show($('#wRed'),inf);$$('[name=red]').forEach(x=>x.required=inf);$('#lblTr').textContent=inf?'3 · Tipo de trabajo':(pro?'3 · Variante (única: Factibilidad)':'3 · Variante');
  // Detalle (infra) o Clasificación (cliente): el select activo es el que lleva name="tipo_orden"
  const curT=(inf?det.value:inst.value)||ini.det;
  if(inf){det.name='tipo_orden';inst.removeAttribute('name');opts(det,(DET[r]||{})[t]||[],curT,'— Sin detalle —');}
  else{inst.name='tipo_orden';det.removeAttribute('name');opts(inst,INST,curT,'— Elige la clasificación —');}
  show($('#wDet'),inf&&r&&t&&((DET[r]||{})[t]||[]).length);show($('#wInst'),cli);inst.required=cli;
  const otro=cli&&inst.value==='Otros';show($('#wOtro'),otro);$('#otro').required=otro;
- show($('#blkCli'),cli);$('#cli').required=cli;show($('#btnP'),cli&&fac);
- $('#lblCli').textContent=fac?'Cliente o prospecto *':'Cliente *';$('#lgCli').textContent=fac?'Cliente o prospecto':'Cliente';
- // prospectos solo para Factibilidad
- $$('#ogP option').forEach(o=>{o.disabled=!fac;});show($('#ogP'),fac);const so=$('#cli').selectedOptions[0];
- $('#cliMsg').textContent=(so&&so.dataset.est==='Prospecto'&&!fac)?'⚠ El prospecto elegido solo admite órdenes de Factibilidad':'';
+ show($('#blkCli'),cli);$('#cli').required=cli;show($('#btnP'),pro);show($('#lnkCli'),c==='cliente');
+ $('#lblCli').textContent=pro?'Prospecto *':'Cliente *';$('#lgCli').textContent=pro?'Prospecto':'Cliente';
+ // Clientes: solo estatus Cliente · Prospecto: solo estatus Prospecto (o el ya guardado en la orden)
+ $$('#ogP option').forEach(o=>{o.disabled=!pro;});$$('#ogC option').forEach(o=>{o.disabled=pro&&!o.selected;});show($('#ogP'),pro);show($('#ogC'),c==='cliente'||!!$('#ogC option:checked'));
+ const so=$('#cli').selectedOptions[0];if(so&&so.value&&so.disabled){$('#cli').value='';}
+ $('#cliMsg').textContent='';
  show($('#blkSites'),inf);$('#reqSites').textContent=inf?(r==='equipo'?'· al menos uno *':'· opcional'):'';
  const pp=(cli&&(inst.value||'').indexOf('Punto-Punto')>=0)||(inf&&r!=='equipo');show($('#wGB'),pp);$('#lblGA').textContent=pp?'Coordenadas GPS punto A':'Coordenadas GPS';
  $('#lblFP').textContent=cli&&t==='Instalación nueva'?'Fecha en que se promete la entrega':'Fecha en que se debe ejecutar';

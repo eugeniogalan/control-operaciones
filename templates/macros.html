@@ -3,8 +3,8 @@
 {% macro fh(v) %}{{ (v or '')|replace('T',' ') }}{% endmacro %}
 
 {% macro clasif(o, compacto=False) %}{% set inf = o.clase=='infra' %}<span style="display:inline-flex;flex-wrap:wrap;gap:4px;align-items:center">
-<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;{{'background:#111;color:#fff' if inf else 'background:#e8f1fd;color:#0b57d0'}}">{{ '🏗 Infra propia' if inf else '🏢 Cliente' }}</span>
+<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;white-space:nowrap;{{'background:#111;color:#fff' if inf else ('background:#fff4e5;color:#b45309;border:1px solid #f5d0a0' if o.clase=='prospecto' else 'background:#e8f1fd;color:#0b57d0')}}">{{ '🏗 Infra propia' if inf else ('🎯 Prospecto' if o.clase=='prospecto' else '🏢 Cliente') }}</span>
 {% if inf and o.red %}<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:#f2f2f5;color:#1d1d1f;border:1px solid #e5e5ea">{{ {'fibra':'Fibra óptica','microondas':'Microondas','equipo':'Equipo activo y sitios'}[o.red] }}</span>{% endif %}
 {% if not inf and o.tipo_orden %}<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;background:#f2f2f5;color:#1d1d1f;border:1px solid #e5e5ea">{{ o.clasif_otro if o.tipo_orden=='Otros' and o.clasif_otro else o.tipo_orden }}</span>{% endif %}
 <span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;background:#fff;color:#1d1d1f;border:1px solid #d2d2d7">{{o.trabajo or '—'}}</span>
-{% if o.cli_estatus=='Prospecto' %}<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#fff4e5;color:#b45309;border:1px solid #f5d0a0">Prospecto</span>{% endif %}</span>{% endmacro %}
+{% if o.clase=='prospecto' and o.cli_estatus=='Cliente' %}<span style="padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#e7f6ec;color:#15803d;border:1px solid #b9e3c6">✓ ya es cliente</span>{% endif %}</span>{% endmacro %}

@@ -72,10 +72,11 @@ TIPOS = {
 PLANT_DE_TIPO = {'Enlace a Internet vía Fibra Optica':'FO','Enlace a Internet vía Microondas':'MO','Enlace a Internet vía Satelital':'SAT',
  'Enlace Punto-Punto vía Fibra Optica':'FO P-P','Enlace Punto-Punto vía Microondas':'MO P-P','Red Inalámbrica (Wi-Fi)':'Red WIFI','Router/Firewall/Switch':'ROUTER-FW'}
 # ---- Clasificación de órdenes (dos niveles) ----
-CLASES = {'infra': 'Infraestructura propia', 'cliente': 'Clientes'}
+CLASES = {'infra': 'Infraestructura propia', 'cliente': 'Clientes', 'prospecto': 'Prospecto'}
 REDES = {'fibra': 'Red de fibra óptica', 'microondas': 'Red de microondas', 'equipo': 'Equipo activo y sitios'}
 TRABAJOS = {'infra': ['Instalación nueva', 'Mantenimiento preventivo', 'Mantenimiento correctivo'],
-            'cliente': ['Instalación nueva', 'Mantenimiento preventivo', 'Mantenimiento correctivo', 'Factibilidad', 'Desinstalación']}
+            'cliente': ['Instalación nueva', 'Mantenimiento preventivo', 'Mantenimiento correctivo', 'Factibilidad', 'Desinstalación'],
+            'prospecto': ['Factibilidad']}
 FACTIBILIDAD = 'Factibilidad'
 CAT_DE_RED = {'fibra': 'EJ-FO', 'microondas': 'EJ-MO', 'equipo': 'EJ-EQ'}
 _EQ_CONS = ['Repetidor Grande (Sitio de Concreto)','Repetidor Grande (Gabinete p/ Ext)','Repetidor Chico (Gabinete p/Exterior)','Circuito de Tierra Física','Sistema de Energía de Emergencia']
@@ -112,7 +113,9 @@ def migrar_ordenes(c):
         c.execute('UPDATE ordenes SET clase=?, red=?, trabajo=?, categoria=?, tipo_grupo=? WHERE id=?', (cl, red, tr, nc, ng, oid))
     c.execute("UPDATE ordenes SET trabajo='Instalación nueva' WHERE clase='cliente' AND trabajo='Instalación'")
     c.execute("UPDATE ordenes SET trabajo='Factibilidad' WHERE clase='cliente' AND trabajo='Estudio de factibilidad'")
-    c.execute("UPDATE ordenes SET tipo_grupo=trabajo WHERE clase='cliente' AND COALESCE(tipo_grupo,'')<>trabajo")
+    # órdenes cuyo cliente sigue siendo prospecto -> categoría Prospecto (Factibilidad)
+    c.execute("UPDATE ordenes SET clase='prospecto', trabajo='Factibilidad' WHERE clase='cliente' AND cliente_id IN (SELECT id FROM clientes WHERE estatus='Prospecto')")
+    c.execute("UPDATE ordenes SET tipo_grupo=trabajo WHERE clase IN ('cliente','prospecto') AND COALESCE(tipo_grupo,'')<>trabajo")
     c.execute('INSERT OR IGNORE INTO orden_sitios(orden_id, site_id) SELECT id, site_id FROM ordenes WHERE site_id IS NOT NULL AND site_id IN (SELECT id FROM sitios)')
     c.execute('CREATE INDEX IF NOT EXISTS ix_ord_clase ON ordenes(clase, red, trabajo)')
 
@@ -236,7 +239,7 @@ def orden_form(oid=None):
     if request.method == 'POST':
         d = {k: (request.form.get(k) or '').strip() or None for k in CAMPOS}
         sel_sites = [int(x) for x in request.form.getlist('sites') if x.isdigit() and q('SELECT 1 FROM sitios WHERE id=?', (int(x),), one=True)]
-        err = validar_orden(d, sel_sites)
+        err = validar_orden(d, sel_sites, o)
         if not err:
             folio = (request.form.get('folio') or '').strip() or (o['folio'] if o else siguiente_folio(d['categoria']))
             if q('SELECT 1 FROM ordenes WHERE folio=? AND id IS NOT ?', (folio, oid), one=True): err = f'El folio {folio} ya existe'
@@ -262,9 +265,9 @@ def orden_form(oid=None):
 
 def etiqueta(o):
     if o['clase'] == 'infra': return f"Infraestructura propia › {REDES.get(o['red'], '?')} › {o['trabajo']}"
-    return f"Clientes › {o['tipo_orden'] if o['tipo_orden'] != 'Otros' else 'Otros: ' + (o['clasif_otro'] or '')} › {o['trabajo']}"
+    return f"{CLASES.get(o['clase'], 'Clientes')} › {o['tipo_orden'] if o['tipo_orden'] != 'Otros' else 'Otros: ' + (o['clasif_otro'] or '')} › {o['trabajo']}"
 
-def validar_orden(d, sel_sites):
+def validar_orden(d, sel_sites, o=None):
     """Valida la clasificación de dos niveles y normaliza campos derivados (categoria, tipo_grupo, cliente, sitio). Devuelve mensaje de error o None."""
     if d['clase'] not in CLASES: return 'Elige la categoría: Infraestructura propia o Clientes'
     if d['trabajo'] not in TRABAJOS[d['clase']]: return 'Elige el tipo de trabajo'
@@ -278,11 +281,16 @@ def validar_orden(d, sel_sites):
         d['cliente_id'] = d['cliente'] = d['tipo_cliente'] = d['clasif_otro'] = None   # infraestructura propia: sin cliente
     else:
         d['red'] = None
-        if not d['cliente_id'] or not str(d['cliente_id']).isdigit(): return 'Elige el cliente' + (' o prospecto' if d['trabajo'] == FACTIBILIDAD else '')
+        pro = d['clase'] == 'prospecto'
+        if not d['cliente_id'] or not str(d['cliente_id']).isdigit(): return 'Elige el prospecto' if pro else 'Elige el cliente'
         cl = q("SELECT nombre, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE id=?", (int(d['cliente_id']),), one=True)
         if not cl: return 'El cliente elegido no existe'
-        if cl['estatus'] == 'Prospecto' and d['trabajo'] != FACTIBILIDAD:
-            return f"«{cl['nombre']}» es prospecto: solo admite órdenes de Factibilidad. Conviértelo a cliente en Configuración › Clientes para otras órdenes"
+        # una orden Prospecto ya existente conserva su prospecto aunque después se haya convertido a cliente (historial)
+        historial = pro and o is not None and o['clase'] == 'prospecto' and str(o['cliente_id']) == str(d['cliente_id'])
+        if pro and cl['estatus'] != 'Prospecto' and not historial:
+            return f"«{cl['nombre']}» ya es cliente: crea la orden en la categoría Clientes"
+        if not pro and cl['estatus'] == 'Prospecto':
+            return f"«{cl['nombre']}» es prospecto: usa la categoría Prospecto (Factibilidad) o conviértelo a cliente en Configuración › Clientes"
         d['cliente'] = cl['nombre']
         if d['tipo_orden'] not in INSTALACIONES: return 'Elige la clasificación de la orden (Enlace a Internet vía Fibra Optica, CCTV, Otros…)'
         if d['tipo_orden'] == 'Otros':

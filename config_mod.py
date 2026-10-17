@@ -168,8 +168,8 @@ SEED_DOM = {
     'SPN-TR-005': ('Camino al Cerro de la Reina','s/n',None,'Calle Hidalgo','Calle Morelos','Cerro de la Reina','45400','Tonalá','Portón verde al final del camino')}
 ESTATUS_CLI = ['Cliente','Prospecto']
 def cli_valid(d, rid):
-    if rid and d.get('estatus') == 'Prospecto' and _g.db.execute("SELECT 1 FROM ordenes WHERE cliente_id=? AND COALESCE(trabajo,'')<>'Factibilidad' LIMIT 1", (rid,)).fetchone():
-        return 'No puede volver a prospecto: ya tiene órdenes de cliente que no son de Factibilidad'
+    if rid and d.get('estatus') == 'Prospecto' and _g.db.execute("SELECT 1 FROM ordenes WHERE cliente_id=? AND clase='cliente' LIMIT 1", (rid,)).fetchone():
+        return 'No puede volver a prospecto: ya tiene órdenes de cliente en la categoría Clientes'
     if d.get('cp') and not (len(d['cp']) == 5 and d['cp'].isdigit()): return 'Código postal debe tener 5 dígitos'
     if 'municipio' in d: d['ciudad'] = d.get('municipio')  # las órdenes siguen usando clientes.ciudad
 
@@ -648,7 +648,7 @@ def registrar(app, q, db):
             import datetime as _dt
             db().execute("UPDATE clientes SET estatus='Cliente', convertido=? WHERE id=?", (_dt.date.today().isoformat(), rid))
             for (oid,) in db().execute('SELECT id FROM ordenes WHERE cliente_id=?', (rid,)).fetchall():
-                db().execute('INSERT INTO bitacora(orden_id,fecha,texto) VALUES(?,?,?)', (oid, _dt.datetime.now().strftime('%Y-%m-%dT%H:%M'), f"Prospecto «{r['nombre']}» convertido a cliente"))
+                db().execute('INSERT INTO bitacora(orden_id,fecha,texto) VALUES(?,?,?)', (oid, _dt.datetime.now().strftime('%Y-%m-%dT%H:%M'), f"Prospecto «{r['nombre']}» convertido a cliente (esta orden de Prospecto se conserva como historial)"))
             db().commit()
         vo = request.form.get('volver') or ''
         return redirect(vo if vo.startswith('/') and not vo.startswith('//') else url_for('cfg_lista', k='clientes', msg=f"«{r['nombre']}» ahora es cliente (se conserva su historial)"))
