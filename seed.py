@@ -63,7 +63,7 @@ CLI = [('Ejemplo Hotel Plaza','Empresa'),('Ejemplo Municipio San Pedro','Gobiern
        ('Red propia (backbone)','Empresa'),('Ejemplo Gasolinera Ruta 45','PYME')]
 CIU = [('Monterrey','Nuevo León'),('Guadalajara','Jalisco'),('Querétaro','Querétaro'),('Puebla','Puebla'),('León','Guanajuato')]
 SITIOS = ['Nodo Centro','Torre Cerro Alto','POP Industrial','Sitio Repetidor Km 32','Edificio corporativo','Sucursal 4','Caseta norte','Azotea bodega','Site principal','Poste P-118']
-ESPC = {'Fibra Óptica':['EJ-FO','INST'],'Microondas':['EJ-MO','INST'],'Instalaciones a cliente':['INST'],'Redes / Wi-Fi':['INST'],'Satelital':['INST'],'Mixta':['EJ-FO','EJ-MO','INST']}
+ESPC = {'Fibra Óptica':['EJ-FO','INST'],'Microondas':['EJ-MO','EJ-EQ','INST'],'Instalaciones a cliente':['INST'],'Redes / Wi-Fi':['INST'],'Satelital':['INST'],'Mixta':['EJ-FO','EJ-MO','EJ-EQ','INST']}
 INSTP = {'Fibra Óptica':['Enlace a Internet vía Fibra Optica','Enlace Punto-Punto vía Fibra Optica'],'Microondas':['Enlace a Internet vía Microondas','Enlace Punto-Punto vía Microondas'],
   'Redes / Wi-Fi':['Red Inalámbrica (Wi-Fi)','Router/Firewall/Switch','Cableado Estructurado','Sistema de Video-vigilancia (CCTV)'],'Satelital':['Enlace a Internet vía Satelital'],
   'Instalaciones a cliente':['Enlace a Internet vía Fibra Optica','Enlace a Internet vía Microondas','Red Inalámbrica (Wi-Fi)','Sistema de Telefonia IP','Control de Acceso (Humanos)'],
@@ -83,8 +83,8 @@ for n in range(150):
     else: estado = random.choice(['asignada','asignada','pendiente'])
     if estado == 'pendiente' and random.random() < .5: cid_ = None
     else: cid_ = cid
-    pref = {'EJ-FO':'FO','EJ-MO':'MO','INST':'IC'}[cat] + d.strftime('%y%m'); cnt[pref] = cnt.get(pref, 0) + 1
-    cli, tcli = random.choice(CLI) if cat == 'INST' else ('Red propia (backbone)','Empresa')
+    pref = {'EJ-FO':'FO','EJ-MO':'MO','EJ-EQ':'EQ','INST':'IC'}[cat] + d.strftime('%y%m'); cnt[pref] = cnt.get(pref, 0) + 1
+    cli, tcli = random.choice(CLI) if cat == 'INST' else (None, None)
     ciu, edo = random.choice(CIU)
     ini = fin = None
     if estado in ('en curso','completada'): ini = f'{d}T{random.randint(8,11):02d}:{random.choice(["00","15","30","45"])}'
@@ -112,6 +112,12 @@ for n in range(150):
             if not r or r[0] < q: alm = max([ALM['Torrelit'], ALM['Autosound']], key=lambda a: (c.execute('SELECT stock FROM existencias WHERE material_id=? AND almacen_id=?', (mid, a)).fetchone() or [0])[0])
             c.execute('INSERT INTO orden_materiales(orden_id,material_id,almacen_id,seccion,concepto,tipo,cantidad,unidad) VALUES(?,?,?,?,?,?,?,?)', (oid, mid, alm, m['seccion'], m['concepto'], random.choice(tipos), q, un))
             A.mover(c, mid, alm, 'salida', q, 'Consumo en orden', f'{pref}{cnt[pref]:04d}', oid, permitir_negativo=True, fecha=fin)
+A.migrar_ordenes(c)
+_sts = c.execute('SELECT id, codigo, nombre FROM sitios WHERE activo=1').fetchall()
+for (oid,) in c.execute("SELECT id FROM ordenes WHERE clase='infra' AND ejemplo=1 AND NOT EXISTS(SELECT 1 FROM orden_sitios WHERE orden_id=ordenes.id)").fetchall():
+    if not _sts: break
+    if random.random() < .5 or c.execute("SELECT red FROM ordenes WHERE id=?", (oid,)).fetchone()[0] == 'equipo':   # equipo activo y sitios siempre con site
+        st = random.choice(_sts); c.execute('INSERT OR IGNORE INTO orden_sitios VALUES(?,?)', (oid, st[0])); c.execute('UPDATE ordenes SET site_id=?, sitio=? WHERE id=?', (st[0], f'{st[1]} · {st[2]}', oid))
 c.commit(); print('materiales', c.execute('SELECT COUNT(*) FROM materiales').fetchone()[0], '· almacenes', c.execute('SELECT COUNT(*) FROM almacenes').fetchone()[0],
   '· movimientos', c.execute('SELECT tipo,COUNT(*) FROM movimientos GROUP BY tipo').fetchall(), '· bajo mínimo (global)', c.execute('SELECT COUNT(*) FROM materiales WHERE stock_actual<=stock_minimo').fetchone()[0], '· alertas por almacén', c.execute('SELECT COUNT(*) FROM existencias WHERE minimo>0 AND stock<=minimo').fetchone()[0],
   '· existencias negativas', c.execute('SELECT COUNT(*) FROM existencias WHERE stock<0').fetchone()[0])

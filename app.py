@@ -56,6 +56,7 @@ PLANT = PM.Plantillas()  # plantillas de Reporte de evidencias (BD; ver plantill
 CATEGORIAS = {
  'EJ-FO': 'Orden de ejecución - Red de Fibra Óptica',
  'EJ-MO': 'Orden de ejecución - Red de Microondas',
+ 'EJ-EQ': 'Orden de ejecución - Equipo activo y sitios',
  'INST': 'Orden de instalación a cliente',
 }
 TIPOS = {
@@ -70,12 +71,58 @@ TIPOS = {
 }
 PLANT_DE_TIPO = {'Enlace a Internet vía Fibra Optica':'FO','Enlace a Internet vía Microondas':'MO','Enlace a Internet vía Satelital':'SAT',
  'Enlace Punto-Punto vía Fibra Optica':'FO P-P','Enlace Punto-Punto vía Microondas':'MO P-P','Red Inalámbrica (Wi-Fi)':'Red WIFI','Router/Firewall/Switch':'ROUTER-FW'}
+# ---- Clasificación de órdenes (dos niveles) ----
+CLASES = {'infra': 'Infraestructura propia', 'cliente': 'Clientes'}
+REDES = {'fibra': 'Red de fibra óptica', 'microondas': 'Red de microondas', 'equipo': 'Equipo activo y sitios'}
+TRABAJOS = {'infra': ['Instalación nueva', 'Mantenimiento preventivo', 'Mantenimiento correctivo'],
+            'cliente': ['Instalación nueva', 'Mantenimiento preventivo', 'Mantenimiento correctivo', 'Factibilidad', 'Desinstalación']}
+FACTIBILIDAD = 'Factibilidad'
+CAT_DE_RED = {'fibra': 'EJ-FO', 'microondas': 'EJ-MO', 'equipo': 'EJ-EQ'}
+_EQ_CONS = ['Repetidor Grande (Sitio de Concreto)','Repetidor Grande (Gabinete p/ Ext)','Repetidor Chico (Gabinete p/Exterior)','Circuito de Tierra Física','Sistema de Energía de Emergencia']
+_EQ_PREV = ['Revisión de POE/Electricidad','Revisión de Torre/Sitio']
+TIPOS['EJ-EQ'] = {'Mantenimiento correctivo': ['Reparación por Daño','Reparación por Modificación','Falla de energía','Falla de equipo activo','Otros'],
+                  'Mantenimiento preventivo': _EQ_PREV + ['Revisión de equipo activo (Router/Switch/Radio)','Revisión de energía (UPS/Solar/Generador)','Otros'],
+                  'Construcción': _EQ_CONS + ['Instalación de equipo activo (Router/Switch)','Otros']}
+TIPOS['EJ-MO']['Construcción'] = [t for t in TIPOS['EJ-MO']['Construcción'] if t not in _EQ_CONS]
+TIPOS['EJ-MO']['Mantenimiento preventivo'] = [t for t in TIPOS['EJ-MO']['Mantenimiento preventivo'] if t not in _EQ_PREV] + ['Revisión de alineación/enlace']
+INSTALACIONES = TIPOS['INST']['Tipo de instalación']
+GRUPO_DE_TRABAJO = {'Instalación nueva': 'Construcción', 'Mantenimiento preventivo': 'Mantenimiento preventivo', 'Mantenimiento correctivo': 'Mantenimiento correctivo'}
+def detalles(red, trabajo):
+    """Opciones de 'Detalle' (tipo_orden) para una orden de infraestructura propia."""
+    T = TIPOS[CAT_DE_RED[red]]; g = GRUPO_DE_TRABAJO.get(trabajo)
+    return (T.get(g, []) + (T.get('Ingeniería', []) if trabajo == 'Instalación nueva' else [])) if g else []
+DETALLES = {r: {t: detalles(r, t) for t in TRABAJOS['infra']} for r in REDES}
+
+def clasificar_legado(cat, grupo, tipo):
+    """Orden antigua (categoria/tipo_grupo/tipo_orden) -> (clase, red, trabajo)."""
+    if cat == 'INST' or not cat: return 'cliente', None, 'Instalación nueva'
+    red = 'fibra' if cat == 'EJ-FO' else ('equipo' if cat == 'EJ-EQ' or tipo in _EQ_CONS + _EQ_PREV else 'microondas')
+    trabajo = {'Construcción': 'Instalación nueva', 'Ingeniería': 'Instalación nueva'}.get(grupo, grupo if grupo in TRABAJOS['infra'] else 'Instalación nueva')
+    return 'infra', red, trabajo
+
+def migrar_ordenes(c):
+    cols = [r[1] for r in c.execute('PRAGMA table_info(ordenes)')]
+    for col in ('clase', 'red', 'trabajo', 'clasif_otro'):
+        if col not in cols: c.execute(f'ALTER TABLE ordenes ADD COLUMN {col} TEXT')
+    c.execute('CREATE TABLE IF NOT EXISTS orden_sitios(orden_id INTEGER NOT NULL REFERENCES ordenes(id) ON DELETE CASCADE, site_id INTEGER NOT NULL REFERENCES sitios(id) ON DELETE CASCADE, PRIMARY KEY(orden_id, site_id))')
+    for oid, cat, grp, tipo in c.execute('SELECT id, categoria, tipo_grupo, tipo_orden FROM ordenes WHERE clase IS NULL').fetchall():
+        cl, red, tr = clasificar_legado(cat, grp, tipo)
+        nc = 'INST' if cl == 'cliente' else CAT_DE_RED[red]
+        ng = (tr if cl == 'cliente' else (grp if nc == cat else GRUPO_DE_TRABAJO[tr]))
+        c.execute('UPDATE ordenes SET clase=?, red=?, trabajo=?, categoria=?, tipo_grupo=? WHERE id=?', (cl, red, tr, nc, ng, oid))
+    c.execute("UPDATE ordenes SET trabajo='Instalación nueva' WHERE clase='cliente' AND trabajo='Instalación'")
+    c.execute("UPDATE ordenes SET trabajo='Factibilidad' WHERE clase='cliente' AND trabajo='Estudio de factibilidad'")
+    c.execute("UPDATE ordenes SET tipo_grupo=trabajo WHERE clase='cliente' AND COALESCE(tipo_grupo,'')<>trabajo")
+    c.execute('INSERT OR IGNORE INTO orden_sitios(orden_id, site_id) SELECT id, site_id FROM ordenes WHERE site_id IS NOT NULL AND site_id IN (SELECT id FROM sitios)')
+    c.execute('CREATE INDEX IF NOT EXISTS ix_ord_clase ON ordenes(clase, red, trabajo)')
+
 def plantilla_de(o):
     k = PM.ligada_a(o['tipo_orden'])  # plantilla ligada explícitamente a este tipo de orden (Configuración › Reporte de evidencias)
     if k: return k
-    if o['categoria']=='EJ-FO': return 'FO'
-    if o['categoria']=='EJ-MO': return 'MO'
-    return PM.por_tipo_orden(o['tipo_orden'])
+    try: clase, red, trabajo = o['clase'], o['red'], o['trabajo']
+    except (KeyError, IndexError): clase, red, trabajo = clasificar_legado(o['categoria'], None, o['tipo_orden'])
+    if clase == 'infra': return {'fibra': 'FO', 'microondas': 'MO', 'equipo': 'MO'}.get(red)
+    return PM.por_tipo_orden(o['tipo_orden'])   # clientes: la clasificación (FO, MO, SAT, FO P-P, MO P-P, Wi-Fi, Router) define la plantilla en cualquier variante
 ESTADOS = ['pendiente','asignada','en curso','completada','cancelada']
 PRIORIDADES = ['baja','media','alta','urgente']
 PUESTOS_ORDENA = ['Director','Gerente','Vendedor','Supervisor']
@@ -119,7 +166,7 @@ def ahora(): return dt.datetime.now().strftime('%Y-%m-%dT%H:%M')
 def log(oid, t): db().execute('INSERT INTO bitacora(orden_id,fecha,texto) VALUES(?,?,?)', (oid, ahora(), t))
 
 @app.context_processor
-def ctx(): return dict(ESTADOS=ESTADOS, PRIORIDADES=PRIORIDADES, CATEGORIAS=CATEGORIAS, TIPOS=TIPOS, PUESTOS_ORDENA=PUESTOS_ORDENA,
+def ctx(): return dict(CLASES=CLASES, REDES=REDES, TRABAJOS=TRABAJOS, DETALLES=DETALLES, INSTALACIONES=INSTALACIONES, FACTIBILIDAD=FACTIBILIDAD, ESTADOS=ESTADOS, PRIORIDADES=PRIORIDADES, CATEGORIAS=CATEGORIAS, TIPOS=TIPOS, PUESTOS_ORDENA=PUESTOS_ORDENA,
     PUESTOS_EJEC=PUESTOS_EJEC, PUESTOS_AUD=PUESTOS_AUD, TIPOS_CLIENTE=TIPOS_CLIENTE, hoy=hoy(), tipos_json=json.dumps(TIPOS, ensure_ascii=False))
 
 VENCIDA = "(o.estado NOT IN ('completada','cancelada') AND o.fecha_programada < date('now','localtime'))"
@@ -131,7 +178,7 @@ def dashboard():
     por_cuad = q(f'''SELECT c.id, c.nombre, COUNT(o.id) total, SUM(o.estado='completada') comp, SUM(o.estado IN ('pendiente','asignada','en curso')) abiertas,
         SUM({VENCIDA}) venc FROM cuadrillas c LEFT JOIN ordenes o ON o.cuadrilla_id=c.id GROUP BY c.id ORDER BY c.id''')
     vencidas = q(f'SELECT o.*, c.nombre cuad FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id WHERE {VENCIDA} ORDER BY o.fecha_programada LIMIT 50')
-    por_cat = q('SELECT categoria, COUNT(*) n FROM ordenes GROUP BY categoria')
+    por_cat = q("SELECT clase, red, trabajo, COUNT(*) n, SUM(estado IN ('pendiente','asignada','en curso')) abiertas FROM ordenes GROUP BY clase, red, trabajo ORDER BY clase='cliente', red, trabajo")
     hoy_n = q("SELECT COUNT(*) n FROM ordenes WHERE fecha_programada=date('now','localtime')", one=True)['n']
     pend_aud = q("SELECT COUNT(*) n FROM ordenes WHERE estado='completada' AND (aprobacion IS NULL OR aprobacion='')", one=True)['n']
     stock_alm = q(f"SELECT a.id, a.nombre, a.tipo, c.nombre cuad, COUNT(CASE WHEN e.stock>0 THEN 1 END) n, SUM(CASE WHEN e.stock<0 THEN 1 ELSE 0 END) neg, SUM(CASE WHEN m.activo=1 AND {BAJO_ALM} THEN 1 ELSE 0 END) bajo FROM almacenes a LEFT JOIN existencias e ON e.almacen_id=a.id LEFT JOIN materiales m ON m.id=e.material_id LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id GROUP BY a.id ORDER BY a.tipo='vehiculo', CASE WHEN a.tipo='bodega' THEN a.id END, a.nombre")
@@ -149,30 +196,33 @@ def dashboard():
 # ---------- Órdenes ----------
 @app.route('/ordenes')
 def ordenes():
-    f = {k: request.args.get(k, '') for k in ('estado','cuadrilla','cliente','desde','hasta','categoria','buscar','vencidas')}
+    f = {k: request.args.get(k, '') for k in ('estado','cuadrilla','cliente','desde','hasta','categoria','clase','red','trabajo','clasif','buscar','vencidas')}
     w, a = ['1=1'], []
+    for k in ('clase','red','trabajo'):
+        if f[k]: w.append(f'o.{k}=?'); a.append(f[k])
     if f['estado']: w.append('o.estado=?'); a.append(f['estado'])
     if f['cuadrilla']: w.append('o.cuadrilla_id=?'); a.append(f['cuadrilla'])
     if f['categoria']: w.append('o.categoria=?'); a.append(f['categoria'])
     if f['cliente']: w.append('o.cliente LIKE ?'); a.append('%'+f['cliente']+'%')
-    if f['buscar']: w.append('(o.folio LIKE ? OR o.sitio LIKE ? OR o.tipo_orden LIKE ?)'); a += ['%'+f['buscar']+'%']*3
+    if f.get('clasif'): w.append('o.tipo_orden=?'); a.append(f['clasif'])
+    if f['buscar']: w.append('(o.folio LIKE ? OR o.sitio LIKE ? OR o.tipo_orden LIKE ? OR o.cliente LIKE ? OR o.clasif_otro LIKE ?)'); a += ['%'+f['buscar']+'%']*5
     if f['desde']: w.append('o.fecha_programada>=?'); a.append(f['desde'])
     if f['hasta']: w.append('o.fecha_programada<=?'); a.append(f['hasta'])
     if f['vencidas']: w.append(VENCIDA)
     where = ' AND '.join(w)
     total = q(f'SELECT COUNT(*) n FROM ordenes o WHERE {where}', a, one=True)['n']
     per = 20; pages = max(1, math.ceil(total/per)); page = min(max(1, int(request.args.get('page', 1) or 1)), pages)
-    rows = q(f'SELECT o.*, c.nombre cuad, {VENCIDA} vencida FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id WHERE {where} ORDER BY o.fecha_programada DESC, o.id DESC LIMIT ? OFFSET ?', a+[per, (page-1)*per])
+    rows = q(f'SELECT o.*, c.nombre cuad, {VENCIDA} vencida, cl.estatus cli_estatus, (SELECT GROUP_CONCAT(st.codigo, \', \') FROM orden_sitios os JOIN sitios st ON st.id=os.site_id WHERE os.orden_id=o.id) sites_txt FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id LEFT JOIN clientes cl ON cl.id=o.cliente_id WHERE {where} ORDER BY o.fecha_programada DESC, o.id DESC LIMIT ? OFFSET ?', a+[per, (page-1)*per])
     clientes = [r['cliente'] for r in q('SELECT DISTINCT cliente FROM ordenes WHERE cliente IS NOT NULL ORDER BY cliente')]
     qs = {k: v for k, v in f.items() if v}
     return render_template('ordenes.html', rows=rows, f=f, total=total, page=page, pages=pages, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), clientes=clientes, qs=qs)
 
-CAMPOS = ['categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
+CAMPOS = ['clase','red','trabajo','clasif_otro','categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
  'cliente','cliente_id','tipo_cliente','calle','ciudad','estado_geo','contacto','telefono','coordenadas','coordenadas_b','sitio','site_id','descripcion','cuadrilla_id','ejecuto_puesto',
  'personas_adicionales','observaciones','notas','folio_evidencias','audito_nombre','audito_puesto','fecha_auditoria','aprobacion','obs_auditoria']
 
 def siguiente_folio(cat):
-    pref = {'EJ-FO':'FO','EJ-MO':'MO','INST':'IC'}[cat] + dt.date.today().strftime('%y%m')
+    pref = {'EJ-FO':'FO','EJ-MO':'MO','EJ-EQ':'EQ','INST':'IC'}[cat] + dt.date.today().strftime('%y%m')
     n = q('SELECT COUNT(*) n FROM ordenes WHERE folio LIKE ?', (pref+'%',), one=True)['n']
     while q('SELECT 1 FROM ordenes WHERE folio=?', (f'{pref}{n+1:04d}',), one=True): n += 1
     return f'{pref}{n+1:04d}'
@@ -182,31 +232,95 @@ def siguiente_folio(cat):
 def orden_form(oid=None):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) if oid else None
     if oid and not o: abort(404)
+    err = None; sel_sites = [r['site_id'] for r in q('SELECT site_id FROM orden_sitios WHERE orden_id=?', (oid,))] if oid else []
     if request.method == 'POST':
-        d = {k: (request.form.get(k) or None) for k in CAMPOS}
-        if d['cliente_id']:   # catálogo manda; el texto libre solo queda para órdenes antiguas
-            cl = q('SELECT nombre FROM clientes WHERE id=?', (d['cliente_id'],), one=True); d['cliente'] = cl['nombre'] if cl else d['cliente']
-        if d['site_id']:
-            st = q('SELECT codigo, nombre FROM sitios WHERE id=?', (d['site_id'],), one=True); d['sitio'] = f"{st['codigo']} · {st['nombre']}" if st else d['sitio']
-        if d['cuadrilla_id'] and d['estado'] == 'pendiente': d['estado'] = 'asignada'
-        if d['estado'] == 'completada' and not d['fecha_cierre']: d['fecha_cierre'] = ahora()
-        folio = request.form.get('folio') or (o['folio'] if o else siguiente_folio(d['categoria'] or 'INST'))
-        if o:
-            db().execute(f"UPDATE ordenes SET folio=?, {', '.join(k+'=?' for k in CAMPOS)} WHERE id=?", [folio]+[d[k] for k in CAMPOS]+[oid])
-            if o['estado'] != d['estado']: log(oid, f"Estado: {o['estado']} → {d['estado']} (oficina)")
-        else:
-            cur = db().execute(f"INSERT INTO ordenes(folio,{','.join(CAMPOS)}) VALUES(?{',?'*len(CAMPOS)})", [folio]+[d[k] for k in CAMPOS]); oid = cur.lastrowid
-            log(oid, 'Orden creada')
-        db().commit(); return redirect(url_for('orden_ver', oid=oid))
-    return render_template('orden_form.html', o=o, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, cliente_id, direccion, ciudad, estado, lat, lng, contacto FROM sitios WHERE activo=1 OR id=? ORDER BY codigo', ((o['site_id'] if o else None),)),
-        clientes_cat=q('SELECT * FROM clientes WHERE activo=1 OR id=? ORDER BY nombre', ((o['cliente_id'] if o else None),)))
+        d = {k: (request.form.get(k) or '').strip() or None for k in CAMPOS}
+        sel_sites = [int(x) for x in request.form.getlist('sites') if x.isdigit() and q('SELECT 1 FROM sitios WHERE id=?', (int(x),), one=True)]
+        err = validar_orden(d, sel_sites)
+        if not err:
+            folio = (request.form.get('folio') or '').strip() or (o['folio'] if o else siguiente_folio(d['categoria']))
+            if q('SELECT 1 FROM ordenes WHERE folio=? AND id IS NOT ?', (folio, oid), one=True): err = f'El folio {folio} ya existe'
+        if not err:
+            if d['cuadrilla_id'] and d['estado'] == 'pendiente': d['estado'] = 'asignada'
+            if d['estado'] == 'completada' and not d['fecha_cierre']: d['fecha_cierre'] = ahora()
+            if o:
+                db().execute(f"UPDATE ordenes SET folio=?, {', '.join(k+'=?' for k in CAMPOS)} WHERE id=?", [folio]+[d[k] for k in CAMPOS]+[oid])
+                if o['estado'] != d['estado']: log(oid, f"Estado: {o['estado']} → {d['estado']} (oficina)")
+                if (o['clase'], o['red'], o['trabajo']) != (d['clase'], d['red'], d['trabajo']): log(oid, f"Clasificación: {etiqueta(o)} → {etiqueta(d)}")
+            else:
+                cur = db().execute(f"INSERT INTO ordenes(folio,{','.join(CAMPOS)}) VALUES(?{',?'*len(CAMPOS)})", [folio]+[d[k] for k in CAMPOS]); oid = cur.lastrowid
+                log(oid, 'Orden creada · ' + etiqueta(d))
+            db().execute('DELETE FROM orden_sitios WHERE orden_id=?', (oid,))
+            for sid in sel_sites: db().execute('INSERT OR IGNORE INTO orden_sitios(orden_id, site_id) VALUES(?,?)', (oid, sid))
+            db().commit(); return redirect(url_for('orden_ver', oid=oid))
+        v = dict(o or {}); v.update(d); v['folio'] = request.form.get('folio') or (o['folio'] if o else '')
+        for k in ('cliente_id', 'site_id', 'cuadrilla_id'): v[k] = int(v[k]) if v.get(k) and str(v[k]).isdigit() else None
+    else: v = dict(o) if o else {'clase': request.args.get('clase') or 'cliente', 'red': request.args.get('red'), 'trabajo': request.args.get('trabajo')}
+    plant_map = {t: plantilla_de({'tipo_orden': t, 'clase': 'cliente', 'red': None, 'trabajo': None, 'categoria': 'INST'}) for t in INSTALACIONES}
+    return render_template('orden_form.html', o=o, v=v, err=err, plant_map=plant_map, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
+        clientes_cat=q("SELECT *, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE activo=1 OR id=? ORDER BY estatus='Prospecto', nombre", ((o['cliente_id'] if o else None),)), ESTADOS_MX=CM.ESTADOS_MX)
+
+def etiqueta(o):
+    if o['clase'] == 'infra': return f"Infraestructura propia › {REDES.get(o['red'], '?')} › {o['trabajo']}"
+    return f"Clientes › {o['tipo_orden'] if o['tipo_orden'] != 'Otros' else 'Otros: ' + (o['clasif_otro'] or '')} › {o['trabajo']}"
+
+def validar_orden(d, sel_sites):
+    """Valida la clasificación de dos niveles y normaliza campos derivados (categoria, tipo_grupo, cliente, sitio). Devuelve mensaje de error o None."""
+    if d['clase'] not in CLASES: return 'Elige la categoría: Infraestructura propia o Clientes'
+    if d['trabajo'] not in TRABAJOS[d['clase']]: return 'Elige el tipo de trabajo'
+    if not d['fecha_programada']: return 'La fecha programada es obligatoria'
+    if d['clase'] == 'infra':
+        if d['red'] not in REDES: return 'Elige la red: fibra óptica, microondas o equipo activo y sitios'
+        if d['red'] == 'equipo' and not sel_sites: return 'Las órdenes de «Equipo activo y sitios» requieren al menos un Site del catálogo'
+        if d['tipo_orden'] and d['tipo_orden'] not in DETALLES[d['red']][d['trabajo']]: d['tipo_orden'] = None
+        d['categoria'] = CAT_DE_RED[d['red']]; d['tipo_grupo'] = GRUPO_DE_TRABAJO[d['trabajo']]
+        if d['tipo_orden'] in TIPOS[d['categoria']].get('Ingeniería', []): d['tipo_grupo'] = 'Ingeniería'
+        d['cliente_id'] = d['cliente'] = d['tipo_cliente'] = d['clasif_otro'] = None   # infraestructura propia: sin cliente
+    else:
+        d['red'] = None
+        if not d['cliente_id'] or not str(d['cliente_id']).isdigit(): return 'Elige el cliente' + (' o prospecto' if d['trabajo'] == FACTIBILIDAD else '')
+        cl = q("SELECT nombre, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE id=?", (int(d['cliente_id']),), one=True)
+        if not cl: return 'El cliente elegido no existe'
+        if cl['estatus'] == 'Prospecto' and d['trabajo'] != FACTIBILIDAD:
+            return f"«{cl['nombre']}» es prospecto: solo admite órdenes de Factibilidad. Conviértelo a cliente en Configuración › Clientes para otras órdenes"
+        d['cliente'] = cl['nombre']
+        if d['tipo_orden'] not in INSTALACIONES: return 'Elige la clasificación de la orden (Enlace a Internet vía Fibra Optica, CCTV, Otros…)'
+        if d['tipo_orden'] == 'Otros':
+            if not d['clasif_otro']: return 'Describe la clasificación «Otros»'
+        else: d['clasif_otro'] = None
+        d['categoria'] = 'INST'; d['tipo_grupo'] = d['trabajo']
+    d['site_id'] = sel_sites[0] if sel_sites else None
+    if sel_sites:
+        d['sitio'] = ', '.join(f"{r['codigo']} · {r['nombre']}" for r in q(f"SELECT codigo, nombre FROM sitios WHERE id IN ({','.join('?'*len(sel_sites))}) ORDER BY codigo", sel_sites))
+    return None
+
+@app.route('/api/prospectos', methods=['POST'])
+def api_prospecto():
+    """Alta rápida de prospecto desde el formulario de orden (Factibilidad)."""
+    j = request.get_json(silent=True) or {}
+    g = lambda k: (str(j.get(k) or '')).strip() or None
+    d = {k: g(k) for k in ('nombre','contacto','telefono','email','calle','num_ext','colonia','cp','municipio','estado','lat','lng')}
+    if not d['nombre']: return jsonify(error='El nombre es obligatorio'), 400
+    if d['cp'] and not (len(d['cp']) == 5 and d['cp'].isdigit()): return jsonify(error='Código postal debe tener 5 dígitos'), 400
+    if d['telefono'] and len(''.join(ch for ch in d['telefono'] if ch.isdigit())) < 10: return jsonify(error='Teléfono debe tener 10 dígitos'), 400
+    if d['email'] and '@' not in d['email']: return jsonify(error='Correo inválido'), 400
+    for k in ('lat','lng'):
+        if d[k]:
+            try: d[k] = float(d[k])
+            except ValueError: return jsonify(error='Coordenadas inválidas'), 400
+    if q('SELECT 1 FROM clientes WHERE nombre=?', (d['nombre'],), one=True): return jsonify(error='Ya existe un cliente o prospecto con ese nombre'), 400
+    calle = ' '.join(x for x in (d['calle'], d['num_ext']) if x) or None
+    cid = db().execute("INSERT INTO clientes(nombre,contacto,telefono,email,calle,colonia,cp,municipio,ciudad,estado,lat,lng,estatus,activo) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,'Prospecto',1)",
+        (d['nombre'], d['contacto'], d['telefono'], d['email'], calle, d['colonia'], d['cp'], d['municipio'], d['municipio'], d['estado'], d['lat'], d['lng'])).lastrowid
+    db().commit()
+    return jsonify(id=cid, nombre=d['nombre'], estatus='Prospecto', contacto=d['contacto'] or '', telefono=d['telefono'] or '', calle=calle or '', ciudad=d['municipio'] or '', estado=d['estado'] or '', lat=d['lat'], lng=d['lng'])
 
 @app.route('/ordenes/<int:oid>')
 def orden_ver(oid):
-    o = q('SELECT o.*, c.nombre cuad FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id WHERE o.id=?', (oid,), one=True) or abort(404)
+    o = q("SELECT o.*, c.nombre cuad, cl.estatus cli_estatus FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id LEFT JOIN clientes cl ON cl.id=o.cliente_id WHERE o.id=?", (oid,), one=True) or abort(404)
     p = plantilla_de(o); pl = PLANT.get(p) if p else None
     fotos = {r['item']: r for r in q('SELECT * FROM orden_fotos WHERE orden_id=?', (oid,))}
-    return render_template('orden_ver.html', o=o, plantilla=p, pl=pl, fotos=fotos,
+    return render_template('orden_ver.html', o=o, sites=q('SELECT s.id, s.codigo, s.nombre, s.tipo FROM orden_sitios os JOIN sitios s ON s.id=os.site_id WHERE os.orden_id=? ORDER BY s.codigo', (oid,)), plantilla=p, pl=pl, fotos=fotos,
         mats=q('SELECT m.*, a.nombre alm FROM orden_materiales m LEFT JOIN almacenes a ON a.id=m.almacen_id WHERE m.orden_id=? ORDER BY m.id', (oid,)), bit=q('SELECT * FROM bitacora WHERE orden_id=? ORDER BY id DESC', (oid,)),
         equipo=q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (o['cuadrilla_id'],)))
 
@@ -321,7 +435,10 @@ def imprimir(oid, fmt):
     equipo = q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (o['cuadrilla_id'],))
     mats = q('SELECT * FROM orden_materiales WHERE orden_id=? ORDER BY id', (oid,))
     fotos = {r['item']: r for r in q('SELECT * FROM orden_fotos WHERE orden_id=?', (oid,))}
-    return render_template('imprimir_orden.html' if fmt == 'orden' else 'imprimir_evidencias.html', o=o, pl=pl, plantilla=p, equipo=equipo, mats=mats, fotos=fotos)
+    if fmt != 'orden' and not pl:   # sin plantilla: mismas fotos libres que la pantalla de evidencias
+        pl = {'fotos': ['Foto libre 1','Foto libre 2','Foto libre 3','Foto libre 4'] + sorted(k for k in fotos if not k.startswith('Foto libre')), 'reportes': []}
+    sites = q('SELECT s.codigo, s.nombre FROM orden_sitios os JOIN sitios s ON s.id=os.site_id WHERE os.orden_id=? ORDER BY s.codigo', (oid,))
+    return render_template('imprimir_orden.html' if fmt == 'orden' else 'imprimir_evidencias.html', o=o, sites=sites, pl=pl, plantilla=p, equipo=equipo, mats=mats, fotos=fotos)
 
 # ---------- Cuadrillas / técnicos ----------
 @app.route('/cuadrillas')
@@ -658,6 +775,7 @@ def init_db():
     UPS.migrar(c)
     SD.migrar(c)
     PM.migrar(c, PM.JSON, PLANT_DE_TIPO)
+    migrar_ordenes(c)
     c.commit(); c.close()
 import syscom_client as SC
 import config_mod as CM

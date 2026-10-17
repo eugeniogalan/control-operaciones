@@ -1,37 +1,70 @@
 {% extends 'base.html' %}{% block body %}
 <h1>{{ 'Editar orden '+o.folio if o else 'Nueva orden de trabajo' }}</h1>
-{% set v = o or {} %}
-<form class="f" method="post" data-cpmx data-estado="estado_geo" data-municipio="ciudad">
+<style>
+.seg{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 2px}.seg input{position:absolute;opacity:0;width:1px;height:1px}
+.seg label{margin:0;cursor:pointer}.seg span{display:inline-flex;align-items:center;gap:6px;padding:10px 16px;border-radius:999px;border:1px solid #d2d2d7;background:#fff;font-weight:600;font-size:14px;color:#1d1d1f}
+.seg input:checked+span{background:#111;color:#fff;border-color:#111}.seg input:focus-visible+span{outline:2px solid #0071e3;outline-offset:2px}
+.seg.big span{padding:14px 18px;font-size:15px;border-radius:16px;flex-direction:column;align-items:flex-start;gap:2px;min-width:150px}.seg.big small{font-weight:400;opacity:.7;font-size:12px}
+.qlbl{font-size:13px;font-weight:600;color:#6e6e73;margin:14px 0 4px;letter-spacing:.02em}.qlbl:first-child{margin-top:0}
+.sitelist{max-height:260px;overflow:auto;border:1px solid #e5e5ea;border-radius:12px;background:#fff}.sitelist label{display:flex;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #f0f0f2;margin:0;font-weight:400}
+.sitelist label:last-child{border-bottom:0}.sitelist input{width:auto}.sitelist small{color:#6e6e73}
+.badge-p{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#fff4e5;color:#b45309;border:1px solid #f5d0a0}
+#dlgP{border:0;border-radius:20px;padding:0;width:min(560px,96vw);max-height:92vh}#dlgP::backdrop{background:rgba(0,0,0,.35)}#dlgP .in{padding:18px}
+</style>
+{% set v = v or {} %}
+{% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ {{err}}</div>{% endif %}
+<form class="f" method="post" id="forden" data-cpmx data-estado="estado_geo" data-municipio="ciudad">
+<input type="hidden" name="categoria" value="{{v.categoria or ''}}"><input type="hidden" name="tipo_grupo" value="{{v.tipo_grupo or ''}}">
+<fieldset><legend>Clasificación de la orden</legend>
+<div class="qlbl">1 · Categoría</div>
+<div class="seg big" id="segClase">{% for k,t in CLASES.items() %}<label><input type="radio" name="clase" value="{{k}}" {{'checked' if v.clase==k}} required><span>{{ '🏗 ' if k=='infra' else '🏢 ' }}{{t}}<small>{{ 'Red y sitios de Spectro Networks' if k=='infra' else 'Servicios a clientes y prospectos' }}</small></span></label>{% endfor %}</div>
+<div id="wRed"><div class="qlbl">2 · Red</div>
+<div class="seg">{% for k,t in REDES.items() %}<label><input type="radio" name="red" value="{{k}}" {{'checked' if v.red==k}}><span>{{t}}</span></label>{% endfor %}</div></div>
+<div id="wInst"><div class="qlbl">2 · Clasificación *</div><select id="inst"></select>
+<label id="wOtro" style="margin-top:8px">Especifica «Otros» *<input name="clasif_otro" id="otro" value="{{v.clasif_otro or ''}}" placeholder="Describe el servicio"></label></div>
+<div class="qlbl" id="lblTr">2 · Tipo de trabajo</div>
+<div class="seg" id="segTr"></div>
+<div class="grid g2" style="margin-top:10px">
+<label id="wDet">Detalle <span class="muted">(opcional)</span><select name="tipo_orden" id="det"></select></label>
+</div>
+<p class="muted" id="hintPl" style="margin:6px 0 0;font-size:12px"></p>
+</fieldset>
 <fieldset><legend>Datos generales</legend><div class="grid g2">
-<label>Formato<select name="categoria" id="cat" required>{% for k,t in CATEGORIAS.items() %}<option value="{{k}}" {{'selected' if v.categoria==k}}>{{t}}</option>{% endfor %}</select></label>
 <label>Folio <span class="muted">(vacío = automático)</span><input name="folio" value="{{v.folio or ''}}"></label>
-<label>Tipo de orden (grupo)<select name="tipo_grupo" id="grp"></select></label>
-<label>Tipo de orden / instalación<select name="tipo_orden" id="tip"></select></label>
 <label>Prioridad<select name="prioridad">{% for p in PRIORIDADES %}<option {{'selected' if (v.prioridad or 'media')==p}}>{{p}}</option>{% endfor %}</select></label>
 <label>Estado<select name="estado">{% for e in ESTADOS %}<option {{'selected' if (v.estado or 'pendiente')==e}}>{{e}}</option>{% endfor %}</select></label>
 <label>Fecha de la orden<input type="date" name="fecha_emision" value="{{v.fecha_emision or hoy}}"></label>
-<label>Fecha en que se debe ejecutar / se promete la entrega<input type="date" name="fecha_programada" value="{{v.fecha_programada or ''}}" required></label>
+<label><span id="lblFP">Fecha en que se debe ejecutar</span><input type="date" name="fecha_programada" value="{{v.fecha_programada or ''}}" required></label>
 </div></fieldset>
 <fieldset><legend>Persona que ordena</legend><div class="grid g2">
 <label>Nombre<input name="ordena_nombre" value="{{v.ordena_nombre or ''}}"></label>
 <label>Puesto<select name="ordena_puesto"><option></option>{% for p in PUESTOS_ORDENA %}<option {{'selected' if v.ordena_puesto==p}}>{{p}}</option>{% endfor %}</select></label></div></fieldset>
-<fieldset><legend>Cliente y lugar</legend><div class="grid g2">
-<div><label>Cliente <span class="muted">(buscar en catálogo)</span> · <a href="/configuracion/clientes/nuevo" target="_blank">+ nuevo cliente</a>
+
+<fieldset id="blkCli"><legend id="lgCli">Cliente</legend><div class="grid g2">
+<div style="grid-column:1/-1"><label><span id="lblCli">Cliente</span> <span class="muted">(buscar en catálogo)</span>
 <input id="cli_q" placeholder="Escribe para filtrar…" oninput="filt('cli')" autocomplete="off">
-<select name="cliente_id" id="cli" onchange="cliSel()"><option value="">— Selecciona cliente —</option>{% for c in clientes_cat %}<option value="{{c.id}}" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}}</option>{% endfor %}</select></label>
-{% if v.cliente and not v.cliente_id %}<div class="muted">Valor anterior (orden antigua): <b>{{v.cliente}}</b> — elige el cliente del catálogo para actualizarla.</div>{% endif %}
-<input type="hidden" name="cliente" value="{{v.cliente or ''}}"></div>
+<select name="cliente_id" id="cli" onchange="cliSel()"><option value="">— Selecciona —</option>
+<optgroup label="Clientes" id="ogC">{% for c in clientes_cat if c.estatus!='Prospecto' %}<option value="{{c.id}}" data-est="Cliente" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.municipio or c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" data-gps="{{ '%s,%s'|format(c.lat,c.lng) if c.lat is not none and c.lng is not none else '' }}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}}</option>{% endfor %}</optgroup>
+<optgroup label="Prospectos" id="ogP">{% for c in clientes_cat if c.estatus=='Prospecto' %}<option value="{{c.id}}" data-est="Prospecto" data-tipo="{{c.tipo_cliente or ''}}" data-calle="{{c.calle or ''}}" data-ciudad="{{c.municipio or c.ciudad or ''}}" data-estado="{{c.estado or ''}}" data-contacto="{{c.contacto or ''}}" data-tel="{{c.telefono or ''}}" data-gps="{{ '%s,%s'|format(c.lat,c.lng) if c.lat is not none and c.lng is not none else '' }}" {{'selected' if v.cliente_id==c.id}}>{{c.nombre}} · prospecto</option>{% endfor %}</optgroup></select></label>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center"><button type="button" class="btn sec" id="btnP" onclick="abrirP()">+ Nuevo prospecto</button><a class="muted" href="/configuracion/clientes/nuevo" target="_blank" id="lnkCli">+ nuevo cliente en catálogo</a><span id="cliMsg" class="muted" style="font-size:12px"></span></div>
+{% if v.cliente and not v.cliente_id %}<div class="muted">Valor anterior (orden antigua): <b>{{v.cliente}}</b> — elige el cliente del catálogo para actualizarla.</div>{% endif %}</div>
 <label>Tipo de cliente<select name="tipo_cliente"><option></option>{% for p in TIPOS_CLIENTE %}<option {{'selected' if v.tipo_cliente==p}}>{{p}}</option>{% endfor %}</select></label>
-<div><label>Site Spectro <span class="muted">(opcional, infraestructura propia)</span> · <a href="/configuracion/sites/nuevo" id="site_new" target="_blank">+ nuevo site</a>
-<input id="site_q" placeholder="Escribe para filtrar…" oninput="filt('site')" autocomplete="off">
-<select name="site_id" id="site"><option value="">— Selecciona site —</option>{% for st in sitios %}<option value="{{st.id}}" {{'selected' if v.site_id==st.id}}>{{st.codigo}} · {{st.nombre}}</option>{% endfor %}</select></label>
-{% if v.sitio and not v.site_id %}<details open><summary class="muted">Sitio en texto libre (orden antigua)</summary><input name="sitio" value="{{v.sitio}}"></details>{% else %}<details><summary class="muted">¿No está en el catálogo? Texto libre</summary><input name="sitio" value="{{'' if v.site_id else (v.sitio or '')}}"></details>{% endif %}</div>
 <label>Calle y No.<input name="calle" value="{{v.calle or ''}}"></label>
 <label>Municipio / Ciudad<input name="ciudad" value="{{v.ciudad or ''}}"></label><label>Estado (entidad)<input name="estado_geo" value="{{v.estado_geo or ''}}"></label>
 <label>Persona de contacto<input name="contacto" value="{{v.contacto or ''}}"></label><label>Teléfono<input name="telefono" value="{{v.telefono or ''}}"></label>
-<label>Coordenadas GPS (punto A)<input name="coordenadas" value="{{v.coordenadas or ''}}" placeholder="19.4326,-99.1332"></label>
-<label>Coordenadas GPS punto B (enlaces P-P)<input name="coordenadas_b" value="{{v.coordenadas_b or ''}}"></label></div>
-<label>Descripción y lugar de la orden<textarea name="descripcion" rows="3">{{v.descripcion or ''}}</textarea></label></fieldset>
+</div></fieldset>
+
+<fieldset id="blkSites"><legend>Sites de Spectro <span id="reqSites" class="muted"></span></legend>
+<input id="site_q" placeholder="Filtrar por código, nombre o municipio…" autocomplete="off" oninput="filtSites()">
+<div class="sitelist" id="sitelist">{% for st in sitios %}<label data-t="{{(st.codigo~' '~st.nombre~' '~(st.municipio or '')~' '~(st.estado or ''))|lower}}"><input type="checkbox" name="sites" value="{{st.id}}" {{'checked' if st.id in sel_sites}}><div><b>{{st.codigo}}</b> · {{st.nombre}}<br><small>{{st.tipo or ''}}{% if st.municipio %} · {{st.municipio}}{% endif %}</small></div></label>{% else %}<div class="muted" style="padding:10px">No hay sites en el catálogo.</div>{% endfor %}</div>
+<p class="muted" style="font-size:12px;margin:6px 0 0"><span id="nSites">0</span> seleccionado(s) · <a href="/configuracion/sites/nuevo" target="_blank">+ nuevo site</a></p>
+{% if v.sitio and not sel_sites %}<details open><summary class="muted">Sitio en texto libre (orden antigua)</summary><input name="sitio" value="{{v.sitio}}"></details>{% else %}<details><summary class="muted">¿No está en el catálogo? Texto libre</summary><input name="sitio" value="{{'' if sel_sites else (v.sitio or '')}}"></details>{% endif %}
+</fieldset>
+
+<fieldset><legend>Ubicación y descripción</legend><div class="grid g2">
+<label><span id="lblGA">Coordenadas GPS</span><input name="coordenadas" value="{{v.coordenadas or ''}}" placeholder="19.4326,-99.1332"></label>
+<label id="wGB">Coordenadas GPS punto B<input name="coordenadas_b" value="{{v.coordenadas_b or ''}}"></label></div>
+<label><span id="lblDesc">Descripción y lugar de la orden</span><textarea name="descripcion" rows="3">{{v.descripcion or ''}}</textarea></label></fieldset>
 <fieldset><legend>Ejecución</legend><div class="grid g2">
 <label>Cuadrilla asignada<select name="cuadrilla_id"><option value="">— Sin asignar —</option>{% for c in cuadrillas %}<option value="{{c.id}}" {{'selected' if v.cuadrilla_id==c.id}}>{{c.nombre}} ({{c.especialidad}})</option>{% endfor %}</select></label>
 <label>Puesto de quien ejecutó<select name="ejecuto_puesto"><option></option>{% for p in PUESTOS_EJEC %}<option {{'selected' if v.ejecuto_puesto==p}}>{{p}}</option>{% endfor %}</select></label>
@@ -48,16 +81,80 @@
 <label>Aprobación<select name="aprobacion"><option value="">— Pendiente —</option><option {{'selected' if v.aprobacion=='POSITIVA'}}>POSITIVA</option><option {{'selected' if v.aprobacion=='NEGATIVA'}}>NEGATIVA</option></select></label></div>
 <label>Observaciones de auditoría<textarea name="obs_auditoria" rows="2">{{v.obs_auditoria or ''}}</textarea></label></fieldset>
 <button class="btn">Guardar</button> <a class="btn sec" href="{{ '/ordenes/%d'%o.id if o else '/ordenes' }}">Cancelar</a></form>
+
+<dialog id="dlgP"><form class="in f" onsubmit="guardarP();return false" data-cpmx data-cp="p_cp" data-estado="p_estado" data-municipio="p_municipio" data-colonia="p_colonia">
+<div style="display:flex;justify-content:space-between;align-items:center"><h2 style="margin:0">Nuevo prospecto</h2><button type="button" class="btn sec" onclick="dlgP.close()" aria-label="Cerrar">✕</button></div>
+<p class="muted" style="margin:4px 0 10px;font-size:13px">Se guarda en Clientes con estatus <b>Prospecto</b>. Podrás convertirlo a cliente después sin perder su historial.</p>
+<div id="pErr" class="ej" style="display:none;background:#fdecec;border-color:#f3c4c4;color:#c62828"></div>
+<div class="grid g2">
+<label style="grid-column:1/-1">Nombre / razón social *<input name="p_nombre" required></label>
+<label>Persona de contacto<input name="p_contacto"></label><label>Teléfono (10 dígitos)<input name="p_telefono" type="tel" inputmode="tel"></label>
+<label style="grid-column:1/-1">Correo<input name="p_email" type="email"></label>
+<label>Calle<input name="p_calle"></label><label>Número<input name="p_num_ext"></label>
+<label>Código postal<input name="p_cp"></label><label>Estado<input name="p_estado"></label>
+<label>Municipio / Alcaldía<input name="p_municipio"></label><label>Colonia<input name="p_colonia"></label>
+<label>Latitud<input name="p_lat" inputmode="decimal"></label><label>Longitud<input name="p_lng" inputmode="decimal"></label></div>
+<div id="pMapa" style="height:220px;border-radius:12px;border:1px solid #d9d9de;margin:8px 0"></div>
+<p class="muted" style="font-size:12px;margin:0 0 10px">Toca el mapa para colocar el pin · <a href="#" id="pGeo">📍 Usar mi ubicación</a></p>
+<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn sec" onclick="dlgP.close()">Cancelar</button><button type="button" class="btn" id="pSave" onclick="guardarP()">Guardar prospecto</button></div>
+</form></dialog>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-const T={{tipos_json|safe}},cat=document.getElementById('cat'),grp=document.getElementById('grp'),tip=document.getElementById('tip');
-const ini={g:{{(v.tipo_grupo or '')|tojson}},t:{{(v.tipo_orden or '')|tojson}}};
-function fill(s,arr,sel){s.innerHTML=arr.map(x=>`<option ${x==sel?'selected':''}>${x}</option>`).join('')}
-function upG(){fill(grp,Object.keys(T[cat.value]),ini.g);upT()} function upT(){fill(tip,T[cat.value][grp.value]||[],ini.t)}
-cat.onchange=upG;grp.onchange=upT;upG();
-</script><script>
+const TR={{TRABAJOS|tojson}},DET={{DETALLES|tojson}},INST={{INSTALACIONES|tojson}},FACT={{FACTIBILIDAD|tojson}};
+const ini={tr:{{(v.trabajo or '')|tojson}},det:{{(v.tipo_orden or '')|tojson}}};
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],F=document.getElementById('forden');
+const radio=n=>(F.querySelector('[name='+n+']:checked')||{}).value||'';
+const show=(el,on)=>{if(el)el.style.display=on?'':'none';};
+let det=$('#det'),inst=$('#inst');
+function opts(sel,arr,cur,ph){sel.innerHTML=(ph!==null?'<option value="">'+(ph||'—')+'</option>':'')+arr.map(x=>`<option ${x==cur?'selected':''}>${x}</option>`).join('');}
+function pintaTr(){const c=radio('clase'),cur=radio('trabajo')||ini.tr;$('#segTr').innerHTML=(TR[c]||[]).map(t=>`<label><input type="radio" name="trabajo" value="${t}" ${t==cur?'checked':''} required><span>${t}</span></label>`).join('');
+ $$('[name=trabajo]').forEach(r=>r.onchange=upd);}
+function upd(){const c=radio('clase'),r=radio('red'),t=radio('trabajo'),inf=c==='infra',cli=c==='cliente',fac=t===FACT;
+ show($('#wRed'),inf);$$('[name=red]').forEach(x=>x.required=inf);$('#lblTr').textContent=inf?'3 · Tipo de trabajo':'3 · Variante';
+ // Detalle (infra) o Clasificación (cliente): el select activo es el que lleva name="tipo_orden"
+ const curT=(inf?det.value:inst.value)||ini.det;
+ if(inf){det.name='tipo_orden';inst.removeAttribute('name');opts(det,(DET[r]||{})[t]||[],curT,'— Sin detalle —');}
+ else{inst.name='tipo_orden';det.removeAttribute('name');opts(inst,INST,curT,'— Elige la clasificación —');}
+ show($('#wDet'),inf&&r&&t&&((DET[r]||{})[t]||[]).length);show($('#wInst'),cli);inst.required=cli;
+ const otro=cli&&inst.value==='Otros';show($('#wOtro'),otro);$('#otro').required=otro;
+ show($('#blkCli'),cli);$('#cli').required=cli;show($('#btnP'),cli&&fac);
+ $('#lblCli').textContent=fac?'Cliente o prospecto *':'Cliente *';$('#lgCli').textContent=fac?'Cliente o prospecto':'Cliente';
+ // prospectos solo para Factibilidad
+ $$('#ogP option').forEach(o=>{o.disabled=!fac;});show($('#ogP'),fac);const so=$('#cli').selectedOptions[0];
+ $('#cliMsg').textContent=(so&&so.dataset.est==='Prospecto'&&!fac)?'⚠ El prospecto elegido solo admite órdenes de Factibilidad':'';
+ show($('#blkSites'),inf);$('#reqSites').textContent=inf?(r==='equipo'?'· al menos uno *':'· opcional'):'';
+ const pp=(cli&&(inst.value||'').indexOf('Punto-Punto')>=0)||(inf&&r!=='equipo');show($('#wGB'),pp);$('#lblGA').textContent=pp?'Coordenadas GPS punto A':'Coordenadas GPS';
+ $('#lblFP').textContent=cli&&t==='Instalación nueva'?'Fecha en que se promete la entrega':'Fecha en que se debe ejecutar';
+ const PL={{plant_map|tojson}};
+ $('#hintPl').textContent=inf?'Reporte de evidencias: '+({fibra:'plantilla FO',microondas:'plantilla MO',equipo:'plantilla MO (provisional)'}[r]||'—'):(inst.value?(PL[inst.value]?'Reporte de evidencias: plantilla '+PL[inst.value]:'Esta clasificación aún no tiene plantilla de reporte de evidencias (fotos libres).'):'');
+ cntSites();}
+$$('[name=clase]').forEach(r=>r.onchange=()=>{pintaTr();upd();});$$('[name=red]').forEach(r=>r.onchange=upd);det.onchange=inst.onchange=upd;
+function filtSites(){const q=$('#site_q').value.toLowerCase();$$('#sitelist label').forEach(l=>{const c=l.querySelector('input').checked;l.style.display=(!q||l.dataset.t.includes(q)||c)?'':'none';});}
+function cntSites(){$('#nSites').textContent=$$('[name=sites]:checked').length;}$$('[name=sites]').forEach(x=>x.onchange=cntSites);
+F.addEventListener('submit',e=>{if(radio('clase')==='infra'&&radio('red')==='equipo'&&!$$('[name=sites]:checked').length){e.preventDefault();alert('Selecciona al menos un Site para «Equipo activo y sitios».');$('#blkSites').scrollIntoView({behavior:'smooth'});}});
 function filt(k){const q=document.getElementById(k+'_q').value.toLowerCase(),s=document.getElementById(k);
  for(const o of s.options){if(!o.value)continue;let ok=o.text.toLowerCase().includes(q);o.hidden=!ok&&!o.selected;}}
 function fillIf(n,v){const e=document.querySelector('[name='+n+']');if(e&&v&&!e.value)e.value=v;}
-function cliSel(){const o=document.getElementById('cli').selectedOptions[0];
- if(o.value){fillIf('tipo_cliente',o.dataset.tipo);fillIf('calle',o.dataset.calle);fillIf('ciudad',o.dataset.ciudad);fillIf('estado_geo',o.dataset.estado);fillIf('contacto',o.dataset.contacto);fillIf('telefono',o.dataset.tel);}}
+function cliSel(){const o=$('#cli').selectedOptions[0];
+ if(o&&o.value){fillIf('tipo_cliente',o.dataset.tipo);fillIf('calle',o.dataset.calle);fillIf('ciudad',o.dataset.ciudad);fillIf('estado_geo',o.dataset.estado);fillIf('contacto',o.dataset.contacto);fillIf('telefono',o.dataset.tel);fillIf('coordenadas',o.dataset.gps);syncCombos();}upd();}
+function syncCombos(){const eg=F.querySelector('[name=estado_geo]'),mu=F.querySelector('[name=ciudad]'),mv=mu.value;
+ if(eg._combo){eg._combo.set(eg._combo.lista,eg.value);eg.dispatchEvent(new Event('change',{bubbles:true}));
+  setTimeout(()=>{mu.value=mv;if(mu._combo)mu._combo.set(mu._combo.lista,mv);},700);}}
+// ---- alta rápida de prospecto ----
+const dlgP=$('#dlgP');let pm=null,pin=null;const P=n=>dlgP.querySelector('[name=p_'+n+']');
+function ponerP(a,b,z){a=+(+a).toFixed(6);b=+(+b).toFixed(6);P('lat').value=a;P('lng').value=b;if(pin)pin.setLatLng([a,b]);else{pin=L.marker([a,b],{draggable:true}).addTo(pm);pin.on('dragend',()=>{const p=pin.getLatLng();ponerP(p.lat,p.lng);});}if(z)pm.setView([a,b],z);}
+function abrirP(){$('#pErr').style.display='none';dlgP.showModal();
+ if(!pm&&window.L){pm=L.map('pMapa',{tap:true}).setView([20.67,-103.35],10);L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'&copy; OpenStreetMap'}).addTo(pm);pm.on('click',e=>ponerP(e.latlng.lat,e.latlng.lng));
+  ['lat','lng'].forEach(k=>P(k).addEventListener('change',()=>{const a=parseFloat(P('lat').value),b=parseFloat(P('lng').value);if(!isNaN(a)&&!isNaN(b))ponerP(a,b,15);}));}
+ setTimeout(()=>{if(pm)pm.invalidateSize();P('nombre').focus();},150);}
+$('#pGeo').onclick=e=>{e.preventDefault();if(!navigator.geolocation)return alert('Tu navegador no soporta geolocalización');navigator.geolocation.getCurrentPosition(p=>ponerP(p.coords.latitude,p.coords.longitude,16),er=>alert('No se pudo obtener la ubicación: '+er.message),{enableHighAccuracy:true,timeout:15000});};
+async function guardarP(){const b={};['nombre','contacto','telefono','email','calle','num_ext','cp','estado','municipio','colonia','lat','lng'].forEach(k=>b[k]=P(k).value.trim());
+ const er=$('#pErr');if(!b.nombre){er.textContent='⚠ El nombre es obligatorio';er.style.display='';return;}
+ $('#pSave').disabled=true;try{const r=await fetch('/api/prospectos',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',body:JSON.stringify(b)});const j=await r.json();
+  if(!r.ok){er.textContent='⚠ '+(j.error||'No se pudo guardar');er.style.display='';return;}
+  const o=document.createElement('option');o.value=j.id;o.textContent=j.nombre+' · prospecto';Object.assign(o.dataset,{est:'Prospecto',calle:j.calle,ciudad:j.ciudad,estado:j.estado,contacto:j.contacto,tel:j.telefono,gps:(j.lat!=null&&j.lng!=null)?j.lat+','+j.lng:''});
+  $('#ogP').appendChild(o);$('#cli').value=j.id;cliSel();$('#cliMsg').textContent='✓ Prospecto «'+j.nombre+'» creado y seleccionado';dlgP.close();
+  dlgP.querySelectorAll('input').forEach(i=>i.value='');}
+ catch(x){er.textContent='⚠ Error de red';er.style.display='';}finally{$('#pSave').disabled=false;}}
+pintaTr();upd();filtSites();
 </script><script src="/static/cp.js?v=1" defer></script>{% endblock %}

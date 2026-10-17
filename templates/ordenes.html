@@ -1,18 +1,23 @@
-{% extends 'base.html' %}{% from 'macros.html' import est, pri %}{% block body %}
+{% extends 'base.html' %}{% from 'macros.html' import est, pri, clasif %}{% block body %}
 <div style="display:flex;justify-content:space-between;align-items:center"><h1>Órdenes de trabajo <span class="muted">({{total}})</span></h1><a class="btn" href="/ordenes/nueva">+ Nueva orden</a></div>
+<div style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px">{% for lbl,args in [('Todas',{}),('🏗 Infra propia',{'clase':'infra'}),('Fibra',{'clase':'infra','red':'fibra'}),('Microondas',{'clase':'infra','red':'microondas'}),('Equipo y sitios',{'clase':'infra','red':'equipo'}),('🏢 Clientes',{'clase':'cliente'}),('Factibilidad',{'clase':'cliente','trabajo':'Factibilidad'})] %}{% set on = (f.clase or '')==(args.clase or '') and (f.red or '')==(args.red or '') and (f.trabajo or '')==(args.trabajo or '') %}<a href="/ordenes?{{args|urlencode}}" style="text-decoration:none;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600;{{'background:#111;color:#fff;border:1px solid #111' if on else 'background:#fff;color:#333;border:1px solid #d9d9de'}}">{{lbl}}</a>{% endfor %}</div>
 <form class="card filt" method="get">
 <label>Estado<select name="estado"><option value="">Todos</option>{% for e in ESTADOS %}<option {{'selected' if f.estado==e}}>{{e}}</option>{% endfor %}</select></label>
 <label>Cuadrilla<select name="cuadrilla"><option value="">Todas</option>{% for c in cuadrillas %}<option value="{{c.id}}" {{'selected' if f.cuadrilla==c.id|string}}>{{c.nombre}}</option>{% endfor %}</select></label>
-<label>Formato<select name="categoria"><option value="">Todos</option>{% for k,v in CATEGORIAS.items() %}<option value="{{k}}" {{'selected' if f.categoria==k}}>{{v}}</option>{% endfor %}</select></label>
+<label>Categoría<select name="clase" id="fClase"><option value="">Todas</option>{% for k,v in CLASES.items() %}<option value="{{k}}" {{'selected' if f.clase==k}}>{{v}}</option>{% endfor %}</select></label>
+<label id="fwRed">Red<select name="red"><option value="">Todas</option>{% for k,v in REDES.items() %}<option value="{{k}}" {{'selected' if f.red==k}}>{{v}}</option>{% endfor %}</select></label>
+<label id="fwCl">Clasificación (clientes)<select name="clasif"><option value="">Todas</option>{% for t in INSTALACIONES %}<option {{'selected' if f.clasif==t}}>{{t}}</option>{% endfor %}</select></label>
+<label>Tipo de trabajo / variante<select name="trabajo" id="fTr"><option value="">Todos</option>{% for t in (TRABAJOS.infra + TRABAJOS.cliente)|unique %}<option data-c="{{ ('infra ' if t in TRABAJOS.infra else '') ~ ('cliente' if t in TRABAJOS.cliente else '') }}" {{'selected' if f.trabajo==t}}>{{t}}</option>{% endfor %}</select></label>
 <label>Cliente<input name="cliente" list="cl" value="{{f.cliente}}"><datalist id="cl">{% for c in clientes %}<option>{{c}}</option>{% endfor %}</datalist></label>
 <label>Desde<input type="date" name="desde" value="{{f.desde}}"></label><label>Hasta<input type="date" name="hasta" value="{{f.hasta}}"></label>
 <label>Buscar (folio, sitio, tipo)<input name="buscar" value="{{f.buscar}}"></label>
 <label><input type="checkbox" name="vencidas" value="1" style="width:auto" {{'checked' if f.vencidas}}> Solo vencidas</label>
 <div><button class="btn">Filtrar</button> <a class="btn sec" href="/ordenes">Limpiar</a></div></form>
-<div class="tw"><table><tr><th>Folio</th><th>Programada</th><th>Tipo</th><th>Cliente / sitio</th><th>Cuadrilla</th><th>Prioridad</th><th>Estado</th><th>Cierre</th></tr>
+<div class="tw"><table><tr><th>Folio</th><th>Programada</th><th>Tipo</th><th>Cliente / sites</th><th>Cuadrilla</th><th>Prioridad</th><th>Estado</th><th>Cierre</th></tr>
 {% for o in rows %}<tr><td><a href="/ordenes/{{o.id}}"><b>{{o.folio}}</b></a>{% if o.ejemplo %}<div class="muted">EJEMPLO</div>{% endif %}</td>
-<td class="{{'venc' if o.vencida}}">{{o.fecha_programada}}{% if o.vencida %}<div>vencida</div>{% endif %}</td><td>{{o.tipo_orden}}<div class="muted">{{o.tipo_grupo}}</div></td>
-<td>{{o.cliente}}<div class="muted">{{o.sitio}}</div></td><td>{{o.cuad or '—'}}</td><td>{{pri(o.prioridad)}}</td><td>{{est(o.estado)}}</td><td>{{(o.fecha_cierre or '')|replace('T',' ')}}</td></tr>
+<td class="{{'venc' if o.vencida}}">{{o.fecha_programada}}{% if o.vencida %}<div>vencida</div>{% endif %}</td><td>{{clasif(o)}}{% if o.tipo_orden and o.clase=='infra' %}<div class="muted" style="font-size:12px;margin-top:3px">{{o.tipo_orden}}</div>{% endif %}</td>
+<td>{% if o.clase=='infra' %}{{o.sites_txt or o.sitio or '—'}}{% else %}{{o.cliente}}<div class="muted">{{o.sitio}}</div>{% endif %}</td><td>{{o.cuad or '—'}}</td><td>{{pri(o.prioridad)}}</td><td>{{est(o.estado)}}</td><td>{{(o.fecha_cierre or '')|replace('T',' ')}}</td></tr>
 {% else %}<tr><td colspan="8" class="muted">Sin resultados</td></tr>{% endfor %}</table></div>
 <p class="pag">{% for p in range(1,pages+1) %}{% if p==page %}<span><b>{{p}}</b></span>{% elif p<=2 or p>pages-2 or (p-page)|abs<=2 %}<a href="?{{ qs|urlencode }}&page={{p}}">{{p}}</a>{% elif (p-page)|abs==3 %}…{% endif %}{% endfor %}</p>
-{% endblock %}
+<script>(function(){var c=document.getElementById('fClase'),r=document.getElementById('fwRed'),t=document.getElementById('fTr');
+var w=document.getElementById('fwCl');function f(){r.style.display=c.value==='cliente'?'none':'';w.style.display=c.value==='infra'?'none':'';if(c.value==='infra')w.querySelector('select').value='';if(c.value==='cliente')r.querySelector('select').value='';[...t.options].forEach(function(o){if(!o.value)return;var ok=!c.value||(o.dataset.c||'').indexOf(c.value)>=0;o.hidden=!ok;if(!ok&&o.selected)t.value='';});}c.onchange=f;f();})();</script>{% endblock %}

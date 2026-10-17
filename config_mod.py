@@ -1,5 +1,5 @@
 """Menú Configuración: altas, bajas y cambios de catálogos (Materiales, Personal, Vehículos, Cuadrillas, Sites, Almacenes, Herramientas y Equipo)."""
-from flask import render_template, request, redirect, url_for, abort
+from flask import render_template, request, redirect, url_for, abort, g as _g
 
 SCHEMA_CFG = '''
 CREATE TABLE IF NOT EXISTS sitios(id INTEGER PRIMARY KEY, codigo TEXT UNIQUE, nombre TEXT NOT NULL, cliente TEXT, direccion TEXT, ciudad TEXT, estado TEXT,
@@ -166,7 +166,10 @@ SEED_DOM = {
     'SPN-CS-003': ('Av. Patria','2000',None,'Av. Acueducto','Calle Santa Margarita','Jacarandas','45160','Zapopan','Gabinete en camellón frente a gasolinera'),
     'SPN-RP-004': ('Camino a Cerro La Cruz','km 3',None,None,None,'La Cruz','49340','Tapalpa','Subir por brecha desde la presa; requiere 4x4'),
     'SPN-TR-005': ('Camino al Cerro de la Reina','s/n',None,'Calle Hidalgo','Calle Morelos','Cerro de la Reina','45400','Tonalá','Portón verde al final del camino')}
+ESTATUS_CLI = ['Cliente','Prospecto']
 def cli_valid(d, rid):
+    if rid and d.get('estatus') == 'Prospecto' and _g.db.execute("SELECT 1 FROM ordenes WHERE cliente_id=? AND COALESCE(trabajo,'')<>'Factibilidad' LIMIT 1", (rid,)).fetchone():
+        return 'No puede volver a prospecto: ya tiene órdenes de cliente que no son de Factibilidad'
     if d.get('cp') and not (len(d['cp']) == 5 and d['cp'].isdigit()): return 'Código postal debe tener 5 dígitos'
     if 'municipio' in d: d['ciudad'] = d.get('municipio')  # las órdenes siguen usando clientes.ciudad
 
@@ -175,6 +178,10 @@ def _migrar_cli_dom(c):
     for col in ('cp', 'colonia', 'municipio'):
         if col not in cc: c.execute(f'ALTER TABLE clientes ADD COLUMN {col} TEXT')
     if 'municipio' not in cc: c.execute("UPDATE clientes SET municipio=ciudad WHERE municipio IS NULL AND TRIM(COALESCE(ciudad,''))<>''")
+    for col, typ in (('lat','REAL'),('lng','REAL'),('convertido','TEXT')):
+        if col not in cc: c.execute(f'ALTER TABLE clientes ADD COLUMN {col} {typ}')
+    if 'estatus' not in cc: c.execute("ALTER TABLE clientes ADD COLUMN estatus TEXT DEFAULT 'Cliente'")
+    c.execute("UPDATE clientes SET estatus='Cliente' WHERE estatus IS NULL OR estatus NOT IN ('Prospecto','Cliente')")
 
 def alm_valid(d, rid):
     if d.get('tipo') == 'vehiculo':
@@ -551,10 +558,12 @@ def registrar(app, q, db):
         unico=[('razon_social','Ese proveedor ya existe')]),
      'clientes': dict(titulo='Clientes', icono='🏢', tabla='clientes', act='activo', orden='nombre', desc='Catálogo de clientes; se eligen en las órdenes de trabajo.',
         buscar=['nombre','rfc','contacto','ciudad','municipio','colonia','cp','tipo_cliente'],
-        cols=[('nombre','Nombre'),('tipo_cliente','Tipo'),('rfc','RFC'),('contacto','Contacto'),('telefono','Teléfono'),('ciudad','Municipio'),('estado','Estado')],
-        campos=[('nombre','Nombre / razón social','text',True),('tipo_cliente','Tipo de cliente','select',['Empresa','PYME','Residencial','Gobierno']),('rfc','RFC','text'),
+        cols=[('nombre','Nombre'),('estatus','Estatus'),('tipo_cliente','Tipo'),('rfc','RFC'),('contacto','Contacto'),('telefono','Teléfono'),('ciudad','Municipio'),('estado','Estado')],
+        filtro=('estatus','Estatus',ESTATUS_CLI),
+        campos=[('nombre','Nombre / razón social','text',True),('estatus','Estatus','select',ESTATUS_CLI,True),('tipo_cliente','Tipo de cliente','select',['Empresa','PYME','Residencial','Gobierno']),('rfc','RFC','text'),
                 ('contacto','Persona de contacto','text'),('telefono','Teléfono','tel'),('email','Email','email'),('calle','Calle y No.','text'),('cp','Código postal','cp'),('colonia','Colonia','text'),
-                ('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('notas','Notas','textarea')], valid=cli_valid,
+                ('municipio','Municipio / Alcaldía','text'),('estado','Estado','select',ESTADOS_MX),('lat','Latitud','coord'),('lng','Longitud','coord'),('notas','Notas','textarea')], valid=cli_valid,
+        domicilio=['calle','cp','colonia','municipio','estado','lat','lng'], dom_after='email',
         hist=lambda i: existe('SELECT 1 FROM ordenes WHERE cliente_id=? LIMIT 1', (i,)),
         unico=[('nombre','Ese cliente ya existe')]),
      'sites': dict(titulo='Sites', icono='📍', tabla='sitios', act='activo', orden='codigo', desc='Sitios propios de Spectro Networks (torres, casetas, POPs, repetidores) con coordenadas.',
@@ -623,10 +632,26 @@ def registrar(app, q, db):
         if s: w.append('(' + ' OR '.join(f"{pre}{c} LIKE ?" for c in e['buscar']) + ')'); a += ['%'+s+'%']*len(e['buscar'])
         if ver == 'activos': w.append(f"COALESCE({pre}{e['act']},1)=1")
         elif ver == 'inactivos': w.append(f"COALESCE({pre}{e['act']},1)=0")
+        fv = request.args.get('f', '') if e.get('filtro') else ''
+        if fv in (e.get('filtro') or ('', '', []))[2]: w.append(f"COALESCE({pre}{e['filtro'][0]},'Cliente')=?"); a.append(fv)
+        else: fv = ''
         orden = ', '.join(pre + o.strip() for o in e['orden'].split(','))
         rows = q(f"{sql} {'WHERE '+' AND '.join(w) if w else ''} ORDER BY {orden} LIMIT 500", a)
         if e.get('post_sql'): rows = e['post_sql'](rows)
-        return render_template('config_lista.html', k=k, e=e, rows=rows, s=s, ver=ver, msg=request.args.get('msg'))
+        nf = {r[0]: r[1] for r in q(f"SELECT COALESCE({e['filtro'][0]},'Cliente'), COUNT(*) FROM {e['tabla']} WHERE COALESCE({e['act']},1)=1 GROUP BY 1")} if e.get('filtro') else {}
+        return render_template('config_lista.html', k=k, e=e, rows=rows, s=s, ver=ver, fv=fv, nf=nf, msg=request.args.get('msg'))
+
+    @app.route('/configuracion/clientes/<int:rid>/convertir', methods=['POST'])
+    def cli_convertir(rid):
+        r = q("SELECT nombre, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE id=?", (rid,), one=True) or abort(404)
+        if r['estatus'] == 'Prospecto':
+            import datetime as _dt
+            db().execute("UPDATE clientes SET estatus='Cliente', convertido=? WHERE id=?", (_dt.date.today().isoformat(), rid))
+            for (oid,) in db().execute('SELECT id FROM ordenes WHERE cliente_id=?', (rid,)).fetchall():
+                db().execute('INSERT INTO bitacora(orden_id,fecha,texto) VALUES(?,?,?)', (oid, _dt.datetime.now().strftime('%Y-%m-%dT%H:%M'), f"Prospecto «{r['nombre']}» convertido a cliente"))
+            db().commit()
+        vo = request.form.get('volver') or ''
+        return redirect(vo if vo.startswith('/') and not vo.startswith('//') else url_for('cfg_lista', k='clientes', msg=f"«{r['nombre']}» ahora es cliente (se conserva su historial)"))
 
     @app.route('/configuracion/<k>/nuevo', methods=['GET','POST'])
     @app.route('/configuracion/<k>/<int:rid>/editar', methods=['GET','POST'])
