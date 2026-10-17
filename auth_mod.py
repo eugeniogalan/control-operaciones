@@ -29,6 +29,7 @@ def migrar(c):
         if col not in cols: c.execute(f'ALTER TABLE tecnicos ADD COLUMN {col} {typ}')
     c.execute("UPDATE tecnicos SET usuario=NULL WHERE TRIM(COALESCE(usuario,''))=''")
     c.execute('CREATE UNIQUE INDEX IF NOT EXISTS ux_tec_usuario ON tecnicos(LOWER(usuario)) WHERE usuario IS NOT NULL')
+    c.execute('CREATE TABLE IF NOT EXISTS usuarios_log(id INTEGER PRIMARY KEY, fecha TEXT, actor TEXT, personal_id INTEGER, usuario TEXT, accion TEXT, detalle TEXT)')
 
 def usuario_actual():
     return getattr(g, 'user', None)
@@ -64,6 +65,7 @@ def registrar(app, q, db, CFG):
                 session.clear(); return redirect(url_for('login', next=request.full_path))
             g.user = u
         p = request.path
+        if p.startswith('/configuracion/usuarios') and not es_su(): abort(403)   # solo el superadmin de entorno
         if (p.startswith('/configuracion') or p.startswith('/proveedores') or p.startswith('/api/syscom') or p.startswith('/catalogo')) and not puede_config():
             abort(403)
 
@@ -98,19 +100,8 @@ def registrar(app, q, db, CFG):
     def logout():
         session.clear(); return redirect(url_for('login'))
 
-    @app.route('/configuracion/personal/<int:rid>/clave', methods=['POST'])
-    def personal_clave(rid):
-        u = q('SELECT id, nombre, usuario FROM tecnicos WHERE id=?', (rid,), one=True) or abort(404)
-        c1, c2 = request.form.get('clave') or '', request.form.get('clave2') or ''
-        if not u['usuario']: m = 'Primero asigna un usuario y guarda la persona'
-        elif len(c1) < MIN_CLAVE: m = f'La contraseña debe tener al menos {MIN_CLAVE} caracteres'
-        elif c1 != c2: m = 'Las contraseñas no coinciden'
-        else:
-            db().execute('UPDATE tecnicos SET pass_hash=? WHERE id=?', (generate_password_hash(c1), rid)); db().commit()
-            return redirect(f'/configuracion/personal/{rid}/editar?msg=' + 'Contraseña actualizada para ' + u['usuario'] + '#acceso')
-        return redirect(f'/configuracion/personal/{rid}/editar?err=' + m + '#acceso')
+    registrar_usuarios(app, q, db)
 
-# ---- Solo para la base de EJEMPLO (seed.py): usuarios demo con contraseñas demo ----
 # Usuarios de ejemplo. La contraseña NO está en el código: solo tienen acceso si existe la variable
 # de entorno DEMO_USERS_PASSWORD (misma para los tres); si no, quedan como Personal sin acceso.
 DEMO_USUARIOS = [('director', 'Director', 'Dirección'), ('administracion', 'Gerente', 'Administración'), ('tecnico', 'Técnico Instalador', 'Operaciones')]
@@ -128,3 +119,103 @@ def demo_usuarios(c):
                   (us, generate_password_hash(cl) if cl else None, 1 if cl else 0, area, r[0]))
         hechos.append((us, r[1], puesto, area, bool(cl)))
     return hechos
+
+
+USR_RE = r'[A-Za-z0-9._-]{3,40}'
+
+def registrar_usuarios(app, q, db):
+    """Configuración › Usuarios: altas, bajas y cambios de acceso. Solo superadmin (ver _auth)."""
+    import re
+    from urllib.parse import quote
+    def log(con, pid, usuario, accion, detalle=''):
+        con.execute('INSERT INTO usuarios_log(fecha, actor, personal_id, usuario, accion, detalle) VALUES (?,?,?,?,?,?)',
+                    (ahora_mx(), session.get('nombre') or 'superadmin', pid, usuario, accion, detalle))
+    def val_usuario(us, pid):
+        if not re.fullmatch(USR_RE, us or ''): return 'Usuario: 3 a 40 caracteres (letras, números, punto, guion o guion bajo), sin espacios'
+        if q('SELECT 1 FROM tecnicos WHERE LOWER(usuario)=LOWER(?) AND id IS NOT ?', (us, pid), one=True): return f'El usuario «{us}» ya existe'
+    def val_clave(c1, c2):
+        if len(c1) < MIN_CLAVE: return f'La contraseña debe tener al menos {MIN_CLAVE} caracteres'
+        if c1 != c2: return 'Las contraseñas no coinciden'
+    def volver(url, msg=None, err=None):
+        return redirect(url + ('?msg=' + quote(msg) if msg else '?err=' + quote(err)))
+
+    @app.route('/configuracion/usuarios')
+    def usuarios():
+        ver = request.args.get('ver', 'activos')
+        w = {'activos': 'AND t.login_activo=1', 'bajas': 'AND t.login_activo=0', 'todos': ''}.get(ver, '')
+        rows = q(f"SELECT t.*, COALESCE(t.activo,1) pers_activa FROM tecnicos t WHERE t.usuario IS NOT NULL {w} ORDER BY t.login_activo DESC, t.nombre")
+        logs = q('SELECT * FROM usuarios_log ORDER BY id DESC LIMIT 30')
+        n = q("SELECT SUM(login_activo=1) a, SUM(login_activo=0) b FROM tecnicos WHERE usuario IS NOT NULL", one=True)
+        return render_template('usuarios.html', rows=rows, logs=logs, ver=ver, n=n)
+
+    @app.route('/configuracion/usuarios/nuevo', methods=['GET', 'POST'])
+    def usuario_nuevo():
+        F = request.form; err = None
+        libres = q("SELECT id, nombre, puesto, area FROM tecnicos WHERE usuario IS NULL AND COALESCE(activo,1)=1 ORDER BY nombre")
+        if request.method == 'POST':
+            us = (F.get('usuario') or '').strip(); rol = F.get('rol_app') if F.get('rol_app') in ROLES_APP else 'Usuario'
+            modo = F.get('modo') or 'existente'
+            if modo == 'existente':
+                pid = int(F.get('personal_id') or 0)
+                per = q('SELECT * FROM tecnicos WHERE id=? AND usuario IS NULL AND COALESCE(activo,1)=1', (pid,), one=True) if pid else None
+                if not per: err = 'Elige una persona de Personal sin usuario'
+            else:
+                pid = None
+                if not (F.get('nombre') or '').strip(): err = 'Escribe el nombre de la persona'
+                elif F.get('area') and F.get('area') not in AREAS: err = 'Área inválida'
+            err = err or val_usuario(us, pid) or val_clave(F.get('clave') or '', F.get('clave2') or '')
+            if not err:
+                con = db()
+                if pid is None:
+                    import config_mod as CM
+                    pid = con.execute('INSERT INTO tecnicos(nombre, puesto, area, activo) VALUES (?,?,?,1)',
+                                      (F['nombre'].strip(), CM.puesto_canonico(F.get('puesto') or '') or None, F.get('area') or None)).lastrowid
+                    log(con, pid, us, 'persona creada', F['nombre'].strip())
+                con.execute('UPDATE tecnicos SET usuario=?, pass_hash=?, login_activo=1, rol_app=? WHERE id=?', (us, generate_password_hash(F['clave']), rol, pid))
+                log(con, pid, us, 'alta', f'rol {rol}'); con.commit()
+                return volver('/configuracion/usuarios', msg=f'Usuario «{us}» dado de alta')
+        import config_mod as CM
+        return render_template('usuario_form.html', u=None, libres=libres, err=err, F=F, ROLES=ROLES_APP, PUESTOS=CM.PUESTOS)
+
+    @app.route('/configuracion/usuarios/<int:pid>', methods=['GET', 'POST'])
+    def usuario_editar(pid):
+        u = q('SELECT * FROM tecnicos WHERE id=? AND usuario IS NOT NULL', (pid,), one=True) or abort(404)
+        err = None; F = request.form
+        if request.method == 'POST':
+            us = (F.get('usuario') or '').strip(); rol = F.get('rol_app') if F.get('rol_app') in ROLES_APP else 'Usuario'
+            act = 1 if F.get('login_activo') else 0
+            if act and not u['pass_hash']: err = 'Asigna una contraseña antes de activar el acceso'
+            err = err or val_usuario(us, pid)
+            if not err:
+                cambios = [f'{n}: {a} → {b}' for n, a, b in (('usuario', u['usuario'], us), ('rol', u['rol_app'] or 'Usuario', rol), ('acceso', 'activo' if u['login_activo'] else 'inactivo', 'activo' if act else 'inactivo')) if a != b]
+                con = db()
+                con.execute('UPDATE tecnicos SET usuario=?, rol_app=?, login_activo=? WHERE id=?', (us, rol, act, pid))
+                if cambios: log(con, pid, us, 'cambio', '; '.join(cambios))
+                con.commit()
+                return volver(f'/configuracion/usuarios/{pid}', msg='Cambios guardados' if cambios else 'Sin cambios')
+        logs = q('SELECT * FROM usuarios_log WHERE personal_id=? ORDER BY id DESC LIMIT 30', (pid,))
+        return render_template('usuario_form.html', u=u, err=err or request.args.get('err'), F=F, ROLES=ROLES_APP, logs=logs)
+
+    @app.route('/configuracion/usuarios/<int:pid>/clave', methods=['POST'])
+    def usuario_clave(pid):
+        u = q('SELECT * FROM tecnicos WHERE id=? AND usuario IS NOT NULL', (pid,), one=True) or abort(404)
+        e = val_clave(request.form.get('clave') or '', request.form.get('clave2') or '')
+        if e: return volver(f'/configuracion/usuarios/{pid}', err=e)
+        con = db(); con.execute('UPDATE tecnicos SET pass_hash=? WHERE id=?', (generate_password_hash(request.form['clave']), pid))
+        log(con, pid, u['usuario'], 'contraseña restablecida', 'sesiones abiertas cerradas'); con.commit()
+        return volver(f'/configuracion/usuarios/{pid}', msg='Contraseña actualizada; sus sesiones abiertas se cerraron')
+
+    @app.route('/configuracion/usuarios/<int:pid>/baja', methods=['POST'])
+    def usuario_baja(pid):
+        u = q('SELECT * FROM tecnicos WHERE id=? AND usuario IS NOT NULL', (pid,), one=True) or abort(404)
+        con = db(); con.execute('UPDATE tecnicos SET login_activo=0 WHERE id=?', (pid,))
+        log(con, pid, u['usuario'], 'baja', 'acceso desactivado; sesiones cerradas; se conserva historial'); con.commit()
+        return volver('/configuracion/usuarios', msg=f'Acceso de «{u["usuario"]}» dado de baja')
+
+    @app.route('/configuracion/usuarios/<int:pid>/reactivar', methods=['POST'])
+    def usuario_reactivar(pid):
+        u = q('SELECT * FROM tecnicos WHERE id=? AND usuario IS NOT NULL', (pid,), one=True) or abort(404)
+        if not u['pass_hash']: return volver(f'/configuracion/usuarios/{pid}', err='Asigna una contraseña antes de reactivar')
+        con = db(); con.execute('UPDATE tecnicos SET login_activo=1 WHERE id=?', (pid,))
+        log(con, pid, u['usuario'], 'reactivado'); con.commit()
+        return volver('/configuracion/usuarios', msg=f'Acceso de «{u["usuario"]}» reactivado')

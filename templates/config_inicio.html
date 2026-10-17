@@ -2,6 +2,8 @@
 <div class="grid g2" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr))">{% for k,e in E.items() %}
 <a class="card" href="/configuracion/{{k}}" style="text-decoration:none;color:inherit;display:block"><div style="font-size:28px">{{e.icono}}</div><b style="font-size:18px">{{e.titulo}}</b>
 <div class="muted">{{e.desc}}</div><div style="margin-top:6px"><b>{{cnt[k].a or 0}}</b> activos <span class="muted">/ {{cnt[k].n}} total</span></div></a>{% endfor %}
+{% if USR.su %}<a class="card" href="/configuracion/usuarios" style="text-decoration:none;color:inherit;display:block;border-color:#c9d6f5"><div style="font-size:28px">🔐</div><b style="font-size:18px">Usuarios</b>
+<div class="muted">Altas, bajas y cambios de usuarios, roles y contraseñas. Solo superadmin.</div><div style="margin-top:6px"><b>{{ usuarios_n }}</b> con acceso activo</div></a>{% endif %}
 <a class="card" href="/configuracion/evidencias" style="text-decoration:none;color:inherit;display:block"><div style="font-size:28px">📸</div><b style="font-size:18px">Reporte de evidencias</b>
 <div class="muted">Plantillas por tipo de trabajo: fotografías requeridas, reportes PDF a entregar y catálogo de materiales.</div><div style="margin-top:6px"><b>{{ n_plantillas }}</b> plantillas</div></a>
 <a class="card" href="/proveedores/syscom" style="text-decoration:none;color:inherit;display:block"><div style="font-size:28px">🔗</div><b style="font-size:18px">API SYSCOM</b>

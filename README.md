@@ -35,7 +35,7 @@ Búsqueda: `GET /api/syscom/buscar?q=texto`. Las miniaturas en `static/productos
 
 ## Usuarios y permisos
 - **Superadmin**: `ADMIN_USER` / `ADMIN_PASSWORD` (variables de entorno). Siempre puede entrar y tiene todos los permisos; úsalo para crear los usuarios reales.
-- **Usuarios por persona**: Configuración › Personal → Usuario, «Acceso al sistema activo», Rol en la app, Área; la contraseña se asigna/restablece en la tarjeta «🔑 Contraseña de acceso» (hash werkzeug, mín. 8 caracteres).
+- **Usuarios por persona**: Configuración › **Usuarios** (solo el superadmin de entorno; Dirección/Administración reciben 403): alta (persona de Personal sin usuario o persona nueva), cambios (usuario, rol, acceso), restablecer contraseña (hash werkzeug, mín. 8) y baja suave del acceso. Baja o cambio de contraseña cierran las sesiones abiertas. Cada movimiento queda en la bitácora (quién y cuándo). Personal conserva puesto y área y muestra el acceso solo como información.
 - **Configuración**: superadmin, puesto Director, área Administración o rol Administrador. **Autorizar órdenes**: superadmin, puesto Director o área Administración.
 - Las órdenes de **Clientes › Instalación nueva** se crean «Pendiente de autorización» y no pueden asignarse, iniciarse ni cerrarse hasta autorizarse.
 - Datos de EJEMPLO (seed): se crean los usuarios `director`, `administracion` y `tecnico`. Solo tienen contraseña si defines la variable de entorno `DEMO_USERS_PASSWORD` (la misma para los tres, mín. 8 caracteres); si no está definida existen como Personal **sin acceso**. Nunca pongas su valor en el repositorio; en Render configúrala como secreto (opcional).
