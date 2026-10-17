@@ -495,6 +495,10 @@ def registrar(app, q, db):
         for d_ in q('SELECT * FROM sitio_documentos WHERE sitio_id=?', (i,)): SD.borrar_archivo(d_)
         db().execute('DELETE FROM sitio_documentos WHERE sitio_id=?', (i,))
     def existe(sql, a): return bool(q(sql, a, one=True))
+    def chk_valid(d, rid):
+        if d.get('orden') is None: d['orden'] = 100
+        if q('SELECT 1 FROM checklist_items WHERE rutina=? AND nombre=? AND id IS NOT ?', (d.get('rutina'), (d.get('nombre') or '').strip(), rid), one=True):
+            return 'Ese punto ya existe en la rutina'
 
     # ---- hooks ----
     def veh_post(vid, d):
@@ -507,11 +511,14 @@ def registrar(app, q, db):
             aid = a['id'] if a else con.execute("INSERT INTO almacenes(nombre,tipo) VALUES(?,'vehiculo')", (nom,)).lastrowid
             con.execute('UPDATE almacenes SET tipo=?, cuadrilla_id=?, activo=? WHERE id=?', ('vehiculo', d['cuadrilla_id'], d['activo'], aid))
             con.execute('UPDATE vehiculos SET almacen_id=? WHERE id=?', (aid, vid))
+        if _g.get('veh_asig_cambio'): VA.historial(con, vid, d)   # historial + carta responsiva de la nueva asignación
     def veh_valid(d, rid):
         if d.get('seguro_vence'):
             try: d['seguro_vence'] = _dt_mod.date.fromisoformat(d['seguro_vence']).isoformat()
             except ValueError: return 'Vencimiento de póliza: fecha inválida (usa AAAA-MM-DD)'
         e = VA.validar_pdfs()
+        if e: return e
+        e = VA.normalizar(d, q('SELECT * FROM vehiculos WHERE id=?', (rid,), one=True) if rid else None)
         if e: return e
         n = (d['numero'] or '').strip()
         if n.isdigit(): d['numero'] = f'{int(n):02d}'
@@ -520,7 +527,9 @@ def registrar(app, q, db):
         if a and (not v or v['almacen_id'] != a['id']) and q('SELECT 1 FROM vehiculos WHERE almacen_id=?', (a['id'],), one=True):
             return 'Ya existe un almacén con ese nombre ligado a otro vehículo'
     def alm_post(aid, d):
-        db().execute('UPDATE vehiculos SET cuadrilla_id=?, activo=? WHERE almacen_id=?', (d['cuadrilla_id'], d['activo'], aid))
+        for v in q('SELECT id, asignacion_tipo FROM vehiculos WHERE almacen_id=?', (aid,)):
+            db().execute('UPDATE vehiculos SET activo=? WHERE id=?', (d['activo'], v['id']))
+            if not (v['asignacion_tipo'] == 'Persona' and not d['cuadrilla_id']): VA.asignar_cuadrilla(db(), v['id'], d['cuadrilla_id'])
     def alm_hist(aid):
         return (existe('SELECT 1 FROM movimientos WHERE almacen_id=? LIMIT 1', (aid,)) or existe('SELECT 1 FROM existencias WHERE almacen_id=? AND stock<>0', (aid,))
                 or existe('SELECT 1 FROM orden_materiales WHERE almacen_id=? LIMIT 1', (aid,)) or existe('SELECT 1 FROM herramientas WHERE almacen_id=?', (aid,)))
@@ -529,6 +538,7 @@ def registrar(app, q, db):
     def veh_baja_soft(vid):
         db().execute('UPDATE almacenes SET activo=0 WHERE id=(SELECT almacen_id FROM vehiculos WHERE id=?)', (vid,))
     def veh_hist(vid):
+        if existe('SELECT 1 FROM checklists WHERE vehiculo_id=?', (vid,)) or existe('SELECT 1 FROM vehiculo_responsivas WHERE vehiculo_id=?', (vid,)): return True   # checklists / cartas responsivas: se conservan
         v = q('SELECT almacen_id FROM vehiculos WHERE id=?', (vid,), one=True); return bool(v and v['almacen_id'] and alm_hist(v['almacen_id']))
     def veh_del(vid):
         VA.borrar_todo(db, q, vid)
@@ -545,12 +555,13 @@ def registrar(app, q, db):
             con.execute('UPDATE tecnicos SET rol=NULL WHERE cuadrilla_id=? AND rol=? AND id IS NOT ?', (cid, rol, int(pid) if pid else None))
             if pid: con.execute('UPDATE tecnicos SET cuadrilla_id=?, rol=? WHERE id=?', (cid, rol, int(pid)))
         sel = [int(x) for x in F.getlist('vehiculos')]
-        con.execute(f"UPDATE vehiculos SET cuadrilla_id=NULL WHERE cuadrilla_id=? AND id NOT IN ({','.join('?'*len(sel)) or 'NULL'})", [cid]+sel)
-        for v in sel: con.execute('UPDATE vehiculos SET cuadrilla_id=? WHERE id=?', (cid, v))
+        for (v,) in con.execute(f"SELECT id FROM vehiculos WHERE cuadrilla_id=? AND id NOT IN ({','.join('?'*len(sel)) or 'NULL'})", [cid]+sel).fetchall(): VA.asignar_cuadrilla(con, v, None)
+        for v in sel: VA.asignar_cuadrilla(con, v, cid)
         con.execute('UPDATE almacenes SET cuadrilla_id=(SELECT cuadrilla_id FROM vehiculos v WHERE v.almacen_id=almacenes.id) WHERE id IN (SELECT almacen_id FROM vehiculos WHERE almacen_id IS NOT NULL)')
     def cuad_del(cid):
         con = db(); con.execute('UPDATE tecnicos SET cuadrilla_id=NULL, rol=NULL WHERE cuadrilla_id=?', (cid,))
-        con.execute('UPDATE vehiculos SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,)); con.execute('UPDATE almacenes SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,))
+        for (v,) in con.execute('SELECT id FROM vehiculos WHERE cuadrilla_id=?', (cid,)).fetchall(): VA.asignar_cuadrilla(con, v, None)
+        con.execute('UPDATE almacenes SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,))
         con.execute('UPDATE herramientas SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,))
     def pers_valid(d, rid):
         if d.get('puesto'): d['puesto'] = puesto_canonico(d['puesto'])
@@ -577,16 +588,18 @@ def registrar(app, q, db):
         cols=[('nombre','Nombre'),('puesto','Puesto'),('area','Área'),('acceso_txt','Acceso'),('telefono','Teléfono'),('email','Email'),('especialidad','Especialidad'),('cuadrilla','Cuadrilla'),('rol','Rol')],
         campos=[('nombre','Nombre','text',True),('puesto','Puesto','select',lambda: PUESTOS + [r[0] for r in q("SELECT DISTINCT puesto FROM tecnicos WHERE TRIM(COALESCE(puesto,''))<>'' ORDER BY 1") if r[0] not in PUESTOS]),('telefono','Teléfono','tel'),('email','Email','email'),('especialidad','Especialidad','select',ESPEC),
                 ('cuadrilla_id','Cuadrilla','fk',CUAD),('rol','Rol en la cuadrilla','select',['líder','técnico']),('area','Área / Departamento','select',AREAS)],
-        hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)) or existe('SELECT 1 FROM orden_personal WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM ordenes WHERE ? IN (ordena_personal_id, responsable_id, audito_personal_id)', (i,)),
+        hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)) or existe('SELECT 1 FROM orden_personal WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM ordenes WHERE ? IN (ordena_personal_id, responsable_id, audito_personal_id)', (i,)) or existe('SELECT 1 FROM checklists WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM responsiva_firmas WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM vehiculo_asignaciones WHERE personal_id=?', (i,)),
         valid=pers_valid),
      'vehiculos': dict(titulo='Vehículos', icono='🚚', tabla='vehiculos', act='activo', orden='numero', desc='Vehículos 01–18 (cada uno es un almacén móvil); varios por cuadrilla.',
-        buscar=['numero','placas','marca','modelo'],
-        sql="SELECT v.*, c.nombre cuadrilla, a.nombre almacen, "+VA.seg_sql('v.')+" seguro_estado, (SELECT COUNT(*) FROM vehiculo_fotos f WHERE f.vehiculo_id=v.id) nfotos, (SELECT COUNT(*) FROM vehiculo_documentos d WHERE d.vehiculo_id=v.id) ndocs FROM vehiculos v LEFT JOIN cuadrillas c ON c.id=v.cuadrilla_id LEFT JOIN almacenes a ON a.id=v.almacen_id",
-        cols=[('numero','Número'),('seguro_vence','Seguro'),('placas','Placas'),('marca','Marca'),('modelo','Modelo'),('anio','Año'),('cuadrilla','Cuadrilla'),('almacen','Almacén')],
+        buscar=['numero','placas','marca','modelo','numero_serie'],
+        sql="SELECT v.*, c.nombre cuadrilla, a.nombre almacen, "+VA.seg_sql('v.')+" seguro_estado, "+VA.asignado_sql('v.')+" asignado, (SELECT estado FROM vehiculo_responsivas r WHERE r.vehiculo_id=v.id ORDER BY r.id DESC LIMIT 1) resp_estado, (SELECT COUNT(*) FROM vehiculo_fotos f WHERE f.vehiculo_id=v.id) nfotos, (SELECT COUNT(*) FROM vehiculo_documentos d WHERE d.vehiculo_id=v.id) ndocs FROM vehiculos v LEFT JOIN cuadrillas c ON c.id=v.cuadrilla_id LEFT JOIN almacenes a ON a.id=v.almacen_id",
+        cols=[('numero','Número'),('asignado','Asignado a'),('seguro_vence','Seguro'),('placas','Placas'),('marca','Marca'),('modelo','Modelo'),('anio','Año'),('almacen','Almacén')],
         campos=[('numero','Número (01–18)','text',True),('placas','Placas','text'),('marca','Marca','text'),('modelo','Modelo','text'),('anio','Año','number'),
-                ('cuadrilla_id','Cuadrilla asignada','fk',CUAD),('notas','Notas','textarea'),
+                ('numero_serie','Número de serie (VIN)','text'),
+                ('asignacion_tipo','Tipo de asignación','select',VA.ASIG_TIPOS),('cuadrilla_id','Cuadrilla asignada','fk',CUAD),('personal_id','Persona asignada','fk',PERS),
+                ('asignacion_fecha','Fecha de asignación','date'),('asignacion_km','Kilometraje al asignar','number'),('notas','Notas','textarea'),
                 ('seguro_compania','Compañía de seguros','text'),('seguro_poliza','Número de póliza','text'),('seguro_vence','Vencimiento de póliza','date')],
-        seguro=VA.SEGURO, seg_filtro=True,
+        seguro=VA.SEGURO, asig=VA.ASIG, seg_filtro=True,
         valid=veh_valid, post=veh_post, hist=veh_hist, soft=veh_baja_soft, pre_del=veh_del, unico=[('numero','Ese número de vehículo ya existe')]),
      'cuadrillas': dict(titulo='Cuadrillas', icono='👥', tabla='cuadrillas', act='activa', orden='id', desc='Líder y técnico (desde Personal), especialidad, zona y vehículos.',
         buscar=['nombre','especialidad','zona'],
@@ -661,6 +674,11 @@ def registrar(app, q, db):
                 ('modelo','Modelo','text'),('estado','Estado','select',ESTADOS_HERR,True),('cuadrilla_id','Asignado a cuadrilla','fk',CUAD),('personal_id','Asignado a persona','fk',PERS),
                 ('almacen_id','Ubicado en almacén / vehículo','fk',ALM),('fecha_calibracion','Próxima calibración','date'),('proveedor_id','Proveedor','fk',PROV),('notas','Notas','textarea')],
         valid=herr_valid, hist=lambda i: True, soft=lambda i: db().execute("UPDATE herramientas SET estado='baja' WHERE id=?", (i,))),
+     'checklist': dict(titulo='Checklist diario', icono='✅', tabla='checklist_items', act='activo', orden='rutina DESC, orden, nombre',
+        desc='Puntos de la rutina de inicio de día del técnico: Vehículo y Seguridad (EPP).', buscar=['nombre','rutina'],
+        cols=[('nombre','Punto a revisar'),('rutina','Rutina'),('orden','Orden')],
+        campos=[('rutina','Rutina','select',['Vehículo','Seguridad'],True),('nombre','Punto a revisar','text',True),('orden','Orden (menor = primero)','number')],
+        valid=chk_valid, hist=lambda i: existe('SELECT 1 FROM checklist_respuestas r JOIN checklist_items it ON it.nombre=r.item AND it.rutina=r.rutina WHERE it.id=? LIMIT 1', (i,))),
     }
     SQLCOL = {'materiales':'m','personal':'t','vehiculos':'v','cuadrillas':'c','almacenes':'a','herramientas':'h'}
 

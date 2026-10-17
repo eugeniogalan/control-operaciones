@@ -3,13 +3,28 @@
 ## Local
     pip install -r requirements.txt
     cp .env.example .env   # y pon una contraseña y SECRET_KEY
-    python seed.py         # datos de EJEMPLO (borra y recrea la BD)
+    python seed.py         # datos de EJEMPLO, solo si la BD no existe o está vacía (--force la borra y recrea)
     python app.py          # http://localhost:8080  (o: gunicorn app:app --bind 0.0.0.0:8080)
 
-## Render (plan gratuito)
-Blueprint `render.yaml`. Variables: ADMIN_USER, ADMIN_PASSWORD, SECRET_KEY (autogenerada), DB_PATH, UPLOAD_DIR.
-Nota: el disco del plan gratuito es efímero; al reiniciar/redeploy la base vuelve a los datos de ejemplo y se pierden fotos subidas.
-El servicio se duerme tras ~15 min sin uso (primer acceso tarda ~1 min).
+### Dónde se guardan los datos (`DATA_DIR`)
+- Sin `DATA_DIR`: `ops.db` y `uploads/` junto al código (como siempre).
+- Con `DATA_DIR=/ruta`: se crea la carpeta y se usan `/ruta/ops.db` y `/ruta/uploads/` (fotos, PDFs, firmas, cartas responsivas).
+- `DB_PATH` / `UPLOAD_DIR` siguen existiendo y, si están definidas, **tienen prioridad** sobre `DATA_DIR`.
+- La siembra de datos de ejemplo (`seed.py`) solo corre si la base no existe o no tiene datos (personal, órdenes, materiales o clientes); nunca sobrescribe datos reales.
+
+## Render (plan Starter + disco persistente)
+Blueprint `render.yaml` (plan `starter`, disco `data` montado en `/var/data`, 1 GB, `DATA_DIR=/var/data`).
+
+Si el servicio ya existe y se configura a mano en el dashboard:
+1. **Settings › Instance type**: Starter (o superior; los discos no están disponibles en Free).
+2. **Disks › Add disk**: Name `data`, Mount path `/var/data`, Size `1` GB.
+3. **Environment**: agrega `DATA_DIR` = `/var/data`. **Elimina `DB_PATH` y `UPLOAD_DIR`** si existen (apuntaban a `/tmp/ops-data`, que es efímero, y tendrían prioridad sobre `DATA_DIR`).
+   Conserva `ADMIN_USER`, `ADMIN_PASSWORD`, `DEMO_USERS_PASSWORD`, `SECRET_KEY`, `PYTHON_VERSION`.
+4. **Start command**: `python seed.py --if-missing && gunicorn app:app --bind 0.0.0.0:$PORT --workers 2 --timeout 60`.
+5. Deploy. En el primer arranque el disco está vacío, así que se siembran los datos de ejemplo una sola vez; a partir de ahí la base y los archivos sobreviven reinicios y redeploys.
+
+Notas: un servicio con disco no admite escalar a varias instancias y el deploy tiene unos segundos de corte (Render detiene la instancia anterior antes de montar el disco en la nueva).
+Respaldo: Render toma snapshots diarios del disco; para una copia propia, `python -c "import sqlite3;s=sqlite3.connect('/var/data/ops.db');d=sqlite3.connect('/var/data/respaldo.db');s.backup(d)"` desde el Shell del servicio.
 
 ## Inventario de materiales
 - **Almacenes (20)**: Torrelit, Autosound y Vehículo 01–18 (almacenes móviles). Cada vehículo se asigna a una cuadrilla en **/vehiculos** (reasignable; una cuadrilla puede tener varios vehículos; puede quedar sin asignar).
@@ -47,3 +62,11 @@ Búsqueda: `GET /api/syscom/buscar?q=texto`. Las miniaturas en `static/productos
 - Cada persona toma el perfil de su **puesto** (catálogo de Personal: Director, Gerente de administración/operaciones/ventas/soporte, Ejecutivo comercial, Supervisor, Técnico Instalador, Almacenista, Proveedor Externo); en Usuarios se puede asignar otro perfil. Clientes y órdenes tienen **Ejecutivo / propietario** (por omisión quien los crea) y las cuadrillas un **Supervisor**; con eso se calcula el alcance «propias» y «equipo». Los permisos se validan en el servidor (403), en menús/botones y en los listados.
 - Las órdenes de **Clientes › Instalación nueva** se crean «Pendiente de autorización» y no pueden asignarse, iniciarse ni cerrarse hasta autorizarse.
 - Datos de EJEMPLO (seed): se crean los usuarios `director`, `administracion` y `tecnico`. Solo tienen contraseña si defines la variable de entorno `DEMO_USERS_PASSWORD` (la misma para los tres, mín. 8 caracteres); si no está definida existen como Personal **sin acceso**. Nunca pongas su valor en el repositorio; en Render configúrala como secreto (opcional).
+
+## Checklist diario de técnicos
+Todo usuario cuyo perfil tiene `checklist.realizar` (perfil Técnico) debe completar, la primera vez que entra cada día (fecha de America/Mexico_City), la **Rutina 1 – Vehículo** (vehículo, kilometraje, foto de odómetro, nivel de combustible + foto, puntos de revisión) y después la **Rutina 2 – Seguridad** (EPP + foto de la cuadrilla). Mientras no termina, cualquier otra pantalla redirige a `/checklist`.
+Los puntos sin cumplir se permiten pero exigen comentario y quedan marcados como incumplimiento. Revisión en **Checklists diarios** (permiso `checklist.ver`). Los puntos se editan en Configuración › Checklist diario (puntos).
+
+## Asignación de vehículos y cartas responsivas
+Cada vehículo se asigna a una **Cuadrilla**, a una **Persona** (de Configuración › Personal) o queda **Sin asignar**, con fecha de asignación e historial.
+Cada nueva asignación genera una **carta responsiva** (Pendiente de firma → Firmada) que el asignado firma en pantalla (en cuadrilla, cada integrante), o que un supervisor/admin captura en persona (`responsivas.firmar_presencial`). Al completarse se genera el PDF (reportlab) en `uploads/responsivas/`.

@@ -1,0 +1,14 @@
+{% extends 'base.html' %}{% block body %}<div class="muted"><a href="/checklists">Checklists diarios</a> › {{r.fecha}}</div>
+<h1 style="margin-bottom:2px">{{r.tecnico}}</h1><p class="muted" style="margin-top:0">{{r.fecha}} · {{r.cuadrilla or 'sin cuadrilla'}}{% if r.ejemplo %} · EJEMPLO{% endif %}</p>
+<style>.ph{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}.ph a{display:block;text-decoration:none;color:inherit;font-size:12.5px}.ph img{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;border:1px solid #d9d9de}
+.it{display:flex;gap:8px;padding:7px 0;border-top:1px solid #f0f0f3;font-size:14px}.it:first-child{border-top:0}.it.no{color:#c62828}</style>
+<div class="card"><h2 style="margin-top:0">🚚 Rutina 1 · Vehículo <span class="muted" style="font-weight:400">{{r.veh_fin[11:] if r.veh_fin}}</span></h2>
+<p style="margin:0 0 8px"><a href="/checklists?vehiculo={{r.vehiculo_id}}"><b>Vehículo {{r.vnum}}</b></a>{{ ' · ' ~ r.placas if r.placas }} · <b>{{'{:,}'.format(r.km) if r.km is not none else '—'}} km</b>{% if r.km_anterior is not none %} <span class="muted">(anterior {{'{:,}'.format(r.km_anterior)}}; {{'%+d'|format(r.km_delta)}})</span>{% endif %} · ⛽ {{r.combustible}}</p>
+{% if r.km_alerta %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ El técnico confirmó un kilometraje menor al último registrado del vehículo.</div>{% endif %}
+<div class="ph" style="margin-bottom:10px">{% for a, l in [(r.foto_odometro,'Odómetro'),(r.foto_combustible,'Indicador de combustible')] if a %}<a href="/uploads/{{CHK_SUB}}/{{a}}" target="_blank"><img src="/uploads/{{CHK_SUB}}/t_{{a}}" alt="{{l}}">{{l}}</a>{% endfor %}</div>
+{% for x in resp['Vehículo'] %}<div class="it {{'no' if not x.cumple}}"><span>{{ '✓' if x.cumple else '✗' }}</span><span><b>{{x.item}}</b>{% if not x.cumple %} — no cumple: {{x.comentario}}{% endif %}</span></div>{% endfor %}
+{% if r.veh_obs %}<p class="muted" style="margin:8px 0 0">📝 {{r.veh_obs}}</p>{% endif %}</div>
+<div class="card"><h2 style="margin-top:0">🦺 Rutina 2 · Seguridad <span class="muted" style="font-weight:400">{{r.seg_fin[11:] if r.seg_fin else 'pendiente'}}</span></h2>
+{% if r.seg_fin %}{% if r.foto_epp %}<div class="ph" style="margin-bottom:10px"><a href="/uploads/{{CHK_SUB}}/{{r.foto_epp}}" target="_blank"><img src="/uploads/{{CHK_SUB}}/t_{{r.foto_epp}}" alt="Cuadrilla con EPP">Cuadrilla con EPP</a></div>{% endif %}
+{% for x in resp['Seguridad'] %}<div class="it {{'no' if not x.cumple}}"><span>{{ '✓' if x.cumple else '✗' }}</span><span><b>{{x.item}}</b>{% if not x.cumple %} — no cumple: {{x.comentario}}{% endif %}</span></div>{% endfor %}
+{% if r.seg_obs %}<p class="muted" style="margin:8px 0 0">📝 {{r.seg_obs}}</p>{% endif %}{% else %}<p class="muted">El técnico aún no termina la rutina de seguridad.</p>{% endif %}</div>{% endblock %}

@@ -1,10 +1,13 @@
-"""Carga datos de EJEMPLO: 10 cuadrillas x 2, ~150 órdenes en un mes, inventario (89 materiales, 20 almacenes). Uso: python3 seed.py  (borra y recrea ops.db)"""
+"""Carga datos de EJEMPLO: 10 cuadrillas x 2, ~150 órdenes en un mes, inventario (89 materiales, 20 almacenes).
+Uso: python3 seed.py [--if-missing]. SOLO siembra si la base no existe o está vacía: nunca borra ni sobrescribe datos reales.
+Para recrear a propósito una base que ya tiene datos: python3 seed.py --force (borra la base)."""
 import os, sys, random, sqlite3, datetime as dt, json
 random.seed(7)
-B = os.path.dirname(os.path.abspath(__file__)); DB = os.environ.get('DB_PATH') or os.path.join(B, 'ops.db')
-if '--if-missing' in sys.argv and os.path.exists(DB):
-    print('DB existente, no se recarga:', DB); sys.exit(0)
-if os.path.exists(DB): os.remove(DB)
+import rutas
+B = rutas.BASE; DB = rutas.DB
+if rutas.bd_con_datos(DB) and '--force' not in sys.argv:
+    print('La base ya tiene datos; no se siembra nada:', DB); sys.exit(0)
+if os.path.exists(DB): os.remove(DB)   # inexistente, vacía o --force
 import app as A
 c = sqlite3.connect(DB)
 CU = [('Cuadrilla 01','Fibra Óptica','Norte'),('Cuadrilla 02','Fibra Óptica','Sur'),('Cuadrilla 03','Fibra Óptica','Centro'),('Cuadrilla 04','Microondas','Norte'),
@@ -25,6 +28,7 @@ A.asegurar_vehiculos(c)
 # Asignación de ejemplo: Vehículo NN → Cuadrilla NN (01-10); 11-18 → cuadrillas 01-08 (segundo vehículo)
 for i in range(1, 19):
     c.execute('UPDATE almacenes SET cuadrilla_id=? WHERE nombre=?', ((i - 1) % 10 + 1, f'Vehículo {i:02d}'))
+c.execute('UPDATE vehiculos SET cuadrilla_id=(SELECT a.cuadrilla_id FROM almacenes a WHERE a.id=vehiculos.almacen_id) WHERE almacen_id IS NOT NULL')   # misma cuadrilla en el catálogo de vehículos
 ALM = {n: i for i, n in c.execute('SELECT id, nombre FROM almacenes')}
 VEH = {cid: i for i, cid in c.execute("SELECT MIN(id), cuadrilla_id FROM almacenes WHERE tipo='vehiculo' AND cuadrilla_id IS NOT NULL GROUP BY cuadrilla_id")}
 PREF = {'FIBRA PLANTA EXTERNA':'FPE','FIBRA PLANTA INTERNA':'FPI','PLANTA EXTERNA':'PE','PLANTA INTERNA':'PI','EQUIPOS':'EQ','EQUIPOS DE RED':'RED',

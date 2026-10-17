@@ -1,0 +1,65 @@
+{% extends 'base.html' %}{% block body %}
+<style>
+.stp{display:flex;gap:6px;margin:0 0 12px}.stp div{flex:1;text-align:center;font-size:12px;font-weight:600;padding:7px 4px;border-radius:999px;background:#f2f2f5;color:#8e8e93}
+.stp .on{background:#111;color:#fff}.stp .ok{background:#e7f6ec;color:#15803d}
+.ci{border-top:1px solid #ececf0;padding:10px 0}.ci:first-of-type{border-top:0}.ci-n{font-weight:600;font-size:15px;margin-bottom:6px}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px}.seg label{margin:0!important}.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg span{display:block;text-align:center;padding:11px 6px;border:1px solid #d9d9de;border-radius:12px;font-size:14px;font-weight:600;color:#333;background:#fff;cursor:pointer}
+.seg input:checked+span{background:#16a34a;border-color:#16a34a;color:#fff}.seg .no input:checked+span{background:#c62828;border-color:#c62828}
+.ci-c{display:none;margin-top:8px}.ci.nc .ci-c{display:block}.ci.nc{background:#fff6f6;margin:0 -10px;padding:10px}
+.fot{display:flex;align-items:center;gap:12px;border:1.5px dashed #c7c7cc;border-radius:14px;padding:12px;background:#fafafc;cursor:pointer;margin:4px 0 12px!important;position:relative}
+.fot input{position:absolute;opacity:0;width:1px;height:1px}.fot img{width:72px;height:72px;object-fit:cover;border-radius:10px;display:none}.fot.has img{display:block}.fot.has{border-style:solid;border-color:#16a34a;background:#f3fbf5}
+.fot .ico{font-size:30px}.fot.has .ico{display:none}.fot b{display:block;color:#111;font-size:15px}.req{color:#c62828}
+.kmw{display:none;background:#fdf6e3;border:1px solid #ecd59a;color:#7a5200;border-radius:12px;padding:10px 12px;font-size:13px;margin:-4px 0 12px}
+</style>
+{% if paso=='listo' %}
+<div class="card" style="text-align:center"><div style="font-size:48px">✅</div><h1 style="margin:4px 0">Rutinas del día completas</h1><p class="muted">{{hoy}} · Vehículo {{veh.numero if veh}} · {{'{:,}'.format(r.km)}} km · combustible {{r.combustible}}</p>
+{% for x in resumen %}<p style="margin:4px 0">{{ '🚚' if x.rutina=='Vehículo' else '🦺' }} {{x.rutina}}: {% if x.nc %}<b style="color:#c62828">{{x.nc}} punto(s) no cumplen</b> — se notificó en la revisión del supervisor{% else %}<b style="color:#15803d">todo cumple</b>{% endif %}</p>{% endfor %}
+<p style="margin-top:14px"><a class="btn" href="{{ini}}" style="width:100%;max-width:320px">Continuar →</a></p></div>
+{% else %}
+<h1 style="margin-bottom:4px">Inicio de día</h1><p class="muted" style="margin-top:0">{{hoy}} · {{USR.nombre}}. Completa las dos rutinas para poder usar el sistema.</p>
+<div class="stp"><div class="{{'on' if paso=='vehiculo' else 'ok'}}">{{ '✓ ' if paso!='vehiculo' }}1 · Vehículo</div><div class="{{'on' if paso=='seguridad' else ''}}">2 · Seguridad</div></div>
+{% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">{% for e in err %}<div>⚠ {{e}}</div>{% endfor %}<div style="margin-top:4px;font-weight:600">Vuelve a tomar las fotos antes de enviar.</div></div>{% endif %}
+{% if paso=='vehiculo' %}
+<form class="f" method="post" action="/checklist/vehiculo" enctype="multipart/form-data" id="frm" novalidate>
+<div class="card"><h2 style="margin-top:0">🚚 Rutina 1 · Vehículo</h2>
+<label>Vehículo <span class="req">*</span><select name="vehiculo_id" id="veh" required><option value="">— Selecciona —</option>{% for v in vs %}<option value="{{v.id}}" {{'selected' if sel==v.id}}>Vehículo {{v.numero}}{{ ' · ' ~ v.placas if v.placas }}{{ ' · ' ~ v.persona if v.persona else (' · ' ~ v.cuadrilla if v.cuadrilla) }}{{ ' (asignado a ti)' if v.id==propio else (' (tu cuadrilla)' if v.id==asignado) }}</option>{% endfor %}</select></label>
+<p class="muted" id="ultkm" style="margin:-4px 0 10px"></p>{% if hoy_cuad %}<p class="muted" style="margin:-6px 0 10px">ℹ {{hoy_cuad.nombre}} ya registró hoy el vehículo seleccionado ({{'{:,}'.format(hoy_cuad.km)}} km).</p>{% endif %}
+<label>Kilometraje <span class="req">*</span><input name="km" id="km" type="number" inputmode="numeric" min="0" step="1" required value="{{F.get('km','')}}" placeholder="Ej. 45230"></label>
+<div class="kmw" id="kmw"><div id="kmwt"></div><label style="margin:6px 0 0;font-weight:600;color:#7a5200;display:flex;gap:8px;align-items:center"><input type="checkbox" name="km_confirmo" value="1" id="kmc" style="width:auto"> Confirmo que el kilometraje es correcto</label></div>
+<label class="fot" id="f_odo"><input type="file" name="foto_odometro" accept="image/*" capture="environment"><span class="ico">📸</span><img alt=""><span><b>Foto del odómetro <span class="req">*</span></b><span class="muted">Toca para tomar la foto</span></span></label>
+<label>Nivel de combustible <span class="req">*</span><select name="combustible" required><option value="">— Selecciona —</option>{% for c in CHK_COMBUSTIBLE %}<option {{'selected' if F.get('combustible')==c}}>{{c}}</option>{% endfor %}</select></label>
+<label class="fot" id="f_comb"><input type="file" name="foto_combustible" accept="image/*" capture="environment"><span class="ico">⛽</span><img alt=""><span><b>Foto del indicador de combustible <span class="req">*</span></b><span class="muted">Toca para tomar la foto</span></span></label></div>
+<div class="card"><h2 style="margin-top:0">Revisión</h2><p class="muted" style="margin-top:-6px">Contesta cada punto. Si algo no cumple, explica por qué: tu supervisor lo verá.</p>
+{% for it in items %}{% set v=F.get('i'~it.id) %}<div class="ci {{'nc' if v=='0'}}"><div class="ci-n">{{it.nombre}}</div><div class="seg"><label><input type="radio" name="i{{it.id}}" value="1" {{'checked' if v=='1'}}><span>✓ Cumple</span></label><label class="no"><input type="radio" name="i{{it.id}}" value="0" {{'checked' if v=='0'}}><span>✗ No cumple</span></label></div>
+<textarea class="ci-c" name="c{{it.id}}" rows="2" placeholder="¿Qué falla? (obligatorio)">{{F.get('c'~it.id,'')}}</textarea></div>{% endfor %}
+<label style="margin-top:10px">Observaciones (opcional)<textarea name="veh_obs" rows="2">{{F.get('veh_obs','')}}</textarea></label></div>
+<button class="btn" style="width:100%;padding:14px">Guardar y continuar a Seguridad →</button></form>
+<script>var ULT={{ ult|tojson }};</script>
+{% else %}
+<form class="f" method="post" action="/checklist/seguridad" enctype="multipart/form-data" id="frm" novalidate>
+<div class="card"><h2 style="margin-top:0">🦺 Rutina 2 · Seguridad</h2><p class="muted" style="margin-top:-6px">Vehículo {{veh.numero if veh}} · {{'{:,}'.format(r.km)}} km registrado. Revisa tu equipo de protección personal.</p>
+{% for it in items %}{% set v=F.get('i'~it.id) %}<div class="ci {{'nc' if v=='0'}}"><div class="ci-n">{{it.nombre}}</div><div class="seg"><label><input type="radio" name="i{{it.id}}" value="1" {{'checked' if v=='1'}}><span>✓ Cumple</span></label><label class="no"><input type="radio" name="i{{it.id}}" value="0" {{'checked' if v=='0'}}><span>✗ No cumple</span></label></div>
+<textarea class="ci-c" name="c{{it.id}}" rows="2" placeholder="¿Qué falta o está dañado? (obligatorio)">{{F.get('c'~it.id,'')}}</textarea></div>{% endfor %}</div>
+<div class="card"><label class="fot" id="f_epp"><input type="file" name="foto_epp" accept="image/*" capture="environment"><span class="ico">👷</span><img alt=""><span><b>Foto de la cuadrilla con su EPP puesto <span class="req">*</span></b><span class="muted">Toca para tomar la foto</span></span></label>
+<label>Observaciones (opcional)<textarea name="seg_obs" rows="2">{{F.get('seg_obs','')}}</textarea></label></div>
+<button class="btn" style="width:100%;padding:14px">Terminar rutina de inicio de día ✓</button></form>
+{% endif %}
+<script>(function(){
+document.querySelectorAll('.fot input').forEach(function(i){i.addEventListener('change',function(){var l=i.closest('.fot'),im=l.querySelector('img'),f=i.files[0];if(f){im.src=URL.createObjectURL(f);l.classList.add('has');l.querySelector('.muted').textContent='✓ '+f.name+' · toca para cambiar';}else l.classList.remove('has');});});
+document.querySelectorAll('.ci').forEach(function(c){c.querySelectorAll('input[type=radio]').forEach(function(r){r.addEventListener('change',function(){var no=c.querySelector('input[value="0"]').checked;c.classList.toggle('nc',no);if(no)c.querySelector('textarea').focus();});});});
+var veh=document.getElementById('veh'),km=document.getElementById('km'),w=document.getElementById('kmw'),wt=document.getElementById('kmwt'),u=document.getElementById('ultkm');
+function fmt(n){return Number(n).toLocaleString('es-MX');}
+function chk(){if(!veh)return;var x=ULT[veh.value]||{};u.textContent=x.km!=null?('Último registro de este vehículo: '+fmt(x.km)+' km el '+x.fecha+(x.nombre?' ('+x.nombre+')':'')):(veh.value?'Sin registros previos de kilometraje para este vehículo.':'');
+var bajo=x.km!=null&&km.value!==''&&+km.value<x.km;w.style.display=bajo?'block':'none';if(bajo)wt.textContent='⚠ El kilometraje capturado ('+fmt(km.value)+') es menor al último registrado ('+fmt(x.km)+' km el '+x.fecha+'). Verifica el odómetro.';}
+if(veh){veh.addEventListener('change',chk);km.addEventListener('input',chk);chk();}
+document.getElementById('frm').addEventListener('submit',function(e){var faltan=[];var f=this;
+f.querySelectorAll('select[required],input[name=km]').forEach(function(x){if(!x.value)faltan.push(x.closest('label'));});
+f.querySelectorAll('.fot').forEach(function(l){if(!l.querySelector('input').files.length)faltan.push(l);});
+f.querySelectorAll('.ci').forEach(function(c){var s=c.querySelector('input:checked');if(!s||(s.value==='0'&&!c.querySelector('textarea').value.trim()))faltan.push(c);});
+if(w&&w.style.display==='block'&&!document.getElementById('kmc').checked)faltan.push(w);
+document.querySelectorAll('.falta').forEach(function(x){x.classList.remove('falta');x.style.outline='';});
+if(faltan.length){e.preventDefault();faltan.forEach(function(x){x.classList.add('falta');x.style.outline='2px solid #c62828';x.style.outlineOffset='3px';x.style.borderRadius='12px';});faltan[0].scrollIntoView({behavior:'smooth',block:'center'});
+alert('Faltan '+faltan.length+' dato(s): fotos, puntos sin contestar o comentario de «No cumple».');}});
+})();</script>
+{% endif %}{% endblock %}

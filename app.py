@@ -3,8 +3,8 @@ from flask import Flask, g, render_template, request, redirect, url_for, jsonify
 from werkzeug.utils import secure_filename
 
 BASE = os.path.dirname(os.path.abspath(__file__))
-DB = os.environ.get('DB_PATH') or os.path.join(BASE, 'ops.db')
-UP = os.environ.get('UPLOAD_DIR') or os.path.join(BASE, 'uploads')
+import rutas
+DB, UP = rutas.DB, rutas.UP   # DATA_DIR (disco persistente) o rutas locales; ver rutas.py
 os.makedirs(UP, exist_ok=True)
 os.makedirs(os.path.dirname(os.path.abspath(DB)), exist_ok=True)
 app = Flask(__name__)
@@ -892,13 +892,14 @@ def api_escanear():
 @app.route('/vehiculos', methods=['GET','POST'])
 def vehiculos():
     if request.method == 'POST':
-        for v in q("SELECT id FROM almacenes WHERE tipo='vehiculo'"):
+        for v in q("SELECT a.id, a.cuadrilla_id, ve.id veh_id, ve.asignacion_tipo FROM almacenes a LEFT JOIN vehiculos ve ON ve.almacen_id=a.id WHERE a.tipo='vehiculo'"):
             cid = request.form.get(f'v{v["id"]}')
-            if cid is not None:
-                db().execute('UPDATE almacenes SET cuadrilla_id=? WHERE id=?', (int(cid) if cid else None, v['id']))
-                db().execute('UPDATE vehiculos SET cuadrilla_id=? WHERE almacen_id=?', (int(cid) if cid else None, v['id']))
+            if cid is None or v['asignacion_tipo'] == 'Persona': continue   # asignado a una persona: se cambia en Configuración › Vehículos
+            cid = int(cid) if cid else None
+            db().execute('UPDATE almacenes SET cuadrilla_id=? WHERE id=?', (cid, v['id']))
+            if v['veh_id']: VA.asignar_cuadrilla(db(), v['veh_id'], cid)
         db().commit(); return redirect(url_for('vehiculos', ok=1))
-    vs = q(f'''SELECT a.*, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat, ve.id veh_id, ve.placas, ve.seguro_compania, ve.seguro_vence, {VA.seg_sql('ve.')} seguro_estado
+    vs = q(f'''SELECT a.*, (SELECT COUNT(*) FROM existencias e WHERE e.almacen_id=a.id AND e.stock>0) nmat, ve.id veh_id, ve.placas, ve.seguro_compania, ve.seguro_vence, {VA.seg_sql('ve.')} seguro_estado, ve.asignacion_tipo, ve.asignacion_fecha, {VA.asignado_sql('ve.')} asignado
         FROM almacenes a LEFT JOIN vehiculos ve ON ve.almacen_id=a.id WHERE a.tipo='vehiculo' ORDER BY a.nombre''')
     cu = q('SELECT * FROM cuadrillas ORDER BY id')
     return render_template('vehiculos.html', vs=vs, cu=cu, ok=request.args.get('ok'))
@@ -958,12 +959,16 @@ def init_db():
     sembrar_imagenes_ejemplo(c)
     CM.migrar(c)
     VA.migrar(c)
+    CL.migrar(c)
+    RM.migrar(c)
     SF.migrar(c)
     UPS.migrar(c)
     SD.migrar(c)
     PM.migrar(c, PM.JSON, PLANT_DE_TIPO)
     migrar_ordenes(c)
+    CL.demo(c, UP)  # solo datos de ejemplo: historial de checklists diarios (días anteriores)
     VA.demo(c)     # solo datos de ejemplo: seguro ficticio de vehículos
+    RM.demo(c, UP, os.path.join(BASE, 'static'))   # solo datos de ejemplo: asignaciones y cartas responsivas
     PERM.demo(c)   # solo datos de ejemplo; no hace nada si ya hay propietarios asignados
     c.commit(); c.close()
 import syscom_client as SC
@@ -972,6 +977,8 @@ import sitio_fotos as SF
 import sitio_ups as UPS
 import sitio_docs as SD
 import vehiculo_adj as VA
+import checklist_mod as CL
+import responsiva_mod as RM
 import sepomex
 app.jinja_env.filters['todate'] = lambda v: dt.date.fromisoformat(v)
 CONFIG = CM.registrar(app, q, db)
@@ -982,6 +989,8 @@ PM.MAPA_TIPO = PLANT_DE_TIPO
 PM.registrar(app, q, db, [t for cat in TIPOS.values() for lst in cat.values() for t in lst])
 SD.registrar(app, q, db)
 VA.registrar(app, q, db)
+CL.registrar(app, q, db, UP)
+RM.registrar(app, q, db, UP)
 app.config.setdefault('MAX_CONTENT_LENGTH', 80 * 1024 * 1024)
 
 @app.route('/proveedores/syscom', methods=['GET','POST'])

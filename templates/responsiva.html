@@ -1,0 +1,38 @@
+{% extends 'base.html' %}{% block body %}{% set est = RESP_ESTADOS[r.estado] %}
+<style>.carta{background:#fff;border:1px solid #e5e5ea;border-radius:14px;padding:16px;font-size:14px;line-height:1.5}.carta h2{text-align:center;margin:6px 0 2px;font-size:17px;letter-spacing:.02em}
+.carta table{width:100%;border-collapse:collapse;margin:8px 0}.carta td{border:1px solid #ececf0;padding:5px 8px;font-size:13px;vertical-align:top}.carta td:first-child{background:#f5f5f7;font-weight:600;width:40%}
+.carta ol{padding-left:20px;margin:6px 0}.carta li{margin-bottom:5px}
+.fz{border:1px solid #e5e5ea;border-radius:14px;padding:12px;margin:10px 0;background:#fff}.pad{width:100%;height:170px;border:1.5px dashed #a1a1aa;border-radius:12px;background:#fcfcfd;touch-action:none;display:block}
+.fz img{max-width:100%;height:90px;object-fit:contain;display:block;margin:4px auto}</style>
+<div class="muted"><a href="/responsivas">Responsivas</a> › RV-{{'%05d'|format(r.id)}}</div>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><h1 style="margin:4px 0">📝 Carta responsiva</h1><span style="display:inline-block;padding:3px 10px;border-radius:999px;font-size:12.5px;font-weight:700;{{est[1]}}">{{est[0]}}{{ ' · ' ~ r.firmada if r.estado=='firmada' }}</span></div>
+{% if msg %}<div class="ej" style="{{'background:#e7f6ec;border-color:#b9e3c6;color:#15803d' if 'guardada' in msg or 'firmada' in msg else ''}}">{{msg}}</div>{% endif %}
+{% if r.estado=='firmada' and r.pdf %}<p><a class="btn" href="/responsivas/{{r.id}}/pdf" target="_blank">📕 Descargar PDF firmado</a></p>{% endif %}
+{% if r.estado=='sustituida' %}<div class="ej">Esta carta quedó sustituida por una asignación posterior del vehículo; ya no se puede firmar.</div>{% endif %}
+<div class="carta"><div style="display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #111;padding-bottom:8px"><img src="/static/logo-spectro.png" alt="Spectro Networks" style="height:34px"><span class="muted" style="font-size:11px;text-align:right">{{EMPRESA}}<br>Folio RV-{{'%05d'|format(r.id)}}</span></div>
+<h2>CARTA RESPONSIVA DE VEHÍCULO</h2><p class="muted" style="text-align:center;margin:0 0 6px;font-size:12px">Fecha de asignación: {{r.fecha_asignacion or '—'}}</p>
+<table><tr><td>Vehículo</td><td>Vehículo {{d.numero}}</td></tr><tr><td>Marca / modelo / año</td><td>{{ [d.marca, d.modelo, d.anio]|select|join(' ') or '—' }}</td></tr><tr><td>Placas</td><td>{{d.placas or '—'}}</td></tr>
+<tr><td>Número de serie (VIN)</td><td>{{d.numero_serie or '—'}}</td></tr><tr><td>Kilometraje al asignar</td><td>{{ '{:,} km'.format(d.km) if d.km is not none else 'No registrado' }}</td></tr>
+<tr><td>Póliza de seguro</td><td>{{ [d.seguro_compania, ('Póliza ' ~ d.seguro_poliza) if d.seguro_poliza, ('vence ' ~ d.seguro_vence) if d.seguro_vence]|select|join(' · ') or '—' }}</td></tr>
+<tr><td>Asignado a</td><td>{{ ('👥 Cuadrilla: ' if r.tipo=='Cuadrilla' else '👤 ') ~ r.asignado }}</td></tr></table>
+<p style="margin:8px 0 4px">{% if r.tipo=='Cuadrilla' %}Los integrantes de la cuadrilla <b>{{r.asignado}}</b> que firmamos abajo declaramos que recibimos de {{EMPRESA}} el vehículo descrito y aceptamos las siguientes condiciones:{% else %}Declaro que recibo de {{EMPRESA}} el vehículo descrito y acepto las siguientes condiciones:{% endif %}</p>
+<ol>{% for t, x in clausulas %}<li><b>{{t}}.</b> {{x}}</li>{% endfor %}</ol></div>
+<h2 style="margin:16px 0 4px">Firma(s)</h2>{% if not fs %}<p class="muted">La cuadrilla no tiene integrantes activos; no hay quién firme.</p>{% endif %}
+{% for f in fs %}<div class="fz" id="f{{f.id}}"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>{{f.nombre}}</b><span class="muted">{{f.puesto or ''}}{{ ' · ' ~ f.rol if f.rol }}</span></div>
+{% if f.firma %}<img src="/responsivas/{{r.id}}/firma/{{f.id}}" alt="Firma de {{f.nombre}}"><div class="muted" style="text-align:center;font-size:12px">✓ Firmó el {{f.fecha}}{% if f.en_persona %} · capturada en persona por {{f.capturada_por}}{% endif %}</div>
+{% elif f.id in firmables %}<form method="post" action="/responsivas/{{r.id}}/firmar" class="ffirma"><input type="hidden" name="firma_id" value="{{f.id}}"><input type="hidden" name="firma">
+<p class="muted" style="margin:6px 0">{{ 'Firma con tu dedo dentro del recuadro.' if f.personal_id==yo else 'Entrega el dispositivo a ' ~ f.nombre ~ ' para que firme con su dedo.' }}</p>
+<canvas class="pad"></canvas><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center"><button type="button" class="btn sec limpiar" style="padding:7px 14px">Limpiar</button>
+{% if f.personal_id!=yo %}<label style="font-size:13px;display:flex;gap:6px;align-items:center;flex:1;min-width:200px"><input type="checkbox" name="confirmo" value="1" style="width:auto" required> Confirmo que {{f.nombre}} firma en persona</label>{% endif %}
+<button class="btn" style="margin-left:auto;padding:9px 18px">✍ Guardar firma</button></div></form>
+{% else %}<p class="muted" style="margin:6px 0 0">⏳ Pendiente de firma{{ '' if r.estado=='pendiente' else ' (no firmó)' }}.</p>{% endif %}</div>{% endfor %}
+<script>document.querySelectorAll('.ffirma').forEach(function(fm){var cv=fm.querySelector('canvas'),cx=cv.getContext('2d'),ink=false,dn=false,last=null;
+function size(){var r=cv.getBoundingClientRect(),d=window.devicePixelRatio||1;cv.width=r.width*d;cv.height=r.height*d;cx.setTransform(d,0,0,d,0,0);cx.lineWidth=2.4;cx.lineCap='round';cx.lineJoin='round';cx.strokeStyle='#0b1f4d';ink=false;}
+size();window.addEventListener('resize',function(){if(!ink)size();});
+function pt(e){var r=cv.getBoundingClientRect();return [e.clientX-r.left,e.clientY-r.top];}
+cv.addEventListener('pointerdown',function(e){dn=true;last=pt(e);cv.setPointerCapture(e.pointerId);cx.beginPath();cx.arc(last[0],last[1],1.1,0,7);cx.fillStyle='#0b1f4d';cx.fill();ink=true;e.preventDefault();});
+cv.addEventListener('pointermove',function(e){if(!dn)return;var p=pt(e);cx.beginPath();cx.moveTo(last[0],last[1]);cx.lineTo(p[0],p[1]);cx.stroke();last=p;ink=true;e.preventDefault();});
+['pointerup','pointercancel','pointerleave'].forEach(function(t){cv.addEventListener(t,function(){dn=false;});});
+fm.querySelector('.limpiar').onclick=function(){cx.clearRect(0,0,cv.width,cv.height);ink=false;};
+fm.addEventListener('submit',function(e){if(!ink){e.preventDefault();alert('Dibuja la firma en el recuadro');return;}fm.querySelector('[name=firma]').value=cv.toDataURL('image/png');});});</script>
+{% endblock %}

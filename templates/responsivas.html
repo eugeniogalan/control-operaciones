@@ -1,0 +1,9 @@
+{% extends 'base.html' %}{% block body %}<h1>📝 Cartas responsivas</h1>
+{% if mias %}<div class="card"><h2 style="margin-top:0">Pendientes de tu firma</h2>{% for m in mias %}<p style="margin:6px 0"><a class="btn" href="/responsivas/{{m.id}}">✍ Firmar responsiva · Vehículo {{m.numero}}</a></p>{% endfor %}</div>
+{% elif not can('responsivas.ver','config.vehiculos','responsivas.firmar_presencial') %}<p class="muted">No tienes cartas responsivas pendientes de firma.</p>{% endif %}
+{% if can('responsivas.ver','config.vehiculos','responsivas.firmar_presencial') %}
+<div class="pills" style="display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px">{% for k, l in [('pendiente','Pendientes de firma'),('firmada','Firmadas'),('sustituida','Sustituidas'),('','Todas')] %}<a href="?estado={{k}}" style="text-decoration:none;padding:6px 12px;border-radius:999px;font-size:13px;font-weight:600;{{'background:#111;color:#fff;border:1px solid #111' if estado==k else 'background:#fff;color:#333;border:1px solid #d9d9de'}}">{{l}}</a>{% endfor %}</div>
+<div class="tw"><table><tr><th>Folio</th><th>Vehículo</th><th>Asignado a</th><th>Fecha</th><th>Firmas</th><th>Estado</th><th></th></tr>
+{% for r in todas %}<tr><td>RV-{{'%05d'|format(r.id)}}</td><td>Vehículo {{r.vnum}}</td><td>{{ '👥 ' if r.tipo=='Cuadrilla' else '👤 ' }}{{r.asignado}}</td><td style="white-space:nowrap">{{r.fecha_asignacion or '—'}}</td><td>{{r.nfir}}/{{r.nf}}</td>
+<td><span style="display:inline-block;white-space:nowrap;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:700;{{RESP_ESTADOS[r.estado][1]}}">{{RESP_ESTADOS[r.estado][0]}}</span></td><td style="white-space:nowrap"><a href="/responsivas/{{r.id}}">{{ 'Firmar' if r.estado=='pendiente' else 'Ver' }}</a>{% if r.pdf %} · <a href="/responsivas/{{r.id}}/pdf" target="_blank">PDF</a>{% endif %}</td></tr>
+{% else %}<tr><td colspan="7" class="muted">Sin registros</td></tr>{% endfor %}</table></div>{% endif %}{% endblock %}

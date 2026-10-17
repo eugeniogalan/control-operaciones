@@ -7,7 +7,7 @@ _db = None   # función que devuelve la conexión de la petición (la fija auth_
 
 # ---- Catálogo de permisos (módulo -> acciones) ----
 CONFIG_CATS = [('materiales', 'Materiales'), ('personal', 'Personal'), ('vehiculos', 'Vehículos'), ('cuadrillas', 'Cuadrillas'), ('sites', 'Sites'),
-               ('almacenes', 'Almacenes'), ('herramientas', 'Herramientas y equipo'), ('proveedores', 'Proveedores'), ('evidencias', 'Reporte de evidencias'), ('syscom', 'API SYSCOM')]
+               ('almacenes', 'Almacenes'), ('herramientas', 'Herramientas y equipo'), ('proveedores', 'Proveedores'), ('evidencias', 'Reporte de evidencias'), ('checklist', 'Checklist diario (puntos)'), ('syscom', 'API SYSCOM')]
 PERMISOS = [
     ('Panel', [('panel.ver', 'Ver panel')]),
     ('Órdenes', [('ordenes.ver', 'Ver'), ('ordenes.crear', 'Crear'), ('ordenes.editar', 'Editar'), ('ordenes.asignar', 'Asignar cuadrilla / personal'),
@@ -20,6 +20,8 @@ PERMISOS = [
     ('Escanear', [('escanear', 'Escanear códigos')]),
     ('Cuadrillas', [('cuadrillas.ver', 'Ver'), ('cuadrillas.editar', 'Editar')]),
     ('Vehículos', [('vehiculos.ver', 'Ver'), ('vehiculos.editar', 'Asignar a cuadrilla')]),
+    ('Responsivas de vehículo', [('responsivas.ver', 'Ver cartas responsivas'), ('responsivas.firmar_presencial', 'Capturar firma en persona')]),
+    ('Checklist diario', [('checklist.realizar', 'Rutina obligatoria al iniciar el día'), ('checklist.ver', 'Ver checklists diarios')]),
     ('Clientes / Prospectos', [('clientes.ver', 'Ver'), ('clientes.crear', 'Crear'), ('clientes.editar', 'Editar / baja'), ('clientes.convertir', 'Convertir prospecto')]),
     ('Reportes', [('reportes.ver', 'Reporte de materiales')]),
     ('Configuración (catálogos)', [('config.' + k, l) for k, l in CONFIG_CATS]),
@@ -38,12 +40,13 @@ _CLI = _s('clientes.ver', 'clientes.crear', 'clientes.editar', 'clientes.convert
 _ALL_CATS = 'infra,cliente,prospecto'
 # clave: (nombre, permisos, alcance, categorías, variantes (solo con alcance «tipo»))
 DEFAULTS = {
-    'director': ('Director', set(TODOS), 'todas', _ALL_CATS, ''),
+    'director': ('Director', set(TODOS) - {'checklist.realizar'}, 'todas', _ALL_CATS, ''),
     'gerente_admin': ('Gerente de administración', _s('panel.ver', 'ordenes.ver', 'ordenes.imprimir', 'ordenes.autorizar', 'ordenes.cancelar', 'evidencias.ver',
-                      'cuadrillas.ver', 'vehiculos.ver', 'reportes.ver') | _INV | _CLI | {'config.' + k for k, _ in CONFIG_CATS}, 'todas', _ALL_CATS, ''),
+                      'cuadrillas.ver', 'vehiculos.ver', 'reportes.ver', 'checklist.ver', 'responsivas.ver', 'responsivas.firmar_presencial') | _INV | _CLI | {'config.' + k for k, _ in CONFIG_CATS}, 'todas', _ALL_CATS, ''),
     'gerente_operaciones': ('Gerente de operaciones', _s('panel.ver', 'ordenes.cancelar', 'cuadrillas.ver', 'cuadrillas.editar', 'vehiculos.ver', 'vehiculos.editar',
                             'clientes.ver', 'reportes.ver', 'inventario.ver', 'inventario.entradas', 'inventario.salidas', 'inventario.transferencias', 'escanear',
-                            'config.cuadrillas', 'config.vehiculos', 'config.sites', 'config.almacenes', 'config.herramientas', 'config.evidencias', 'config.personal') | _ORD_OP | _CAMPO,
+                            'config.cuadrillas', 'config.vehiculos', 'config.sites', 'config.almacenes', 'config.herramientas', 'config.evidencias', 'config.personal',
+                            'checklist.ver', 'config.checklist', 'responsivas.ver', 'responsivas.firmar_presencial') | _ORD_OP | _CAMPO,
                             'todas', 'infra,cliente', ''),
     'gerente_ventas': ('Gerente de ventas', _s('panel.ver', 'ordenes.ver', 'ordenes.crear', 'ordenes.editar', 'ordenes.cancelar', 'ordenes.imprimir', 'evidencias.ver') | _CLI,
                        'todas', 'cliente,prospecto', ''),
@@ -51,13 +54,14 @@ DEFAULTS = {
                         'tipo', 'cliente', 'Mantenimiento preventivo,Mantenimiento correctivo'),
     'ejecutivo': ('Ejecutivo comercial', _s('panel.ver', 'ordenes.ver', 'ordenes.crear', 'ordenes.editar', 'ordenes.imprimir', 'evidencias.ver') | _CLI,
                   'propias', 'cliente,prospecto', ''),
-    'supervisor': ('Supervisor', _s('panel.ver', 'inventario.ver', 'inventario.salidas', 'escanear', 'cuadrillas.ver', 'vehiculos.ver') | _ORD_OP | _CAMPO,
+    'supervisor': ('Supervisor', _s('panel.ver', 'inventario.ver', 'inventario.salidas', 'escanear', 'cuadrillas.ver', 'vehiculos.ver', 'checklist.ver', 'responsivas.ver', 'responsivas.firmar_presencial') | _ORD_OP | _CAMPO,
                    'equipo', _ALL_CATS, ''),
-    'tecnico': ('Técnico', _s('ordenes.ver', 'ordenes.estado') | _CAMPO, 'propias', _ALL_CATS, ''),
+    'tecnico': ('Técnico', _s('ordenes.ver', 'ordenes.estado', 'checklist.realizar') | _CAMPO, 'propias', _ALL_CATS, ''),
     'almacenista': ('Almacenista', _s('panel.ver', 'ordenes.ver', 'reportes.ver', 'config.materiales', 'config.almacenes', 'config.herramientas', 'config.proveedores') | _INV,
                     'todas', _ALL_CATS, ''),
 }
 ORDEN_DEF = list(DEFAULTS)
+PERM_NUEVOS = ['checklist.realizar', 'checklist.ver', 'config.checklist', 'responsivas.ver', 'responsivas.firmar_presencial']   # agregados a la matriz después de su creación
 # puesto (Configuración › Personal) -> perfil predeterminado
 PUESTO_PERFIL = {'director': 'director', 'gerente de administracion': 'gerente_admin', 'gerente de operaciones': 'gerente_operaciones', 'gerente de ventas': 'gerente_ventas',
                  'gerente de soporte/atencion': 'gerente_soporte', 'ejecutivo comercial': 'ejecutivo', 'vendedor': 'ejecutivo', 'supervisor': 'supervisor',
@@ -76,6 +80,14 @@ def migrar(c):
         if not c.execute('SELECT 1 FROM perfiles WHERE clave=?', (k,)).fetchone():
             pid = c.execute('INSERT INTO perfiles(clave, nombre, base, predeterminado, alcance, categorias, trabajos, orden) VALUES (?,?,?,1,?,?,?,?)', (k, nom, k, alc, cats, trab, i + 1)).lastrowid
             c.executemany('INSERT OR IGNORE INTO perfil_permisos VALUES (?,?)', [(pid, p) for p in perms])
+    # permisos agregados después de crear los perfiles: se otorgan UNA vez a los perfiles cuyo valor predeterminado los incluye
+    # (si luego el superadmin los quita en la matriz, no vuelven a aparecer)
+    c.execute('CREATE TABLE IF NOT EXISTS perm_migrados(permiso TEXT PRIMARY KEY)')
+    for perm in PERM_NUEVOS:
+        if c.execute('SELECT 1 FROM perm_migrados WHERE permiso=?', (perm,)).fetchone(): continue
+        for pid, base in c.execute('SELECT id, base FROM perfiles').fetchall():
+            if base in DEFAULTS and perm in DEFAULTS[base][1]: c.execute('INSERT OR IGNORE INTO perfil_permisos VALUES (?,?)', (pid, perm))
+        c.execute('INSERT INTO perm_migrados VALUES (?)', (perm,))
     tc = [r[1] for r in c.execute('PRAGMA table_info(tecnicos)')]
     if 'perfil_id' not in tc:
         c.execute('ALTER TABLE tecnicos ADD COLUMN perfil_id INTEGER REFERENCES perfiles(id) ON DELETE SET NULL')
@@ -194,6 +206,11 @@ def requerido(p, m):
     if re.match(r'^/inventario/\d+/minimos$', p): return ['inventario.ajustes']
     if p.startswith('/inventario') : return ['inventario.ver']
     if p == '/api/materiales': return ['inventario.ver', 'ordenes.materiales']
+    if p.startswith('/responsivas/generar/'): return ['config.vehiculos']
+    if p.startswith('/uploads/responsivas/'): return ['responsivas.ver', 'config.vehiculos']   # firmas y PDFs (los firmantes descargan el PDF por /responsivas/<id>/pdf)
+    if p.startswith('/checklists'): return ['checklist.ver']
+    if p == '/checklist' or p.startswith('/checklist/'): return ['checklist.realizar']
+    if p.startswith('/uploads/checklists/'): return ['checklist.ver', 'checklist.realizar']
     if p.startswith('/uploads/vehiculos/'): return ['vehiculos.ver', 'config.vehiculos']   # fotos, tarjeta de circulación y póliza
     if p.startswith('/vehiculos'): return ['vehiculos.editar'] if post else ['vehiculos.ver']
     if p.startswith('/proveedores/syscom') or p.startswith('/api/syscom') or p.startswith('/catalogo'): return ['config.syscom']
@@ -215,7 +232,7 @@ def requerido(p, m):
 def inicio():
     """Primera sección permitida (para quien no ve el panel)."""
     for perm, url in (('panel.ver', '/'), ('ordenes.ver', '/tecnico'), ('inventario.ver', '/inventario'), ('clientes.ver', '/configuracion/clientes'),
-                      ('escanear', '/inventario/escanear'), ('cuadrillas.ver', '/cuadrillas'), ('vehiculos.ver', '/vehiculos'), ('reportes.ver', '/reportes/materiales')):
+                      ('escanear', '/inventario/escanear'), ('cuadrillas.ver', '/cuadrillas'), ('vehiculos.ver', '/vehiculos'), ('reportes.ver', '/reportes/materiales'), ('checklist.ver', '/checklists')):
         if can(perm): return url
     return None
 
