@@ -114,6 +114,12 @@ for n in range(150):
             c.execute('INSERT INTO orden_materiales(orden_id,material_id,almacen_id,seccion,concepto,tipo,cantidad,unidad) VALUES(?,?,?,?,?,?,?,?)', (oid, mid, alm, m['seccion'], m['concepto'], random.choice(tipos), q, un))
             A.mover(c, mid, alm, 'salida', q, 'Consumo en orden', f'{pref}{cnt[pref]:04d}', oid, permitir_negativo=True, fecha=fin)
 A.migrar_ordenes(c)
+print('usuarios demo:', ', '.join(f"{u[0]} ({'con acceso' if u[4] else 'sin acceso'})" for u in A.AU.demo_usuarios(c)) or 'ninguno')
+# autorización de ejemplo: algunas instalaciones nuevas aún sin iniciar quedan pendientes / una rechazada
+_pend = [r[0] for r in c.execute("SELECT id FROM ordenes WHERE clase='cliente' AND trabajo='Instalación nueva' AND estado IN ('pendiente','asignada') AND fecha_inicio IS NULL ORDER BY fecha_programada DESC LIMIT 5")]
+for i, oid in enumerate(_pend):
+    if i == 0: c.execute("UPDATE ordenes SET autorizacion='rechazada', estado='pendiente', aut_por_nombre='Roberto Íñiguez (ejemplo)', aut_fecha=fecha_emision||'T10:15', aut_motivo='EJEMPLO: falta confirmar domicilio y contacto del cliente' WHERE id=?", (oid,))
+    else: c.execute("UPDATE ordenes SET autorizacion='pendiente', estado='pendiente', aut_por_nombre=NULL, aut_fecha=NULL, aut_solicitada=fecha_emision||'T09:00', aut_solicito='Supervisor Ejemplo' WHERE id=?", (oid,))
 _sts = c.execute('SELECT id, codigo, nombre FROM sitios WHERE activo=1').fetchall()
 for (oid,) in c.execute("SELECT id FROM ordenes WHERE clase='infra' AND ejemplo=1 AND NOT EXISTS(SELECT 1 FROM orden_sitios WHERE orden_id=ordenes.id)").fetchall():
     if not _sts: break

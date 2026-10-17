@@ -2,7 +2,7 @@
 <h1>Panel de operaciones</h1>
 <div class="ej">Los datos actuales son <b>de ejemplo</b> (marcados "EJEMPLO"); sustitúyelos por los reales cuando quieras.</div>
 <div class="grid g5">
-<a class="kpi" href="/ordenes"><div class="n">{{total}}</div><div class="l">Órdenes totales</div></a>
+{% if USR.autoriza %}<a class="kpi" href="/ordenes?aut=pendiente" style="border-color:#ecd59a;background:#fffbeb"><div class="n" style="color:#a16207">{{(pend_autoriz.n or 0) - (pend_autoriz.r or 0)}}</div><div class="l">⏳ Pendientes de autorización{% if pend_autoriz.r %} · {{pend_autoriz.r}} rechazada(s){% endif %}</div></a>{% endif %}<a class="kpi" href="/ordenes"><div class="n">{{total}}</div><div class="l">Órdenes totales</div></a>
 {% for e in ESTADOS %}<a class="kpi" href="/ordenes?estado={{e}}"><div class="n">{{por_estado[e]}}</div><div class="l">{{est(e)}}</div></a>{% endfor %}
 <a class="kpi" href="/ordenes?vencidas=1" style="border-color:#f3c4c4"><div class="n venc">{{vencidas|length}}</div><div class="l">Vencidas (abiertas y fuera de fecha)</div></a>
 <a class="kpi" href="/ordenes?desde={{hoy}}&hasta={{hoy}}"><div class="n">{{hoy_n}}</div><div class="l">Programadas hoy</div></a>

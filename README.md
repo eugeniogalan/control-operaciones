@@ -31,3 +31,11 @@ Credenciales (nunca en la base de datos ni en git):
 Flujo: **Guardar y probar** → **Probar conexión** → **Sincronizar catálogo** (se habilita solo cuando la conexión funciona).
 La sync busca cada material por ID Syscom → número de parte/modelo → SKU; llena `numero_parte`, `syscom_id`, `marca`, `precio_syscom`, `imagen_url` y descarga la foto a `uploads/productos/`. No toca existencias. Puede dar de alta modelos nuevos (uno por línea).
 Búsqueda: `GET /api/syscom/buscar?q=texto`. Las miniaturas en `static/productos/ejemplo-*.svg` son **de ejemplo** (marcadas `imagen_ejemplo=1`).
+
+
+## Usuarios y permisos
+- **Superadmin**: `ADMIN_USER` / `ADMIN_PASSWORD` (variables de entorno). Siempre puede entrar y tiene todos los permisos; úsalo para crear los usuarios reales.
+- **Usuarios por persona**: Configuración › Personal → Usuario, «Acceso al sistema activo», Rol en la app, Área; la contraseña se asigna/restablece en la tarjeta «🔑 Contraseña de acceso» (hash werkzeug, mín. 8 caracteres).
+- **Configuración**: superadmin, puesto Director, área Administración o rol Administrador. **Autorizar órdenes**: superadmin, puesto Director o área Administración.
+- Las órdenes de **Clientes › Instalación nueva** se crean «Pendiente de autorización» y no pueden asignarse, iniciarse ni cerrarse hasta autorizarse.
+- Datos de EJEMPLO (seed): se crean los usuarios `director`, `administracion` y `tecnico`. Solo tienen contraseña si defines la variable de entorno `DEMO_USERS_PASSWORD` (la misma para los tres, mín. 8 caracteres); si no está definida existen como Personal **sin acceso**. Nunca pongas su valor en el repositorio; en Render configúrala como secreto (opcional).

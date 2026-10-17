@@ -27,27 +27,8 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config.update(SESSION_COOKIE_SECURE=_HTTPS, SESSION_COOKIE_HTTPONLY=True, SESSION_COOKIE_SAMESITE='Lax', PERMANENT_SESSION_LIFETIME=dt.timedelta(days=14))
 
-@app.before_request
-def _auth():
-    if request.endpoint in ('login',) or session.get('ok'): return
-    if request.path == '/static/logo-spectro.png': return  # logo visible en la pantalla de login
-    if request.path.startswith('/api/'): return jsonify(error='no autorizado'), 401
-    return redirect(url_for('login', next=request.full_path))
-
-@app.route('/login', methods=['GET','POST'])
-def login():
-    err = None
-    if request.method == 'POST':
-        if hmac.compare_digest(request.form.get('usuario',''), CFG['APP_USER']) and hmac.compare_digest(request.form.get('clave',''), CFG['APP_PASSWORD']):
-            session.clear(); session['ok'] = True; session.permanent = True
-            nxt = request.args.get('next') or '/'
-            return redirect(nxt if nxt.startswith('/') and not nxt.startswith('//') else '/')
-        err = 'Usuario o contraseña incorrectos'
-    return render_template('login.html', err=err)
-
-@app.route('/logout')
-def logout():
-    session.clear(); return redirect(url_for('login'))
+import auth_mod as AU
+AU.registrar(app, lambda *a, **k: q(*a, **k), lambda: db(), CFG)
 import plantillas_mod as PM
 PM.JSON = os.path.join(BASE, 'plantillas.json'); PM.DB = DB
 PLANT = PM.Plantillas()  # plantillas de Reporte de evidencias (BD; ver plantillas_mod.py)
@@ -119,6 +100,8 @@ def migrar_ordenes(c):
     c.execute('INSERT OR IGNORE INTO orden_sitios(orden_id, site_id) SELECT id, site_id FROM ordenes WHERE site_id IS NOT NULL AND site_id IN (SELECT id FROM sitios)')
     c.execute('CREATE INDEX IF NOT EXISTS ix_ord_clase ON ordenes(clase, red, trabajo)')
     migrar_personal(c)
+    AU.migrar(c)
+    migrar_autorizacion(c)
 
 def migrar_personal(c):
     """Liga órdenes con Configuración › Personal: quien ordena, responsable (ejecutó), técnicos y quien auditó."""
@@ -195,8 +178,8 @@ def _c(e):
     if d: d.close()
 def q(sql, a=(), one=False):
     r = db().execute(sql, a).fetchall(); return (r[0] if r else None) if one else r
-def hoy(): return dt.date.today().isoformat()
-def ahora(): return dt.datetime.now().strftime('%Y-%m-%dT%H:%M')
+def hoy(): return AU.ahora_mx()[:10]
+def ahora(): return AU.ahora_mx()   # hora de Ciudad de México aunque el servidor (Render) esté en UTC
 def log(oid, t): db().execute('INSERT INTO bitacora(orden_id,fecha,texto) VALUES(?,?,?)', (oid, ahora(), t))
 
 @app.context_processor
@@ -213,6 +196,7 @@ def dashboard():
         SUM({VENCIDA}) venc FROM cuadrillas c LEFT JOIN ordenes o ON o.cuadrilla_id=c.id GROUP BY c.id ORDER BY c.id''')
     vencidas = q(f'SELECT o.*, c.nombre cuad FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id WHERE {VENCIDA} ORDER BY o.fecha_programada LIMIT 50')
     por_cat = q("SELECT clase, red, trabajo, COUNT(*) n, SUM(estado IN ('pendiente','asignada','en curso')) abiertas FROM ordenes GROUP BY clase, red, trabajo ORDER BY clase='cliente', red, trabajo")
+    pend_autoriz = q("SELECT COUNT(*) n, SUM(autorizacion='rechazada') r FROM ordenes WHERE autorizacion IN ('pendiente','rechazada')", one=True)
     hoy_n = q("SELECT COUNT(*) n FROM ordenes WHERE fecha_programada=date('now','localtime')", one=True)['n']
     pend_aud = q("SELECT COUNT(*) n FROM ordenes WHERE estado='completada' AND (aprobacion IS NULL OR aprobacion='')", one=True)['n']
     stock_alm = q(f"SELECT a.id, a.nombre, a.tipo, c.nombre cuad, COUNT(CASE WHEN e.stock>0 THEN 1 END) n, SUM(CASE WHEN e.stock<0 THEN 1 ELSE 0 END) neg, SUM(CASE WHEN m.activo=1 AND {BAJO_ALM} THEN 1 ELSE 0 END) bajo FROM almacenes a LEFT JOIN existencias e ON e.almacen_id=a.id LEFT JOIN materiales m ON m.id=e.material_id LEFT JOIN cuadrillas c ON c.id=a.cuadrilla_id GROUP BY a.id ORDER BY a.tipo='vehiculo', CASE WHEN a.tipo='bodega' THEN a.id END, a.nombre")
@@ -225,12 +209,12 @@ def dashboard():
         ) WHERE alerta IS NOT NULL ORDER BY cambio""")
     contratos = q(f"SELECT id, codigo, nombre, tenencia, CASE tenencia WHEN 'Rentado' THEN arr_nombre ELSE int_nombre END contraparte, vence, CASE WHEN tenencia='Rentado' THEN arr_renta END arr_renta, alerta FROM (SELECT *, {SD.VENCE_SQL} vence, {SD.ALERTA_SQL} alerta FROM sitios WHERE activo=1) WHERE alerta IS NOT NULL ORDER BY vence")
     total = sum(por_estado.values()); maxc = max([r['total'] for r in por_cuad] + [1])
-    return render_template('dashboard.html', por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, contratos=contratos, hoy=dt.date.today())
+    return render_template('dashboard.html', pend_autoriz=pend_autoriz, por_estado=por_estado, por_cuad=por_cuad, vencidas=vencidas, total=total, maxc=maxc, por_cat=por_cat, hoy_n=hoy_n, pend_aud=pend_aud, bajo_min=bajo_min, nbajo=nbajo, stock_alm=stock_alm, bat_cambio=bat_cambio, contratos=contratos, hoy=dt.date.today())
 
 # ---------- Órdenes ----------
 @app.route('/ordenes')
 def ordenes():
-    f = {k: request.args.get(k, '') for k in ('estado','cuadrilla','cliente','desde','hasta','categoria','clase','red','trabajo','clasif','buscar','vencidas')}
+    f = {k: request.args.get(k, '') for k in ('estado','cuadrilla','cliente','desde','hasta','categoria','clase','red','trabajo','clasif','aut','buscar','vencidas')}
     w, a = ['1=1'], []
     for k in ('clase','red','trabajo'):
         if f[k]: w.append(f'o.{k}=?'); a.append(f[k])
@@ -239,6 +223,7 @@ def ordenes():
     if f['categoria']: w.append('o.categoria=?'); a.append(f['categoria'])
     if f['cliente']: w.append('o.cliente LIKE ?'); a.append('%'+f['cliente']+'%')
     if f.get('clasif'): w.append('o.tipo_orden=?'); a.append(f['clasif'])
+    if f.get('aut') in ('pendiente', 'rechazada', 'autorizada'): w.append('o.autorizacion=?'); a.append(f['aut'])
     if f['buscar']: w.append('(o.folio LIKE ? OR o.sitio LIKE ? OR o.tipo_orden LIKE ? OR o.cliente LIKE ? OR o.clasif_otro LIKE ?)'); a += ['%'+f['buscar']+'%']*5
     if f['desde']: w.append('o.fecha_programada>=?'); a.append(f['desde'])
     if f['hasta']: w.append('o.fecha_programada<=?'); a.append(f['hasta'])
@@ -277,7 +262,10 @@ def orden_form(oid=None):
             folio = (request.form.get('folio') or '').strip() or (o['folio'] if o else siguiente_folio(d['categoria']))
             if q('SELECT 1 FROM ordenes WHERE folio=? AND id IS NOT ?', (folio, oid), one=True): err = f'El folio {folio} ya existe'
         if not err:
-            if d['cuadrilla_id'] and d['estado'] == 'pendiente': d['estado'] = 'asignada'
+            aut, aut_log = calc_autorizacion(o, d)
+            if aut in ('pendiente', 'rechazada') and d['estado'] not in ('pendiente', 'cancelada'):
+                d['estado'] = 'pendiente'; aut_log = (aut_log + ' · ' if aut_log else '') + 'estado se mantiene pendiente hasta autorizar'
+            if d['cuadrilla_id'] and d['estado'] == 'pendiente' and aut not in ('pendiente', 'rechazada'): d['estado'] = 'asignada'
             if d['estado'] == 'completada' and not d['fecha_cierre']: d['fecha_cierre'] = ahora()
             if o:
                 db().execute(f"UPDATE ordenes SET folio=?, {', '.join(k+'=?' for k in CAMPOS)} WHERE id=?", [folio]+[d[k] for k in CAMPOS]+[oid])
@@ -286,6 +274,10 @@ def orden_form(oid=None):
             else:
                 cur = db().execute(f"INSERT INTO ordenes(folio,{','.join(CAMPOS)}) VALUES(?{',?'*len(CAMPOS)})", [folio]+[d[k] for k in CAMPOS]); oid = cur.lastrowid
                 log(oid, 'Orden creada · ' + etiqueta(d))
+            if aut == 'pendiente' and (not o or o['autorizacion'] != 'pendiente'):
+                db().execute("UPDATE ordenes SET autorizacion='pendiente', aut_solicitada=?, aut_solicito=? WHERE id=?", (ahora(), AU.nombre_actual(), oid))
+            elif aut is None: db().execute('UPDATE ordenes SET autorizacion=NULL WHERE id=?', (oid,))
+            if aut_log: log(oid, aut_log)
             db().execute('DELETE FROM orden_sitios WHERE orden_id=?', (oid,))
             for sid in sel_sites: db().execute('INSERT OR IGNORE INTO orden_sitios(orden_id, site_id) VALUES(?,?)', (oid, sid))
             db().execute('DELETE FROM orden_personal WHERE orden_id=?', (oid,)); db().execute('UPDATE ordenes SET personal_ok=1 WHERE id=?', (oid,))
@@ -301,6 +293,59 @@ def orden_form(oid=None):
     ordenantes = [dict(t, no_aut=not CM.puede_ordenar(t['puesto'])) for t in personal if CM.puede_ordenar(t['puesto']) and t['activo'] != 0 or t['id'] == v.get('ordena_personal_id')]
     return render_template('orden_form.html', o=o, v=v, err=err, plant_map=plant_map, personal=personal, ordenantes=ordenantes, tec_sel=tec_sel, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
         clientes_cat=q("SELECT *, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE activo=1 OR id=? ORDER BY estatus='Prospecto', nombre", ((o['cliente_id'] if o else None),)), ESTADOS_MX=CM.ESTADOS_MX)
+
+# ---- Autorización de órdenes (clientes · Instalación nueva) ----
+CAMPOS_CLAVE_AUT = ('clase', 'trabajo', 'cliente_id', 'tipo_orden', 'clasif_otro')
+def requiere_aut(o): return o['clase'] == 'cliente' and o['trabajo'] == 'Instalación nueva'
+def bloqueada(o):
+    try: return requiere_aut(o) and o['autorizacion'] != 'autorizada'
+    except (KeyError, IndexError): return False
+def calc_autorizacion(o, d):
+    """Nuevo estado de autorización al guardar desde el formulario -> (autorizacion, texto para bitácora)."""
+    if not requiere_aut(d): return None, ('Ya no requiere autorización' if o and o['autorizacion'] else '')
+    if not o: return 'pendiente', 'Enviada a autorización'
+    prev = o['autorizacion']
+    if prev == 'rechazada': return 'pendiente', 'Corregida y reenviada a autorización'
+    if prev == 'autorizada':
+        cambio = [k for k in CAMPOS_CLAVE_AUT if str(o[k] or '') != str(d[k] or '')]
+        if cambio: return 'pendiente', 'Autorización reiniciada: cambió ' + ', '.join({'clase':'categoría','trabajo':'variante','cliente_id':'cliente','tipo_orden':'clasificación','clasif_otro':'clasificación (Otros)'}[k] for k in cambio)
+        return 'autorizada', ''
+    return 'pendiente', ('' if prev == 'pendiente' else 'Enviada a autorización')
+
+def migrar_autorizacion(c):
+    cols = [r[1] for r in c.execute('PRAGMA table_info(ordenes)')]
+    for col, typ in (('autorizacion', 'TEXT'), ('aut_por', 'INTEGER REFERENCES tecnicos(id) ON DELETE SET NULL'), ('aut_por_nombre', 'TEXT'), ('aut_fecha', 'TEXT'), ('aut_motivo', 'TEXT'), ('aut_solicitada', 'TEXT'), ('aut_solicito', 'TEXT')):
+        if col not in cols: c.execute(f'ALTER TABLE ordenes ADD COLUMN {col} {typ}')
+    # órdenes anteriores: ya autorizadas por «migración» para no bloquear nada
+    c.execute("UPDATE ordenes SET autorizacion='autorizada', aut_por_nombre='migración', aut_fecha=COALESCE(fecha_emision, substr(creado,1,10)) WHERE clase='cliente' AND trabajo='Instalación nueva' AND autorizacion IS NULL")
+    c.execute('CREATE INDEX IF NOT EXISTS ix_ord_aut ON ordenes(autorizacion)')
+
+def exigir_autorizada(o, campo=False):
+    """Bloquea ejecución (estado, evidencias, materiales) mientras la orden no esté autorizada."""
+    if bloqueada(o):
+        msg = 'Orden pendiente de autorización' if o['autorizacion'] == 'pendiente' else 'Orden rechazada: corrígela y reenvíala a autorización'
+        abort(409, msg)
+
+@app.errorhandler(409)
+def _409(e):
+    return render_template('prohibido.html', titulo='Orden bloqueada', mensaje=e.description), 409
+
+@app.route('/ordenes/<int:oid>/autorizar', methods=['POST'])
+def orden_autorizar(oid):
+    o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) or abort(404)
+    if not AU.puede_autorizar(): abort(403)
+    if not requiere_aut(o) or o['autorizacion'] != 'pendiente': return redirect(url_for('orden_ver', oid=oid))
+    acc = request.form.get('accion'); motivo = (request.form.get('motivo') or '').strip()
+    u = AU.usuario_actual(); quien = AU.nombre_actual(); cuando = ahora()
+    if acc == 'autorizar':
+        db().execute("UPDATE ordenes SET autorizacion='autorizada', aut_por=?, aut_por_nombre=?, aut_fecha=?, aut_motivo=NULL, estado=CASE WHEN estado='pendiente' AND cuadrilla_id IS NOT NULL THEN 'asignada' ELSE estado END WHERE id=?", (u['id'] if u else None, quien, cuando, oid))
+        log(oid, f'✅ Autorizada por {quien}')
+    elif acc == 'rechazar':
+        if not motivo: return redirect(url_for('orden_ver', oid=oid, err='Escribe el motivo del rechazo') + '#aut')
+        db().execute("UPDATE ordenes SET autorizacion='rechazada', aut_por=?, aut_por_nombre=?, aut_fecha=?, aut_motivo=? WHERE id=?", (u['id'] if u else None, quien, cuando, motivo, oid))
+        log(oid, f'⛔ Rechazada por {quien} · Motivo: {motivo}')
+    else: abort(400)
+    db().commit(); return redirect(url_for('orden_ver', oid=oid))
 
 def validar_personal(d, sel_tecs, o=None):
     """Personal elegido: debe existir (activo, salvo que ya estuviera en la orden); copia nombre/puesto a los campos del formato."""
@@ -386,7 +431,7 @@ def orden_ver(oid):
     o = q("SELECT o.*, c.nombre cuad, cl.estatus cli_estatus FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id LEFT JOIN clientes cl ON cl.id=o.cliente_id WHERE o.id=?", (oid,), one=True) or abort(404)
     p = plantilla_de(o); pl = PLANT.get(p) if p else None
     fotos = {r['item']: r for r in q('SELECT * FROM orden_fotos WHERE orden_id=?', (oid,))}
-    return render_template('orden_ver.html', o=o, sites=q('SELECT s.id, s.codigo, s.nombre, s.tipo FROM orden_sitios os JOIN sitios s ON s.id=os.site_id WHERE os.orden_id=? ORDER BY s.codigo', (oid,)), plantilla=p, pl=pl, fotos=fotos,
+    return render_template('orden_ver.html', o=o, bloq=bloqueada(o), req_aut=requiere_aut(o), aut_err=request.args.get('err'), sites=q('SELECT s.id, s.codigo, s.nombre, s.tipo FROM orden_sitios os JOIN sitios s ON s.id=os.site_id WHERE os.orden_id=? ORDER BY s.codigo', (oid,)), plantilla=p, pl=pl, fotos=fotos,
         mats=q('SELECT m.*, a.nombre alm FROM orden_materiales m LEFT JOIN almacenes a ON a.id=m.almacen_id WHERE m.orden_id=? ORDER BY m.id', (oid,)), bit=q('SELECT * FROM bitacora WHERE orden_id=? ORDER BY id DESC', (oid,)),
         equipo=personal_orden(o))
 
@@ -398,6 +443,7 @@ def orden_eliminar(oid):
 def orden_estado(oid):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) or abort(404)
     e = request.form['estado']; assert e in ESTADOS
+    if e != 'cancelada': exigir_autorizada(o)
     sets = {'estado': e}
     if e == 'en curso' and not o['fecha_inicio']: sets['fecha_inicio'] = request.form.get('hora') or ahora()
     if e == 'completada': sets['fecha_cierre'] = request.form.get('hora') or ahora()
@@ -421,6 +467,7 @@ def orden_nota(oid):
 @app.route('/ordenes/<int:oid>/materiales', methods=['GET','POST'])
 def orden_materiales(oid):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) or abort(404)
+    if request.method == 'POST': exigir_autorizada(o)
     p = plantilla_de(o) or request.args.get('plantilla') or 'FO'
     cat = PLANT[p]['materiales']
     porclave = {(r['categoria'], r['nombre']): r for r in q('SELECT * FROM materiales')}
@@ -476,6 +523,7 @@ def orden_materiales(oid):
 @app.route('/ordenes/<int:oid>/foto', methods=['POST'])
 def orden_foto(oid):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) or abort(404)
+    exigir_autorizada(o)
     f = request.files.get('archivo'); item = request.form['item']
     if f and f.filename:
         name = f'{oid}_{dt.datetime.now().strftime("%H%M%S%f")}_' + secure_filename(f.filename); f.save(os.path.join(UP, name))
@@ -542,7 +590,7 @@ def tecnico():
     cid = request.args.get('cuadrilla', type=int); cs = q('SELECT * FROM cuadrillas ORDER BY id')
     if not cid: return render_template('tecnico_elegir.html', cs=cs)
     c = q('SELECT * FROM cuadrillas WHERE id=?', (cid,), one=True) or abort(404)
-    base = f'SELECT o.*, {VENCIDA} vencida FROM ordenes o WHERE o.cuadrilla_id=? '
+    base = f"SELECT o.*, {VENCIDA} vencida FROM ordenes o WHERE o.cuadrilla_id=? AND NOT (o.clase='cliente' AND o.trabajo='Instalación nueva' AND COALESCE(o.autorizacion,'')<>'autorizada') "
     de_hoy = q(base + "AND (o.fecha_programada=date('now','localtime') OR (o.estado='completada' AND substr(o.fecha_cierre,1,10)=date('now','localtime'))) ORDER BY CASE o.estado WHEN 'en curso' THEN 0 WHEN 'asignada' THEN 1 WHEN 'pendiente' THEN 1 ELSE 2 END, o.prioridad='urgente' DESC", (cid,))
     ids = [o['id'] for o in de_hoy]
     pend = [o for o in q(base + "AND o.estado IN ('pendiente','asignada','en curso') ORDER BY o.fecha_programada", (cid,)) if o['id'] not in ids]
@@ -566,7 +614,9 @@ def norm_unidad(u):
 BAJO = 'm.activo=1 AND m.stock_minimo>0 AND m.stock_actual <= m.stock_minimo'   # total bajo el mínimo global
 BAJO_ALM = 'e.minimo>0 AND e.stock <= e.minimo'                                 # por almacén (en tabla existencias e)
 BAJO_ALGUNO = f'({BAJO} OR EXISTS(SELECT 1 FROM existencias e WHERE e.material_id=m.id AND {BAJO_ALM}))'
-def usuario(): return CFG['APP_USER']
+def usuario():
+    u = AU.usuario_actual()
+    return (f"{u['usuario']} · {u['nombre']}" if u else (CFG['APP_USER'] + ' (superadmin)'))
 
 def mover(con, mid, alm, tipo, cantidad, motivo='', referencia='', orden_id=None, permitir_negativo=False, fecha=None):
     """Registra un movimiento en un almacén y actualiza existencias + stock_actual (total) en la misma transacción.

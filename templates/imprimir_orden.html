@@ -1,7 +1,7 @@
 {% extends 'print_base.html' %}{% block c %}{% macro ck(c) %}<span class="x">{{'X' if c}}</span>{% endmacro %}
 {% set lider = (equipo|selectattr('rol','equalto','líder')|list) %}{% set tec = (equipo|selectattr('rol','equalto','técnico')|list) %}
 <h1>{% if o.clase=='infra' %}ORDEN DE EJECUCIÓN - {{ REDES[o.red]|upper }}{% elif o.clase=='prospecto' %}ORDEN DE FACTIBILIDAD - PROSPECTO{% elif o.trabajo in (None,'Instalación nueva') %}ORDEN DE INSTALACIÓN A CLIENTE{% else %}ORDEN DE TRABAJO A CLIENTE - {{o.trabajo|upper}}{% endif %}</h1>
-<table><tr><td>FECHA: {{o.fecha_emision}}</td><td>FOLIO: <b>{{o.folio}}</b></td></tr></table>
+<table><tr><td>FECHA: {{o.fecha_emision}}</td><td>FOLIO: <b>{{o.folio}}</b></td></tr></table>{% if o.autorizacion %}<table><tr><td>AUTORIZACIÓN: <b>{{ {'pendiente':'PENDIENTE DE AUTORIZACIÓN','rechazada':'RECHAZADA','autorizada':'AUTORIZADA'}[o.autorizacion] }}</b>{% if o.autorizacion!='pendiente' %} — {{o.aut_por_nombre or ''}} {{(o.aut_fecha or '')|replace('T',' ')}}{% endif %}{% if o.aut_motivo and o.autorizacion=='rechazada' %} · Motivo: {{o.aut_motivo}}{% endif %}</td></tr></table>{% endif %}
 <div class="s">PERSONA QUE ORDENA:</div><table><tr><td>Nombre: {{o.ordena_nombre or ''}}</td><td>Puesto: {% for p in (['Director/Gerente','Vendedor','Supervisor'] if o.categoria=='INST' else ['Director','Gerente','Supervisor']) %}{{ck(o.ordena_puesto and o.ordena_puesto in p)}}{{p}} {% endfor %}</td></tr>
 <tr><td class="firma">Firma:</td><td>{{ 'Fecha en que se promete la entrega' if o.categoria=='INST' else 'Fecha en que se debe ejecutar' }}: <b>{{o.fecha_programada}}</b></td></tr></table>
 {% if o.categoria=='INST' %}

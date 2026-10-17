@@ -32,7 +32,7 @@
 <fieldset><legend>Datos generales</legend><div class="grid g2">
 <label>Folio <span class="muted">(vacío = automático)</span><input name="folio" value="{{v.folio or ''}}"></label>
 <label>Prioridad<select name="prioridad">{% for p in PRIORIDADES %}<option {{'selected' if (v.prioridad or 'media')==p}}>{{p}}</option>{% endfor %}</select></label>
-<label>Estado<select name="estado">{% for e in ESTADOS %}<option {{'selected' if (v.estado or 'pendiente')==e}}>{{e}}</option>{% endfor %}</select></label>
+{% if v.autorizacion in ('pendiente','rechazada') %}<div class="ej" style="grid-column:1/-1;background:#fdf6e3;border-color:#ecd59a;color:#a16207;font-size:13px;margin:0">{{ '⏳ Pendiente de autorización' if v.autorizacion=='pendiente' else '⛔ Rechazada: al guardar se reenvía a autorización' }} — el estado queda en «pendiente» hasta que Administración o Dirección la autorice.</div>{% endif %}<label>Estado<select name="estado">{% for e in ESTADOS %}<option {{'selected' if (v.estado or 'pendiente')==e}}>{{e}}</option>{% endfor %}</select></label>
 <label>Fecha de la orden<input type="date" name="fecha_emision" value="{{v.fecha_emision or hoy}}"></label>
 <label><span id="lblFP">Fecha en que se debe ejecutar</span><input type="date" name="fecha_programada" value="{{v.fecha_programada or ''}}" required></label>
 </div></fieldset>

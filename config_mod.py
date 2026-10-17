@@ -280,6 +280,7 @@ def _partir_contacto(txt):
 TIPOS_HERR = ['Herramienta','Equipo de medición','EPP','Equipo de fusión','Escalera / altura','Vehículo / remolque','Otro']
 ESTADOS_HERR = ['disponible','asignado','en reparación','baja']
 PUESTOS = ['Director','Gerente','Supervisor','Vendedor','Técnico Instalador','Almacenista','Proveedor Externo']
+from auth_mod import AREAS, ROLES_APP
 PUESTOS_ORDENA = ['Supervisor','Gerente','Director','Vendedor']   # únicos que pueden ser 'Persona que ordena'
 import unicodedata as _ud
 def norm_txt(t): return ''.join(ch for ch in _ud.normalize('NFD', (t or '').strip().lower()) if _ud.category(ch) != 'Mn')
@@ -531,6 +532,15 @@ def registrar(app, q, db):
         con.execute('UPDATE vehiculos SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,)); con.execute('UPDATE almacenes SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,))
         con.execute('UPDATE herramientas SET cuadrilla_id=NULL WHERE cuadrilla_id=?', (cid,))
     def pers_valid(d, rid):
+        u = (d.get('usuario') or '').strip()
+        if u:
+            if not _re.fullmatch(r'[A-Za-z0-9._-]{3,40}', u): return 'Usuario: 3 a 40 caracteres (letras, números, punto, guion o guion bajo), sin espacios'
+            if q('SELECT 1 FROM tecnicos WHERE LOWER(usuario)=LOWER(?) AND id IS NOT ?', (u, rid), one=True): return f'El usuario «{u}» ya existe'
+            d['usuario'] = u
+        else:
+            d['usuario'] = None
+            if d.get('login_activo'): return 'Para activar el acceso al sistema asigna un usuario'
+        if not d.get('rol_app'): d['rol_app'] = 'Usuario'
         if d.get('puesto'): d['puesto'] = puesto_canonico(d['puesto'])
         if d.get('rol') and d.get('cuadrilla_id'):
             o = q('SELECT nombre FROM tecnicos WHERE cuadrilla_id=? AND rol=? AND id IS NOT ?', (d['cuadrilla_id'], d['rol'], rid), one=True)
@@ -550,10 +560,12 @@ def registrar(app, q, db):
         alta_url='/inventario/nuevo', editar_url='/inventario/{id}/editar', ver_url='/inventario/{id}', hist=mat_hist, campos=[]),
      'personal': dict(titulo='Personal', icono='👷', tabla='tecnicos', act='activo', orden='nombre', desc='Empleados y técnicos; asignación a cuadrilla como líder o técnico.',
         buscar=['nombre','puesto','telefono','email','especialidad'],
-        sql='SELECT t.*, c.nombre cuadrilla FROM tecnicos t LEFT JOIN cuadrillas c ON c.id=t.cuadrilla_id',
-        cols=[('nombre','Nombre'),('puesto','Puesto'),('telefono','Teléfono'),('email','Email'),('especialidad','Especialidad'),('cuadrilla','Cuadrilla'),('rol','Rol')],
+        sql="SELECT t.*, c.nombre cuadrilla, CASE WHEN t.usuario IS NULL THEN '—' WHEN t.login_activo=1 AND t.pass_hash IS NOT NULL THEN '🔑 '||t.usuario WHEN t.pass_hash IS NULL THEN t.usuario||' (sin contraseña)' ELSE t.usuario||' (desactivado)' END acceso_txt FROM tecnicos t LEFT JOIN cuadrillas c ON c.id=t.cuadrilla_id",
+        buscar_extra=None,
+        cols=[('nombre','Nombre'),('puesto','Puesto'),('area','Área'),('acceso_txt','Acceso'),('telefono','Teléfono'),('email','Email'),('especialidad','Especialidad'),('cuadrilla','Cuadrilla'),('rol','Rol')],
         campos=[('nombre','Nombre','text',True),('puesto','Puesto','select',lambda: PUESTOS + [r[0] for r in q("SELECT DISTINCT puesto FROM tecnicos WHERE TRIM(COALESCE(puesto,''))<>'' ORDER BY 1") if r[0] not in PUESTOS]),('telefono','Teléfono','tel'),('email','Email','email'),('especialidad','Especialidad','select',ESPEC),
-                ('cuadrilla_id','Cuadrilla','fk',CUAD),('rol','Rol en la cuadrilla','select',['líder','técnico'])],
+                ('cuadrilla_id','Cuadrilla','fk',CUAD),('rol','Rol en la cuadrilla','select',['líder','técnico']),('area','Área / Departamento','select',AREAS),
+                ('usuario','Usuario (para iniciar sesión)','text'),('login_activo','Acceso al sistema activo','bool'),('rol_app','Rol en la app','select',ROLES_APP)],
         hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)) or existe('SELECT 1 FROM orden_personal WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM ordenes WHERE ? IN (ordena_personal_id, responsable_id, audito_personal_id)', (i,)),
         valid=pers_valid),
      'vehiculos': dict(titulo='Vehículos', icono='🚚', tabla='vehiculos', act='activo', orden='numero', desc='Vehículos 01–18 (cada uno es un almacén móvil); varios por cuadrilla.',
