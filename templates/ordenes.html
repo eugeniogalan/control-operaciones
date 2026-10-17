@@ -13,10 +13,10 @@
 <label>Buscar (folio, sitio, tipo)<input name="buscar" value="{{f.buscar}}"></label>
 <label><input type="checkbox" name="vencidas" value="1" style="width:auto" {{'checked' if f.vencidas}}> Solo vencidas</label>
 <div><button class="btn">Filtrar</button> <a class="btn sec" href="/ordenes">Limpiar</a></div></form>
-<div class="tw"><table><tr><th>Folio</th><th>Programada</th><th>Tipo</th><th>Cliente / sites</th><th>Cuadrilla</th><th>Prioridad</th><th>Estado</th><th>Cierre</th></tr>
+<div class="tw"><table><tr><th>Folio</th><th>Programada</th><th>Tipo</th><th>Cliente / sites</th><th>Cuadrilla / responsable</th><th>Prioridad</th><th>Estado</th><th>Cierre</th></tr>
 {% for o in rows %}<tr><td><a href="/ordenes/{{o.id}}"><b>{{o.folio}}</b></a>{% if o.ejemplo %}<div class="muted">EJEMPLO</div>{% endif %}</td>
 <td class="{{'venc' if o.vencida}}">{{o.fecha_programada}}{% if o.vencida %}<div>vencida</div>{% endif %}</td><td>{{clasif(o)}}{% if o.tipo_orden and o.clase=='infra' %}<div class="muted" style="font-size:12px;margin-top:3px">{{o.tipo_orden}}</div>{% endif %}</td>
-<td>{% if o.clase=='infra' %}{{o.sites_txt or o.sitio or '—'}}{% else %}{{o.cliente}}<div class="muted">{{o.sitio}}</div>{% endif %}</td><td>{{o.cuad or '—'}}</td><td>{{pri(o.prioridad)}}</td><td>{{est(o.estado)}}</td><td>{{(o.fecha_cierre or '')|replace('T',' ')}}</td></tr>
+<td>{% if o.clase=='infra' %}{{o.sites_txt or o.sitio or '—'}}{% else %}{{o.cliente}}<div class="muted">{{o.sitio}}</div>{% endif %}</td><td>{{o.cuad or '—'}}{% if o.resp_txt %}<div class="muted" style="font-size:12px">👷 {{o.resp_txt}}{% if o.n_tecs %} +{{o.n_tecs}}{% endif %}</div>{% endif %}</td><td>{{pri(o.prioridad)}}</td><td>{{est(o.estado)}}</td><td>{{(o.fecha_cierre or '')|replace('T',' ')}}</td></tr>
 {% else %}<tr><td colspan="8" class="muted">Sin resultados</td></tr>{% endfor %}</table></div>
 <p class="pag">{% for p in range(1,pages+1) %}{% if p==page %}<span><b>{{p}}</b></span>{% elif p<=2 or p>pages-2 or (p-page)|abs<=2 %}<a href="?{{ qs|urlencode }}&page={{p}}">{{p}}</a>{% elif (p-page)|abs==3 %}…{% endif %}{% endfor %}</p>
 <script>(function(){var c=document.getElementById('fClase'),r=document.getElementById('fwRed'),t=document.getElementById('fTr');

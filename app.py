@@ -118,6 +118,37 @@ def migrar_ordenes(c):
     c.execute("UPDATE ordenes SET tipo_grupo=trabajo WHERE clase IN ('cliente','prospecto') AND COALESCE(tipo_grupo,'')<>trabajo")
     c.execute('INSERT OR IGNORE INTO orden_sitios(orden_id, site_id) SELECT id, site_id FROM ordenes WHERE site_id IS NOT NULL AND site_id IN (SELECT id FROM sitios)')
     c.execute('CREATE INDEX IF NOT EXISTS ix_ord_clase ON ordenes(clase, red, trabajo)')
+    migrar_personal(c)
+
+def migrar_personal(c):
+    """Liga órdenes con Configuración › Personal: quien ordena, responsable (ejecutó), técnicos y quien auditó."""
+    cols = [r[1] for r in c.execute('PRAGMA table_info(ordenes)')]
+    nuevas = [k for k in ('ordena_personal_id', 'responsable_id', 'audito_personal_id') if k not in cols]
+    for col in nuevas: c.execute(f'ALTER TABLE ordenes ADD COLUMN {col} INTEGER REFERENCES tecnicos(id) ON DELETE SET NULL')
+    if 'personal_ok' not in cols: c.execute('ALTER TABLE ordenes ADD COLUMN personal_ok INTEGER')
+    c.execute("CREATE TABLE IF NOT EXISTS orden_personal(orden_id INTEGER NOT NULL REFERENCES ordenes(id) ON DELETE CASCADE, personal_id INTEGER NOT NULL REFERENCES tecnicos(id) ON DELETE CASCADE, PRIMARY KEY(orden_id, personal_id))")
+    P = 'AND personal_ok IS NULL'   # solo órdenes aún no mapeadas (las guardadas desde el formulario quedan con personal_ok=1)
+    norm = "LOWER(TRIM({}))"
+    for txt, col in (('ordena_nombre', 'ordena_personal_id'), ('audito_nombre', 'audito_personal_id')):   # nombres en texto libre que coinciden con Personal
+        c.execute(f"UPDATE ordenes SET {col}=(SELECT MIN(t.id) FROM tecnicos t WHERE {norm.format('t.nombre')}={norm.format('ordenes.'+txt)}) WHERE {col} IS NULL AND TRIM(COALESCE({txt},''))<>'' {P}")
+    # responsable = líder de la cuadrilla asignada; técnicos = resto de la cuadrilla (lo que ya imprimía el formato)
+    c.execute(f"UPDATE ordenes SET responsable_id=(SELECT MIN(t.id) FROM tecnicos t WHERE t.cuadrilla_id=ordenes.cuadrilla_id AND t.rol='líder') WHERE responsable_id IS NULL AND cuadrilla_id IS NOT NULL {P}")
+    c.execute("INSERT OR IGNORE INTO orden_personal SELECT o.id, t.id FROM ordenes o JOIN tecnicos t ON t.cuadrilla_id=o.cuadrilla_id AND t.rol='técnico' WHERE o.cuadrilla_id IS NOT NULL AND o.personal_ok IS NULL")
+    for oid, extra in c.execute("SELECT id, personas_adicionales FROM ordenes WHERE TRIM(COALESCE(personas_adicionales,''))<>'' AND personal_ok IS NULL").fetchall():   # personas adicionales que coinciden
+        resto = []
+        for n in [x.strip() for x in extra.replace(';', ',').split(',') if x.strip()]:
+            t = c.execute('SELECT id FROM tecnicos WHERE LOWER(TRIM(nombre))=LOWER(?)', (n,)).fetchone()
+            if t: c.execute('INSERT OR IGNORE INTO orden_personal VALUES(?,?)', (oid, t[0]))
+            else: resto.append(n)
+        c.execute('UPDATE ordenes SET personas_adicionales=? WHERE id=?', (', '.join(resto) or None, oid))
+    c.execute('UPDATE ordenes SET personal_ok=1 WHERE personal_ok IS NULL')
+
+def personal_orden(o):
+    """Responsable + técnicos de la orden (Personal); si la orden no tiene, los integrantes de su cuadrilla."""
+    resp = q('SELECT *, \'líder\' rol_orden FROM tecnicos WHERE id=?', (o['responsable_id'],), one=True) if o['responsable_id'] else None
+    tecs = q('SELECT t.*, \'técnico\' rol_orden FROM orden_personal op JOIN tecnicos t ON t.id=op.personal_id WHERE op.orden_id=? AND t.id IS NOT ? ORDER BY t.nombre', (o['id'], o['responsable_id']))
+    if resp or tecs: return [dict(r, rol=r['rol_orden']) for r in ([resp] if resp else []) + list(tecs)]
+    return [dict(r) for r in q("SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY CASE rol WHEN 'líder' THEN 0 ELSE 1 END", (o['cuadrilla_id'],))] if o['cuadrilla_id'] else []
 
 def plantilla_de(o):
     k = PM.ligada_a(o['tipo_orden'])  # plantilla ligada explícitamente a este tipo de orden (Configuración › Reporte de evidencias)
@@ -215,12 +246,12 @@ def ordenes():
     where = ' AND '.join(w)
     total = q(f'SELECT COUNT(*) n FROM ordenes o WHERE {where}', a, one=True)['n']
     per = 20; pages = max(1, math.ceil(total/per)); page = min(max(1, int(request.args.get('page', 1) or 1)), pages)
-    rows = q(f'SELECT o.*, c.nombre cuad, {VENCIDA} vencida, cl.estatus cli_estatus, (SELECT GROUP_CONCAT(st.codigo, \', \') FROM orden_sitios os JOIN sitios st ON st.id=os.site_id WHERE os.orden_id=o.id) sites_txt FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id LEFT JOIN clientes cl ON cl.id=o.cliente_id WHERE {where} ORDER BY o.fecha_programada DESC, o.id DESC LIMIT ? OFFSET ?', a+[per, (page-1)*per])
+    rows = q(f'SELECT o.*, c.nombre cuad, {VENCIDA} vencida, cl.estatus cli_estatus, (SELECT nombre||COALESCE(\' — \'||puesto,\'\') FROM tecnicos WHERE id=o.responsable_id) resp_txt, (SELECT COUNT(*) FROM orden_personal op WHERE op.orden_id=o.id AND op.personal_id IS NOT o.responsable_id) n_tecs, (SELECT GROUP_CONCAT(st.codigo, \', \') FROM orden_sitios os JOIN sitios st ON st.id=os.site_id WHERE os.orden_id=o.id) sites_txt FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id LEFT JOIN clientes cl ON cl.id=o.cliente_id WHERE {where} ORDER BY o.fecha_programada DESC, o.id DESC LIMIT ? OFFSET ?', a+[per, (page-1)*per])
     clientes = [r['cliente'] for r in q('SELECT DISTINCT cliente FROM ordenes WHERE cliente IS NOT NULL ORDER BY cliente')]
     qs = {k: v for k, v in f.items() if v}
     return render_template('ordenes.html', rows=rows, f=f, total=total, page=page, pages=pages, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), clientes=clientes, qs=qs)
 
-CAMPOS = ['clase','red','trabajo','clasif_otro','categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
+CAMPOS = ['clase','red','trabajo','clasif_otro','ordena_personal_id','responsable_id','audito_personal_id','categoria','tipo_grupo','tipo_orden','prioridad','estado','fecha_emision','fecha_programada','fecha_inicio','fecha_cierre','ordena_nombre','ordena_puesto',
  'cliente','cliente_id','tipo_cliente','calle','ciudad','estado_geo','contacto','telefono','coordenadas','coordenadas_b','sitio','site_id','descripcion','cuadrilla_id','ejecuto_puesto',
  'personas_adicionales','observaciones','notas','folio_evidencias','audito_nombre','audito_puesto','fecha_auditoria','aprobacion','obs_auditoria']
 
@@ -235,11 +266,13 @@ def siguiente_folio(cat):
 def orden_form(oid=None):
     o = q('SELECT * FROM ordenes WHERE id=?', (oid,), one=True) if oid else None
     if oid and not o: abort(404)
+    tec_sel = [r['personal_id'] for r in q('SELECT personal_id FROM orden_personal WHERE orden_id=?', (oid,))] if oid else []
     err = None; sel_sites = [r['site_id'] for r in q('SELECT site_id FROM orden_sitios WHERE orden_id=?', (oid,))] if oid else []
     if request.method == 'POST':
         d = {k: (request.form.get(k) or '').strip() or None for k in CAMPOS}
         sel_sites = [int(x) for x in request.form.getlist('sites') if x.isdigit() and q('SELECT 1 FROM sitios WHERE id=?', (int(x),), one=True)]
-        err = validar_orden(d, sel_sites, o)
+        sel_tecs = [int(x) for x in request.form.getlist('tecnicos') if x.isdigit()]
+        err = validar_orden(d, sel_sites, o) or validar_personal(d, sel_tecs)
         if not err:
             folio = (request.form.get('folio') or '').strip() or (o['folio'] if o else siguiente_folio(d['categoria']))
             if q('SELECT 1 FROM ordenes WHERE folio=? AND id IS NOT ?', (folio, oid), one=True): err = f'El folio {folio} ya existe'
@@ -255,13 +288,32 @@ def orden_form(oid=None):
                 log(oid, 'Orden creada · ' + etiqueta(d))
             db().execute('DELETE FROM orden_sitios WHERE orden_id=?', (oid,))
             for sid in sel_sites: db().execute('INSERT OR IGNORE INTO orden_sitios(orden_id, site_id) VALUES(?,?)', (oid, sid))
+            db().execute('DELETE FROM orden_personal WHERE orden_id=?', (oid,)); db().execute('UPDATE ordenes SET personal_ok=1 WHERE id=?', (oid,))
+            for pid in sel_tecs: db().execute('INSERT OR IGNORE INTO orden_personal(orden_id, personal_id) VALUES(?,?)', (oid, pid))
             db().commit(); return redirect(url_for('orden_ver', oid=oid))
         v = dict(o or {}); v.update(d); v['folio'] = request.form.get('folio') or (o['folio'] if o else '')
-        for k in ('cliente_id', 'site_id', 'cuadrilla_id'): v[k] = int(v[k]) if v.get(k) and str(v[k]).isdigit() else None
+        tec_sel = sel_tecs
+        for k in ('cliente_id', 'site_id', 'cuadrilla_id', 'ordena_personal_id', 'responsable_id', 'audito_personal_id'): v[k] = int(v[k]) if v.get(k) and str(v[k]).isdigit() else None
     else: v = dict(o) if o else {'clase': request.args.get('clase') or 'cliente', 'red': request.args.get('red'), 'trabajo': request.args.get('trabajo')}
     plant_map = {t: plantilla_de({'tipo_orden': t, 'clase': 'cliente', 'red': None, 'trabajo': None, 'categoria': 'INST'}) for t in INSTALACIONES}
-    return render_template('orden_form.html', o=o, v=v, err=err, plant_map=plant_map, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
+    ids = set(tec_sel) | {v.get(k) for k in ('ordena_personal_id', 'responsable_id', 'audito_personal_id') if v.get(k)}
+    personal = q(f"SELECT t.id, t.nombre, t.puesto, t.rol, t.cuadrilla_id, t.activo, c.nombre cuad FROM tecnicos t LEFT JOIN cuadrillas c ON c.id=t.cuadrilla_id WHERE COALESCE(t.activo,1)=1 OR t.id IN ({','.join('?'*len(ids)) or 'NULL'}) ORDER BY t.nombre", list(ids))
+    return render_template('orden_form.html', o=o, v=v, err=err, plant_map=plant_map, personal=personal, tec_sel=tec_sel, sel_sites=sel_sites, cuadrillas=q('SELECT * FROM cuadrillas ORDER BY id'), sitios=q('SELECT id, codigo, nombre, tipo, municipio, estado FROM sitios WHERE activo=1 OR id IN (SELECT site_id FROM orden_sitios WHERE orden_id=?) OR id=? ORDER BY codigo', (oid, (o['site_id'] if o else None))),
         clientes_cat=q("SELECT *, COALESCE(estatus,'Cliente') estatus FROM clientes WHERE activo=1 OR id=? ORDER BY estatus='Prospecto', nombre", ((o['cliente_id'] if o else None),)), ESTADOS_MX=CM.ESTADOS_MX)
+
+def validar_personal(d, sel_tecs):
+    """Personal elegido: debe existir (activo, salvo que ya estuviera en la orden); copia nombre/puesto a los campos del formato."""
+    for k in ('ordena_personal_id', 'responsable_id', 'audito_personal_id'):
+        if d[k] and not str(d[k]).isdigit(): d[k] = None
+    todos = [int(d[k]) for k in ('ordena_personal_id', 'responsable_id', 'audito_personal_id') if d[k]] + sel_tecs
+    if todos:
+        ok = {r['id']: r for r in q(f"SELECT id, nombre, puesto FROM tecnicos WHERE id IN ({','.join('?'*len(todos))})", todos)}
+        if any(i not in ok for i in todos): return 'Persona no encontrada en Configuración › Personal'
+        if d['ordena_personal_id']: p = ok[int(d['ordena_personal_id'])]; d['ordena_nombre'], d['ordena_puesto'] = p['nombre'], p['puesto'] or d['ordena_puesto']
+        if d['audito_personal_id']: p = ok[int(d['audito_personal_id'])]; d['audito_nombre'], d['audito_puesto'] = p['nombre'], p['puesto'] or d['audito_puesto']
+        if d['responsable_id'] and not d['ejecuto_puesto'] and ok[int(d['responsable_id'])]['puesto'] in PUESTOS_EJEC: d['ejecuto_puesto'] = ok[int(d['responsable_id'])]['puesto']
+    if d['responsable_id'] and int(d['responsable_id']) in sel_tecs: sel_tecs.remove(int(d['responsable_id']))
+    return None
 
 def etiqueta(o):
     if o['clase'] == 'infra': return f"Infraestructura propia › {REDES.get(o['red'], '?')} › {o['trabajo']}"
@@ -330,7 +382,7 @@ def orden_ver(oid):
     fotos = {r['item']: r for r in q('SELECT * FROM orden_fotos WHERE orden_id=?', (oid,))}
     return render_template('orden_ver.html', o=o, sites=q('SELECT s.id, s.codigo, s.nombre, s.tipo FROM orden_sitios os JOIN sitios s ON s.id=os.site_id WHERE os.orden_id=? ORDER BY s.codigo', (oid,)), plantilla=p, pl=pl, fotos=fotos,
         mats=q('SELECT m.*, a.nombre alm FROM orden_materiales m LEFT JOIN almacenes a ON a.id=m.almacen_id WHERE m.orden_id=? ORDER BY m.id', (oid,)), bit=q('SELECT * FROM bitacora WHERE orden_id=? ORDER BY id DESC', (oid,)),
-        equipo=q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (o['cuadrilla_id'],)))
+        equipo=personal_orden(o))
 
 @app.route('/ordenes/<int:oid>/eliminar', methods=['POST'])
 def orden_eliminar(oid):
@@ -440,7 +492,7 @@ def uploads(n): return send_from_directory(UP, n)
 def imprimir(oid, fmt):
     o = q('SELECT o.*, c.nombre cuad FROM ordenes o LEFT JOIN cuadrillas c ON c.id=o.cuadrilla_id WHERE o.id=?', (oid,), one=True) or abort(404)
     p = plantilla_de(o); pl = PLANT.get(p) if p else None
-    equipo = q('SELECT * FROM tecnicos WHERE cuadrilla_id=? ORDER BY rol', (o['cuadrilla_id'],))
+    equipo = personal_orden(o)
     mats = q('SELECT * FROM orden_materiales WHERE orden_id=? ORDER BY id', (oid,))
     fotos = {r['item']: r for r in q('SELECT * FROM orden_fotos WHERE orden_id=?', (oid,))}
     if fmt != 'orden' and not pl:   # sin plantilla: mismas fotos libres que la pantalla de evidencias

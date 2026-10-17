@@ -11,7 +11,7 @@
 .badge-p{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:700;background:#fff4e5;color:#b45309;border:1px solid #f5d0a0}
 #dlgP{border:0;border-radius:20px;padding:0;width:min(560px,96vw);max-height:92vh}#dlgP::backdrop{background:rgba(0,0,0,.35)}#dlgP .in{padding:18px}
 </style>
-{% set v = v or {} %}
+{% set v = v or {} %}{% macro psel(name, sel, ph) %}<select name="{{name}}" class="psel"><option value="">{{ph}}</option>{% for t in personal %}<option value="{{t.id}}" data-puesto="{{t.puesto or ''}}" data-nombre="{{t.nombre}}" {{'selected' if sel==t.id}}>{{t.nombre}} — {{t.puesto or 'sin puesto'}}{{' (inactivo)' if t.activo==0}}</option>{% endfor %}</select>{% endmacro %}
 {% if err %}<div class="ej" style="background:#fdecec;border-color:#f3c4c4;color:#c62828">⚠ {{err}}</div>{% endif %}
 <form class="f" method="post" id="forden" data-cpmx data-estado="estado_geo" data-municipio="ciudad">
 <input type="hidden" name="categoria" value="{{v.categoria or ''}}"><input type="hidden" name="tipo_grupo" value="{{v.tipo_grupo or ''}}">
@@ -37,8 +37,9 @@
 <label><span id="lblFP">Fecha en que se debe ejecutar</span><input type="date" name="fecha_programada" value="{{v.fecha_programada or ''}}" required></label>
 </div></fieldset>
 <fieldset><legend>Persona que ordena</legend><div class="grid g2">
-<label>Nombre<input name="ordena_nombre" value="{{v.ordena_nombre or ''}}"></label>
-<label>Puesto<select name="ordena_puesto"><option></option>{% for p in PUESTOS_ORDENA %}<option {{'selected' if v.ordena_puesto==p}}>{{p}}</option>{% endfor %}</select></label></div></fieldset>
+<label style="grid-column:1/-1">Persona (Configuración › Personal){{ psel('ordena_personal_id', v.ordena_personal_id, '— Selecciona persona —') }}</label>
+{% if v.ordena_nombre and not v.ordena_personal_id %}<div class="muted" style="grid-column:1/-1;font-size:12px">Valor anterior (texto libre): <b>{{v.ordena_nombre}}</b>{% if v.ordena_puesto %} — {{v.ordena_puesto}}{% endif %}. Elige a la persona para actualizarla.</div>{% endif %}
+<input type="hidden" name="ordena_nombre" value="{{v.ordena_nombre or ''}}"><input type="hidden" name="ordena_puesto" value="{{v.ordena_puesto or ''}}"></div></fieldset>
 
 <fieldset id="blkCli"><legend id="lgCli">Cliente</legend><div class="grid g2">
 <div style="grid-column:1/-1"><label><span id="lblCli">Cliente</span> <span class="muted">(buscar en catálogo)</span>
@@ -66,17 +67,22 @@
 <label id="wGB">Coordenadas GPS punto B<input name="coordenadas_b" value="{{v.coordenadas_b or ''}}"></label></div>
 <label><span id="lblDesc">Descripción y lugar de la orden</span><textarea name="descripcion" rows="3">{{v.descripcion or ''}}</textarea></label></fieldset>
 <fieldset><legend>Ejecución</legend><div class="grid g2">
-<label>Cuadrilla asignada<select name="cuadrilla_id"><option value="">— Sin asignar —</option>{% for c in cuadrillas %}<option value="{{c.id}}" {{'selected' if v.cuadrilla_id==c.id}}>{{c.nombre}} ({{c.especialidad}})</option>{% endfor %}</select></label>
+<label>Cuadrilla asignada<select name="cuadrilla_id" id="cuad"><option value="">— Sin asignar —</option>{% for c in cuadrillas %}<option value="{{c.id}}" {{'selected' if v.cuadrilla_id==c.id}}>{{c.nombre}} ({{c.especialidad}})</option>{% endfor %}</select></label>
+<label>Responsable / persona que ejecuta{{ psel('responsable_id', v.responsable_id, '— Selecciona responsable —') }}</label>
+<div style="grid-column:1/-1"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px;color:var(--tx2);font-weight:500;margin-bottom:4px"><span>Técnicos asignados <span class="muted">(<span id="nTec">0</span>)</span></span><button type="button" class="btn sec" id="btnCuad" style="padding:5px 10px;font-size:12px">↻ Cargar integrantes de la cuadrilla</button></div>
+<input id="tec_q" placeholder="Filtrar por nombre o puesto…" autocomplete="off" oninput="filtTec()">
+<div class="sitelist" id="teclist" style="margin-top:6px">{% for t in personal %}<label data-t="{{(t.nombre~' '~(t.puesto or '')~' '~(t.cuad or ''))|lower}}" data-cuad="{{t.cuadrilla_id or ''}}" data-rol="{{t.rol or ''}}"><input type="checkbox" name="tecnicos" value="{{t.id}}" {{'checked' if t.id in tec_sel}}><div><b>{{t.nombre}}</b> — {{t.puesto or 'sin puesto'}}<br><small>{{ (t.cuad ~ ' · ' ~ t.rol) if t.cuad else 'Sin cuadrilla' }}{{' · inactivo' if t.activo==0}}</small></div></label>{% else %}<div class="muted" style="padding:10px">No hay personal activo. Agrégalo en Configuración › Personal.</div>{% endfor %}</div></div>
 <label>Puesto de quien ejecutó<select name="ejecuto_puesto"><option></option>{% for p in PUESTOS_EJEC %}<option {{'selected' if v.ejecuto_puesto==p}}>{{p}}</option>{% endfor %}</select></label>
-<label>Personas adicionales involucradas<input name="personas_adicionales" value="{{v.personas_adicionales or ''}}"></label>
+<label>Personas adicionales <span class="muted">(externos, texto libre)</span><input name="personas_adicionales" value="{{v.personas_adicionales or ''}}"></label>
 <label>No. folio reporte de evidencias<input name="folio_evidencias" value="{{v.folio_evidencias or ''}}"></label>
 <label>Inicio de ejecución<input type="datetime-local" name="fecha_inicio" value="{{v.fecha_inicio or ''}}"></label>
 <label>Fin de ejecución (cierre)<input type="datetime-local" name="fecha_cierre" value="{{v.fecha_cierre or ''}}"></label></div>
 <label>Observaciones<textarea name="observaciones" rows="2">{{v.observaciones or ''}}</textarea></label>
 <label>Notas de campo<textarea name="notas" rows="3">{{v.notas or ''}}</textarea></label></fieldset>
 <fieldset><legend>Auditoría de la ejecución</legend><div class="grid g2">
-<label>Persona que auditó<input name="audito_nombre" value="{{v.audito_nombre or ''}}"></label>
-<label>Puesto<select name="audito_puesto"><option></option>{% for p in PUESTOS_AUD %}<option {{'selected' if v.audito_puesto==p}}>{{p}}</option>{% endfor %}</select></label>
+<label style="grid-column:1/-1">Persona que auditó{{ psel('audito_personal_id', v.audito_personal_id, '— Selecciona persona —') }}</label>
+{% if v.audito_nombre and not v.audito_personal_id %}<div class="muted" style="grid-column:1/-1;font-size:12px">Valor anterior (texto libre): <b>{{v.audito_nombre}}</b>{% if v.audito_puesto %} — {{v.audito_puesto}}{% endif %}</div>{% endif %}
+<input type="hidden" name="audito_nombre" value="{{v.audito_nombre or ''}}"><input type="hidden" name="audito_puesto" value="{{v.audito_puesto or ''}}">
 <label>Fecha de auditoría<input type="date" name="fecha_auditoria" value="{{v.fecha_auditoria or ''}}"></label>
 <label>Aprobación<select name="aprobacion"><option value="">— Pendiente —</option><option {{'selected' if v.aprobacion=='POSITIVA'}}>POSITIVA</option><option {{'selected' if v.aprobacion=='NEGATIVA'}}>NEGATIVA</option></select></label></div>
 <label>Observaciones de auditoría<textarea name="obs_auditoria" rows="2">{{v.obs_auditoria or ''}}</textarea></label></fieldset>
@@ -157,5 +163,18 @@ async function guardarP(){const b={};['nombre','contacto','telefono','email','ca
   $('#ogP').appendChild(o);$('#cli').value=j.id;cliSel();$('#cliMsg').textContent='✓ Prospecto «'+j.nombre+'» creado y seleccionado';dlgP.close();
   dlgP.querySelectorAll('input').forEach(i=>i.value='');}
  catch(x){er.textContent='⚠ Error de red';er.style.display='';}finally{$('#pSave').disabled=false;}}
-pintaTr();upd();filtSites();
+// ---- personal ----
+const cuad=$('#cuad'),resp=F.querySelector('[name=responsable_id]');
+function filtTec(){const q=$('#tec_q').value.toLowerCase();$$('#teclist label').forEach(l=>{const c=l.querySelector('input').checked;l.style.display=(!q||l.dataset.t.includes(q)||c)?'':'none';});}
+function arribaTec(){const L=$('#teclist');$$('#teclist label').filter(l=>l.querySelector('input').checked).reverse().forEach(l=>L.prepend(l));L.scrollTop=0;}
+function cntTec(){$('#nTec').textContent=$$('[name=tecnicos]:checked').length;
+ $$('#teclist label').forEach(l=>{const i=l.querySelector('input'),es=resp.value&&i.value===resp.value;i.disabled=es;if(es)i.checked=false;l.style.opacity=es?.45:1;});}
+function cargarCuad(forzar){const c=cuad.value;if(!c)return;const ls=$$('#teclist label').filter(l=>l.dataset.cuad===c);
+ if(!forzar&&($$('[name=tecnicos]:checked').length||resp.value))return;
+ const li=ls.find(l=>l.dataset.rol==='líder');if(li&&(!resp.value||forzar))resp.value=li.querySelector('input').value;
+ ls.forEach(l=>{const i=l.querySelector('input');if(i.value!==resp.value)i.checked=true;});resp.dispatchEvent(new Event('change'));cntTec();arribaTec();}
+cuad.addEventListener('change',()=>cargarCuad(false));$('#btnCuad').onclick=()=>{if(!cuad.value)return alert('Primero elige la cuadrilla');cargarCuad(true);};
+resp.addEventListener('change',()=>{const o=resp.selectedOptions[0],ep=F.querySelector('[name=ejecuto_puesto]');if(o&&o.value&&!ep.value&&[...ep.options].some(x=>x.text===o.dataset.puesto))ep.value=o.dataset.puesto;cntTec();});
+$$('[name=tecnicos]').forEach(x=>x.onchange=cntTec);
+pintaTr();upd();filtSites();cntTec();arribaTec();
 </script><script src="/static/cp.js?v=1" defer></script>{% endblock %}

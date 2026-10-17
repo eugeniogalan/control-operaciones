@@ -532,7 +532,7 @@ def registrar(app, q, db):
         cols=[('nombre','Nombre'),('puesto','Puesto'),('telefono','Teléfono'),('email','Email'),('especialidad','Especialidad'),('cuadrilla','Cuadrilla'),('rol','Rol')],
         campos=[('nombre','Nombre','text',True),('puesto','Puesto','select',PUESTOS),('telefono','Teléfono','tel'),('email','Email','email'),('especialidad','Especialidad','select',ESPEC),
                 ('cuadrilla_id','Cuadrilla','fk',CUAD),('rol','Rol en la cuadrilla','select',['líder','técnico'])],
-        hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)),
+        hist=lambda i: existe('SELECT 1 FROM herramientas WHERE personal_id=?', (i,)) or existe("SELECT 1 FROM tecnicos t JOIN ordenes o ON o.cuadrilla_id=t.cuadrilla_id WHERE t.id=?", (i,)) or existe('SELECT 1 FROM orden_personal WHERE personal_id=?', (i,)) or existe('SELECT 1 FROM ordenes WHERE ? IN (ordena_personal_id, responsable_id, audito_personal_id)', (i,)),
         valid=pers_valid),
      'vehiculos': dict(titulo='Vehículos', icono='🚚', tabla='vehiculos', act='activo', orden='numero', desc='Vehículos 01–18 (cada uno es un almacén móvil); varios por cuadrilla.',
         buscar=['numero','placas','marca','modelo'],
